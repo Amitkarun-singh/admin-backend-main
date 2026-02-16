@@ -1,0 +1,103 @@
+import dotenv from "dotenv";
+dotenv.config();
+import { parseMCQs } from "../../util/parceMCQ.js";
+import { parseQnA } from "../../util/parceQnA.js";
+import { getPYQ } from "../../modal/questions.modal.js";
+import { GoogleGenAI } from "@google/genai";
+
+import OpenAI from "openai";
+
+// const openai = new OpenAI({
+//   baseURL: "https://openrouter.ai/api/v1",
+//   apiKey: process.env.apiKey,
+// });
+
+const ai = new GoogleGenAI({ apiKey: process.env.apiKey });
+
+const generatePracticeQuestions = async (
+  class_,
+  language,
+  subject,
+  chapter,
+  questionType,
+  count,
+) => {
+  if (questionType === "PYQ") {
+    return await PYQ(class_, language, subject, chapter);
+  }
+
+  if (questionType === "PQ") {
+    return await PQ(class_, language, subject, chapter);
+  }
+
+  return await dynamicQnA(
+    class_,
+    language,
+    subject,
+    chapter,
+    questionType,
+    count,
+  );
+};
+
+const dynamicQnA = async (
+  class_,
+  language,
+  subject,
+  chapter,
+  questionType,
+  count,
+) => {
+  console.log(questionType, count);
+  try {
+    const prompt = `
+      You are an expert educator. Generate **${count} ${questionType} question${count > 1 ? "s" : ""}**
+      for students studying in ${class_}, subject ${subject}, chapter "${chapter}".
+      Response should be in ${language}.
+
+      Instructions:
+      - If ${questionType} is MCQ, provide ${count} multiple choice questions with 4 options each and indicate the correct answer.
+      - If ${questionType} is Short Answer, provide ${count} questions that can be answered in 2-3 lines.
+      - If ${questionType} is Long Answer, provide ${count} questions that require detailed answers.
+
+      Provide the questions clearly, numbered, and in an easy-to-read format.
+    `;
+
+    // const completion = await openai.chat.completions.create({
+    //   model: "tngtech/deepseek-r1t-chimera:free",
+    //   messages: [{ role: "user", content: prompt }],
+
+    //   max_tokens: 1500,
+    // });
+
+    // const content = completion.choices[0].message.content;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-lite",
+      contents: prompt,
+    });
+
+    const content = response.text;
+    console.log(content);
+
+    if (questionType === "MCQ") {
+      return parseMCQs(content);
+    }
+    return parseQnA(content);
+  } catch (error) {
+    console.error(`Error generating ${questionType} questions:`, error);
+    return `Failed to generate ${questionType} questions. Please try again.`;
+  }
+};
+
+const PYQ = async (class_, language, subject, chapter) => {
+  const questions = await getPYQ([class_, language, subject, chapter]);
+  return questions;
+};
+
+const PQ = async (class_, language, subject, chapter) => {
+  const questions = await getPYQ([class_, language, subject, chapter]);
+  return questions;
+};
+
+export { generatePracticeQuestions };
