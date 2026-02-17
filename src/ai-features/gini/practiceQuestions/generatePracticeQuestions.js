@@ -12,7 +12,7 @@ import OpenAI from "openai";
 //   apiKey: process.env.apiKey,
 // });
 
-const ai = new GoogleGenAI({ apiKey: process.env.apiKey });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 const generatePracticeQuestions = async (
   class_,

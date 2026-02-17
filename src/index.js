@@ -19,8 +19,8 @@ import parentRoutes from "./routes/parent.routes.js";
 import giniRouter from "./ai-features/gini/giniRouter.js";
 import performanceRouter from "./ai-features/studentPerformance/studentPerformanceRouter.js";
 import previousPapersRouter from "./ai-features/previousPapers/previousPapersRouter.js";
-import summarizeRoute from "./routes/summarize.route.js";
-import ainoteRoute from "./routes/ainote.route.js";
+import summarizeRoute from "./routes/summarize.routes.js";
+import ainoteRoutes from "./routes/ainote.routes.js";
 
 const app = express();
 
@@ -44,7 +44,7 @@ app.use(
 /* ---------------- ROUTES ---------------- */
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
-app.use("/api", classRoutes);
+// app.use("/api", classRoutes);
 app.use("/api", classRoutes);
 app.use("/api", sectionRoutes);
 app.use("/api", subjectRoutes);
@@ -55,7 +55,7 @@ app.use("/api/parents", parentRoutes);
 
 // AI Feature Routes
 app.use("/api/summarize", summarizeRoute);
-app.use("/api/ainote", ainoteRoute);
+app.use("/api/ainote", ainoteRoutes);
 
 // Static serving for AI server's papers
 app.use("/api/ai/papers", express.static("papers"));
