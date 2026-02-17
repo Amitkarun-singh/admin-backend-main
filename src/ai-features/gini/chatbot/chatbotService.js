@@ -7,7 +7,7 @@ import Tesseract from "tesseract.js";
 
 const openai = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.apiKey,
+  apiKey: process.env.OPENROUTER_API_KEY,
 });
 
 /**
