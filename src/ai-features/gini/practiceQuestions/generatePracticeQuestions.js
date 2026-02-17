@@ -48,7 +48,18 @@ const dynamicQnA = async (
   questionType,
   count,
 ) => {
-  console.log(questionType, count);
+  // console.log(questionType, count);
+
+  const getQueationPromp = (qt) => {
+    switch (qt) {
+      case qt == "MCQ":
+        return `-  MCQ, provide ${count} multiple choice questions with 4 options each and indicate the correct answer.`;
+      case qt == "SA":
+        return ` -  Short Answer, provide ${count} questions that can be answered in 2-3 lines.`;
+      case qt == "LA":
+        return `-  is Long Answer, provide ${count} questions that require detailed answers.`;
+    }
+  };
   try {
     const prompt = `
       You are an expert educator. Generate **${count} ${questionType} question${count > 1 ? "s" : ""}**
@@ -56,9 +67,8 @@ const dynamicQnA = async (
       Response should be in ${language}.
 
       Instructions:
-      - If ${questionType} is MCQ, provide ${count} multiple choice questions with 4 options each and indicate the correct answer.
-      - If ${questionType} is Short Answer, provide ${count} questions that can be answered in 2-3 lines.
-      - If ${questionType} is Long Answer, provide ${count} questions that require detailed answers.
+       ${getQueationPromp(questionType)}
+      
 
       Provide the questions clearly, numbered, and in an easy-to-read format.
     `;
