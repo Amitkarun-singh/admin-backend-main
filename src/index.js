@@ -19,6 +19,8 @@ import parentRoutes from "./routes/parent.routes.js";
 import giniRouter from "./ai-features/gini/giniRouter.js";
 import performanceRouter from "./ai-features/studentPerformance/studentPerformanceRouter.js";
 import previousPapersRouter from "./ai-features/previousPapers/previousPapersRouter.js";
+import summarizeRoute from "./routes/summarize.route.js";
+import ainoteRoute from "./routes/ainote.route.js";
 
 const app = express();
 
@@ -28,7 +30,11 @@ app.use(express.static("public"));
 app.use(cookieParser());
 app.use(
   cors({
-    origin: "http://localhost:5173", // frontend URL
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:8000",
+      "http://localhost:8080", 
+    ], // frontend URL
     credentials: true, // allow cookies
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -46,6 +52,10 @@ app.use("/api", courseRoutes);
 app.use("/api/teachers", teacherRoutes);
 app.use("/api/students", studentRoutes);
 app.use("/api/parents", parentRoutes);
+
+// AI Feature Routes
+app.use("/api/summarize", summarizeRoute);
+app.use("/api/ainote", ainoteRoute);
 
 // Static serving for AI server's papers
 app.use("/api/ai/papers", express.static("papers"));
