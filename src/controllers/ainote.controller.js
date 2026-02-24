@@ -624,87 +624,129 @@ async function retry(fn, retries = 3) {
 export const generateAiNotes = async (req, res) => {
     try {
         const {
-            language,
-            board,
-            class: className,
-            subject,
-            chapter,
+        language,
+        board,
+        class: className,
+        subjects,
         } = req.body;
 
-        if (!language || !board || !className || !subject || !chapter) {
-            return res.status(400).json({
-                success: false,
-                message:
-                    "language, board, class, subject, and chapter are required",
-            });
+        if (!language || !board || !className || !subjects?.length) {
+        return res.status(400).json({
+            success: false,
+            message:
+            "language, board, class and subjects array are required",
+        });
         }
 
-        const chapters = Array.isArray(chapter) ? chapter : [chapter];
         const results = [];
+
+        for (const sub of subjects) {
+        const subjectName = sub?.name?.trim();
+        let subjectlanguage;
+        if (subjectName === "Hindi"){
+            subjectlanguage = "Hindi";
+        }
+        const chapters = sub?.chapters || [];
+
+        if (!subjectName || !chapters.length) continue;
 
         for (const ch of chapters) {
             const topic = ch.trim();
             if (!topic) continue;
 
-            // single AI call with retry
-            const aiText = await retry(() =>
+            let aiText = null;
+            let attempts = 0;
+            const MAX_ATTEMPTS = 3;
+
+            // 🔁 regenerate if null
+            while (!aiText && attempts < MAX_ATTEMPTS) {
+            try {
+                aiText = await retry(() =>
                 generateNotes({
-                    language,
+                    language: subjectlanguage || language,
                     board,
                     className,
-                    subject,
+                    subject: subjectName,
                     chapter: topic,
                 })
-            );
+                );
+            } catch (err) {
+                console.warn(
+                `Retrying generation for ${subjectName} - ${topic}`
+                );
+            }
+
+            attempts++;
+            if (!aiText) await sleep(3000);
+            }
+
+            if (!aiText) {
+            results.push({
+                subject: subjectName,
+                topic,
+                status: "failed",
+            });
+            continue;
+            }
 
             const parsed = parseNotes(aiText);
 
             // DB logic
             let note = await AiNote.findOne({
-                where: {
-                    language,
-                    board,
-                    class: className,
-                    subject,
-                    topic,
-                },
+            where: {
+                language,
+                board,
+                class: className,
+                subject: subjectName,
+                topic,
+            },
             });
 
             if (!note) {
-                note = await AiNote.create({
-                    language,
-                    board,
-                    class: className,
-                    subject,
-                    topic,
-                    short_notes: parsed.short_notes,
-                    full_notes: parsed.full_notes,
-                    generated_by: "AI",
-                });
+            await AiNote.create({
+                language,
+                board,
+                class: className,
+                subject: subjectName,
+                topic,
+                short_notes: parsed.short_notes,
+                full_notes: parsed.full_notes,
+                generated_by: "AI",
+            });
 
-                results.push({ topic, status: "created" });
+            results.push({
+                subject: subjectName,
+                topic,
+                status: "created",
+            });
             } else {
-                note.short_notes = parsed.short_notes;
-                note.full_notes = parsed.full_notes;
-                await note.save();
+            note.short_notes = parsed.short_notes;
+            note.full_notes = parsed.full_notes;
+            await note.save();
 
-                results.push({ topic, status: "updated" });
+            results.push({
+                subject: subjectName,
+                topic,
+                status: "updated",
+            });
             }
 
-            // delay between chapters (free-tier safe)
+            // 💤 rate limit safe
             await sleep(2000);
+        }
         }
 
         res.status(200).json({
-            success: true,
-            message: "Notes generated successfully",
-            results,
+        success: true,
+        message: "Notes generated successfully",
+        results,
         });
     } catch (error) {
         console.error("Generate AI Notes Error:", error);
         res.status(500).json({
-            success: false,
-            message: "Failed to generate AI notes",
+        success: false,
+        message: "Failed to generate AI notes",
         });
     }
 };
+
