@@ -7,7 +7,7 @@ import Tesseract from "tesseract.js";
 
 const openai = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENROUTER_API_KEY,
+  apiKey: process.env.API_KEY,
 });
 
 /**
@@ -73,7 +73,8 @@ Rules:
     ];
 
     const stream = await openai.chat.completions.create({
-      model: "tngtech/deepseek-r1t-chimera:free",
+      // model: "tngtech/deepseek-r1t-chimera:free",
+      model: "liquid/lfm-2.5-1.2b-thinking:free",
       messages: finalMessages,
       stream: true,
       max_tokens: 1200,
