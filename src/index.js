@@ -31,14 +31,8 @@ app.use(express.static("public"));
 app.use(cookieParser());
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "http://localhost:8000",
-      "http://localhost:8080",
-    ], // frontend URL
-    credentials: true, // allow cookies
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    origin: true,
+    credentials: true,
   }),
 );
 
