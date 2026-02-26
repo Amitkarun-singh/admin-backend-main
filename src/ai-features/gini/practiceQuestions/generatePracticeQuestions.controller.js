@@ -1,4 +1,5 @@
 import { generatePracticeQuestions } from "./generatePracticeQuestions.js";
+import OpenAI from "openai";
 
 export const generatePracticeQuestionsController = async (req, res) => {
   try {
@@ -13,19 +14,6 @@ export const generatePracticeQuestionsController = async (req, res) => {
     }
 
     const allQuestions = {};
-
-    // // Loop through each requested question type
-    // for (const type of questionType) {
-    //   const count = questionsCount[type.toLowerCase()] || 1; // default to 1 if not specified
-    //   allQuestions[type] = await generatePracticeQuestions(
-    //     class_,
-    //     language,
-    //     subject,
-    //     chapter,
-    //     type,
-    //     count,
-    //   );
-    // }
 
     await Promise.all(
       questionType.map(async (type) => {
@@ -48,6 +36,8 @@ export const generatePracticeQuestionsController = async (req, res) => {
       questions: allQuestions,
       message: "AI-generated practice questions successfully created.",
     });
+
+    // res.status(200).json({ msg: "rate limiter testing " });
   } catch (error) {
     console.error("Error in /generate-practice-questions endpoint:", error);
     res.status(500).json({

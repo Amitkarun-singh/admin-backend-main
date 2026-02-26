@@ -3,7 +3,7 @@ import { fetchPaper } from "./previousPapers.controller.js";
 import path from "path";
 
 const router = express.Router();
-router.use("/papers", express.static("papers"));
+router.use("/predict", express.static("predict"));
 
 router.get("/papers", fetchPaper); // get specific paper
 

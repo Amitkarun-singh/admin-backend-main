@@ -19,8 +19,9 @@ import parentRoutes from "./routes/parent.routes.js";
 import giniRouter from "./ai-features/gini/giniRouter.js";
 import performanceRouter from "./ai-features/studentPerformance/studentPerformanceRouter.js";
 import previousPapersRouter from "./ai-features/previousPapers/previousPapersRouter.js";
-import summarizeRoute from "./routes/summarize.routes.js";
-import ainoteRoutes from "./routes/ainote.routes.js";
+import predictPapersRouter from "./ai-features/predictPapers/previousPapersRouter.js";
+import summarizeRoute from "./routes/summarize.route.js";
+import ainoteRoute from "./routes/ainote.route.js";
 
 const app = express();
 
@@ -33,7 +34,7 @@ app.use(
     origin: [
       "http://localhost:5173",
       "http://localhost:8000",
-      "http://localhost:8080", 
+      "http://localhost:8080",
     ], // frontend URL
     credentials: true, // allow cookies
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -64,6 +65,7 @@ app.use("/api/ai/papers", express.static("papers"));
 app.use("/gini", giniRouter);
 app.use("/student", performanceRouter);
 app.use("/pyq", previousPapersRouter);
+app.use("/predict", predictPapersRouter);
 
 /* ---------------- HEALTH CHECK ---------------- */
 app.get("/health", (_, res) => {
@@ -93,8 +95,8 @@ app.use((err, req, res, next) => {
     await sequelize.sync();
     console.log("✅ Tables synced");
 
-    app.listen(process.env.PORT, () => {
-      console.log(`🚀 Server running on port ${process.env.PORT}`);
+    app.listen(process.env.PORT || 3000, () => {
+      console.log(`🚀 Server running on port ${process.env.PORT || 3000}`);
     });
   } catch (error) {
     console.error("❌ DB connection failed:", error);

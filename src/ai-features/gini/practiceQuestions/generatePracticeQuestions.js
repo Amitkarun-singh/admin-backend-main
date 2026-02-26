@@ -3,16 +3,13 @@ dotenv.config();
 import { parseMCQs } from "../../util/parceMCQ.js";
 import { parseQnA } from "../../util/parceQnA.js";
 import { getPYQ } from "../../modal/questions.modal.js";
-import { GoogleGenAI } from "@google/genai";
 
 import OpenAI from "openai";
 
-// const openai = new OpenAI({
-//   baseURL: "https://openrouter.ai/api/v1",
-//   apiKey: process.env.apiKey,
-// });
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const openai = new OpenAI({
+  baseURL: "https://openrouter.ai/api/v1",
+  apiKey: process.env.API_KEY,
+});
 
 const generatePracticeQuestions = async (
   class_,
@@ -73,22 +70,14 @@ const dynamicQnA = async (
       Provide the questions clearly, numbered, and in an easy-to-read format.
     `;
 
-    // const completion = await openai.chat.completions.create({
-    //   model: "tngtech/deepseek-r1t-chimera:free",
-    //   messages: [{ role: "user", content: prompt }],
+    const completion = await openai.chat.completions.create({
+      model: "deepseek/deepseek-r1-0528:free",
+      messages: [{ role: "user", content: prompt }],
 
-    //   max_tokens: 1500,
-    // });
-
-    // const content = completion.choices[0].message.content;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-lite",
-      contents: prompt,
+      max_tokens: 1500,
     });
 
-    const content = response.text;
-    console.log(content);
+    const content = completion.choices[0].message.content;
 
     if (questionType === "MCQ") {
       return parseMCQs(content);
