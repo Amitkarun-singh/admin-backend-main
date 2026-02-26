@@ -81,6 +81,10 @@ app.use((err, req, res, next) => {
 });
 
 /* ---------------- START SERVER + DB ---------------- */
+
+app.listen(process.env.PORT || 3000, () => {
+  console.log(`🚀 Server running on port ${process.env.PORT || 3000}`);
+});
 (async () => {
   try {
     await sequelize.authenticate();
@@ -88,12 +92,7 @@ app.use((err, req, res, next) => {
 
     await sequelize.sync();
     console.log("✅ Tables synced");
-
-    app.listen(process.env.PORT || 3000, () => {
-      console.log(`🚀 Server running on port ${process.env.PORT || 3000}`);
-    });
   } catch (error) {
     console.error("❌ DB connection failed:", error);
-    process.exit(1);
   }
 })();
