@@ -481,7 +481,6 @@ export async function generateNotes({
     subject,
     chapter,
 }) {
-    try {
         const prompt = `
             You are an AI notes generation assistant.
 
@@ -514,31 +513,6 @@ export async function generateNotes({
 
             5. Quick Summary  
             Very short final revision.
-
-            EXAMPLE OUTPUT:
-
-            Class 10 Science – Chapter: Electricity
-
-            1. Introduction  
-            Electricity deals with the flow of electric charge in a conductor.
-
-            2. Key Concepts  
-            - Electric current: Flow of charge  
-            - Potential difference: Work done per unit charge  
-            - Resistance: Opposition to current flow
-
-            3. Important Formulas  
-            - I = Q / t  
-            - V = IR  
-            - P = VI
-
-            4. Important Exam Points  
-            - Ammeter in series  
-            - Voltmeter in parallel  
-            - Household wiring uses parallel circuits
-
-            5. Quick Summary  
-            Electricity involves current, voltage, resistance, and power.
 
             Now generate notes in the same format for:
 
@@ -583,13 +557,9 @@ export async function generateNotes({
             Language: ${language}
             `;
 
-        // const response = await ai.models.generateContent({
-        // model: "gemini-3-pro-preview",
-        // contents: prompt,
-        // });
-
+    try {
         const response = await openai.chat.completions.create({
-            model: "deepseek/deepseek-r1-0528:free",
+            model: "openai/gpt-oss-120b",
             messages: [
                 {
                     role: "system",
@@ -605,14 +575,33 @@ export async function generateNotes({
 
         const text = response?.choices?.[0]?.message?.content;
 
-        // const text = response?.text || response?.choices?.[0]?.message?.content;
+        if (text) {
+            console.log("Generated using OpenAI");
+            return text;
+        }
+        throw new Error("Empty OpenAI response");
+    } catch (openaiError) {
+        console.warn("OpenAI failed, switching to Gemini...");
 
-        if (!text) throw new Error("Empty AI response");
+        // ----------- FALLBACK TO GEMINI -----------
+        try {
+            const response = await gemini.models.generateContent({
+                model: "gemini-2.0-flash",
+                contents: prompt,
+            });
 
-        return text;
-    } catch (error) {
-        console.error("AI Note Generation Error:", error.message);
-        throw error;
+            const text =
+                response?.text ||
+                response?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+            if (!text) throw new Error("Empty Gemini response");
+
+            console.log("Generated using Gemini");
+            return text;
+        } catch (geminiError) {
+            console.error("Both OpenAI and Gemini failed");
+            throw new Error("AI services unavailable");
+        }
     }
 }
 
