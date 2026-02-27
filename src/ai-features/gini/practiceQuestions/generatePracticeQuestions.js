@@ -6,11 +6,16 @@ import { getPYQ } from "../../modal/questions.modal.js";
 
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.API_KEY,
-});
+let openai;
 
+try {
+  open = new OpenAI({
+    baseURL: "https://openrouter.ai/api/v1",
+    apiKey: process.env.API_KEY,
+  });
+} catch {
+  console.log("API_KEY openrouter required");
+}
 const generatePracticeQuestions = async (
   class_,
   language,

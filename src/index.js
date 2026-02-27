@@ -14,6 +14,7 @@ import courseRoutes from "./routes/course.routes.js";
 import teacherRoutes from "./routes/teacher.routes.js";
 import studentRoutes from "./routes/student.routes.js";
 import parentRoutes from "./routes/parent.routes.js";
+import { errorMessage } from "../error.js";
 
 // Imports for AI features
 import giniRouter from "./ai-features/gini/giniRouter.js";
@@ -22,7 +23,8 @@ import previousPapersRouter from "./ai-features/previousPapers/previousPapersRou
 import predictPapersRouter from "./ai-features/predictPapers/previousPapersRouter.js";
 import summarizeRoute from "./routes/summarize.routes.js";
 import ainoteRoute from "./routes/ainote.routes.js";
-
+import dotenv from "dotenv";
+dotenv.config();
 const app = express();
 
 app.use(express.json({ limit: "16kb" }));
@@ -63,7 +65,7 @@ app.use("/predict", predictPapersRouter);
 
 /* ---------------- HEALTH CHECK ---------------- */
 app.get("/health", (_, res) => {
-  res.status(200).json({ status: "OK" });
+  res.status(200).json({ status: "OK", errorMessage });
 });
 
 /* ---------------- GLOBAL ERROR HANDLER ---------------- */
@@ -94,5 +96,6 @@ app.listen(process.env.PORT || 3000, () => {
     console.log("✅ Tables synced");
   } catch (error) {
     console.error("❌ DB connection failed:", error);
+    errorMessage.push({ error, msg: " DB connection failed" });
   }
 })();

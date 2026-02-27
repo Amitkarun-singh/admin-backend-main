@@ -1,6 +1,6 @@
 import { streamChatbotResponse } from "./chatbotService.js";
 import multer from "multer";
-
+import { errorMessage } from "../../../../error.js";
 // Use memory storage for simplicity
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -43,6 +43,7 @@ export const chatbotController = [
       await streamChatbotResponse(messages, res, uploadedFile);
     } catch (error) {
       console.error("Streaming Controller Error:", error);
+      errorMessage.push({ error, msg: "Streaming Controller Error" });
       res.write(`data: ${JSON.stringify({ error: "Streaming failed" })}\n\n`);
       res.write("data: [DONE]\n\n");
       res.end();
