@@ -19,8 +19,9 @@ import parentRoutes from "./routes/parent.routes.js";
 import giniRouter from "./ai-features/gini/giniRouter.js";
 import performanceRouter from "./ai-features/studentPerformance/studentPerformanceRouter.js";
 import previousPapersRouter from "./ai-features/previousPapers/previousPapersRouter.js";
+import predictPapersRouter from "./ai-features/predictPapers/previousPapersRouter.js";
 import summarizeRoute from "./routes/summarize.routes.js";
-import ainoteRoutes from "./routes/ainote.routes.js";
+import ainoteRoute from "./routes/ainote.routes.js";
 
 const app = express();
 
@@ -30,14 +31,8 @@ app.use(express.static("public"));
 app.use(cookieParser());
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "http://localhost:8000",
-      "http://localhost:8080", 
-    ], // frontend URL
-    credentials: true, // allow cookies
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    origin: true,
+    credentials: true,
   }),
 );
 
@@ -55,7 +50,7 @@ app.use("/api/parents", parentRoutes);
 
 // AI Feature Routes
 app.use("/api/summarize", summarizeRoute);
-app.use("/api/ainote", ainoteRoutes);
+app.use("/api/ainote", ainoteRoute);
 
 // Static serving for AI server's papers
 app.use("/api/ai/papers", express.static("papers"));
@@ -64,6 +59,7 @@ app.use("/api/ai/papers", express.static("papers"));
 app.use("/gini", giniRouter);
 app.use("/student", performanceRouter);
 app.use("/pyq", previousPapersRouter);
+app.use("/predict", predictPapersRouter);
 
 /* ---------------- HEALTH CHECK ---------------- */
 app.get("/health", (_, res) => {
@@ -85,6 +81,10 @@ app.use((err, req, res, next) => {
 });
 
 /* ---------------- START SERVER + DB ---------------- */
+
+app.listen(process.env.PORT || 3000, () => {
+  console.log(`🚀 Server running on port ${process.env.PORT || 3000}`);
+});
 (async () => {
   try {
     await sequelize.authenticate();
@@ -92,12 +92,7 @@ app.use((err, req, res, next) => {
 
     await sequelize.sync();
     console.log("✅ Tables synced");
-
-    app.listen(process.env.PORT, () => {
-      console.log(`🚀 Server running on port ${process.env.PORT}`);
-    });
   } catch (error) {
     console.error("❌ DB connection failed:", error);
-    process.exit(1);
   }
 })();
