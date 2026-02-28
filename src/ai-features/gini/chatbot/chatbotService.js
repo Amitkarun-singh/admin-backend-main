@@ -1,15 +1,19 @@
-import dotenv from "dotenv";
-dotenv.config();
-
 import OpenAI from "openai";
 import pdf from "@cedrugs/pdf-parse"; // ESM-friendly PDF parser
 import Tesseract from "tesseract.js";
+import { errorMessage } from "../../../../error.js";
 
-const openai = new OpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENROUTER_API_KEY,
-});
+let openai;
 
+try {
+  openai = new OpenAI({
+    baseURL: "https://openrouter.ai/api/v1",
+    apiKey: process.env.OPENROUTER_API_KEY,
+  });
+} catch (error) {
+  console.log("API_KEY openrouter required");
+  errorMessage.push({ error, msg: "API_KEY openrouter required" });
+}
 /**
  * Extract text from uploaded file (PDF or image)
  */
@@ -34,6 +38,7 @@ const extractFileText = async (file) => {
     }
   } catch (err) {
     console.error("File extraction error:", err);
+    errorMessage.push(err);
     return "";
   }
 };

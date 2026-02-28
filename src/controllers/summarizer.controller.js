@@ -3,9 +3,15 @@ import fs from "fs/promises";
 import "dotenv/config";
 
 // Initialize Gemini client
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-});
+let ai;
+
+try {
+  ai = new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY,
+  });
+} catch {
+  console.log("GEMINI_API_KEY is required");
+}
 
 export async function summarizeFileOrText({ filePath, mimeType, text }) {
   let contents;
