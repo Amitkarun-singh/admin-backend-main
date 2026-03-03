@@ -22,7 +22,6 @@ import AdminRolePermission from "./admin_role_permission.model.js";
 import AdminClass from "./admin_class.model.js";
 import AdminSection from "./admin_section.model.js";
 import AdminCourse from "./admin_course.model.js";
-
 import AdminClassCourseMap from "./admin_class_course_map.model.js";
 
 import AdminClassSubject from "./admin_class_subject.model.js";
@@ -32,57 +31,29 @@ import AdminSubjectMaster from "./admin_subject_master.model.js";
 /* =====================================================
    SCHOOL ↔ USER
    ===================================================== */
-AdminUser.belongsTo(AdminSchool, {
-  foreignKey: "school_id",
-  as: "school"
-});
-
-AdminSchool.hasMany(AdminUser, {
-  foreignKey: "school_id",
-  as: "users"
-});
+AdminUser.belongsTo(AdminSchool, { foreignKey: "school_id", as: "school" });
+AdminSchool.hasMany(AdminUser, { foreignKey: "school_id", as: "users" });
 
 
 /* =====================================================
    USER ↔ STUDENT PROFILE
    ===================================================== */
-AdminUser.hasOne(StudentProfile, {
-  foreignKey: "user_id",
-  as: "student"
-});
-
-StudentProfile.belongsTo(AdminUser, {
-  foreignKey: "user_id",
-  as: "user"
-});
+AdminUser.hasOne(StudentProfile, { foreignKey: "user_id", as: "student" });
+StudentProfile.belongsTo(AdminUser, { foreignKey: "user_id", as: "user" });
 
 
 /* =====================================================
    USER ↔ TEACHER PROFILE
    ===================================================== */
-AdminUser.hasOne(TeacherProfile, {
-  foreignKey: "user_id",
-  as: "teacher"
-});
-
-TeacherProfile.belongsTo(AdminUser, {
-  foreignKey: "user_id",
-  as: "user"
-});
+AdminUser.hasOne(TeacherProfile, { foreignKey: "user_id", as: "teacher" });
+TeacherProfile.belongsTo(AdminUser, { foreignKey: "user_id", as: "user" });
 
 
 /* =====================================================
    USER ↔ PARENT PROFILE
    ===================================================== */
-AdminUser.hasOne(ParentProfile, {
-  foreignKey: "user_id",
-  as: "parent"
-});
-
-ParentProfile.belongsTo(AdminUser, {
-  foreignKey: "user_id",
-  as: "user"
-});
+AdminUser.hasOne(ParentProfile, { foreignKey: "user_id", as: "parent" });
+ParentProfile.belongsTo(AdminUser, { foreignKey: "user_id", as: "user" });
 
 
 /* =====================================================
@@ -213,6 +184,38 @@ AdminCourse.belongsToMany(AdminClass, {
   foreignKey: "course_id",
   otherKey: "class_id",
   as: "classes"
+});
+
+
+/* =====================================================
+   SECTION ↔ COURSE (IMPORTANT – because section_id exists)
+   ===================================================== */
+AdminSection.belongsToMany(AdminCourse, {
+  through: AdminClassCourseMap,
+  foreignKey: "section_id",
+  otherKey: "course_id",
+  as: "courses"
+});
+
+AdminCourse.belongsToMany(AdminSection, {
+  through: AdminClassCourseMap,
+  foreignKey: "course_id",
+  otherKey: "section_id",
+  as: "sections"
+});
+
+
+/* =====================================================
+   CLASS SUBJECT ↔ CLASS
+   ===================================================== */
+AdminClass.hasMany(AdminClassSubject, {
+  foreignKey: "class_id",
+  as: "classSubjects"
+});
+
+AdminClassSubject.belongsTo(AdminClass, {
+  foreignKey: "class_id",
+  as: "class"
 });
 
 

@@ -8,7 +8,7 @@ let openai;
 try {
   openai = new OpenAI({
     baseURL: "https://openrouter.ai/api/v1",
-    apiKey: process.env.API_KEY,
+    apiKey: process.env.OPENROUTER_API_KEY,
   });
 } catch (error) {
   console.log("API_KEY openrouter required");

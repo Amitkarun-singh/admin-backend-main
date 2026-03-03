@@ -707,3 +707,4 @@ export const generateAiNotes = async (req, res) => {
     });
   }
 };
+

@@ -1,19 +1,11 @@
 import { DataTypes } from "sequelize";
 import sequelize from "../config/db.js";
 
-const AdminClassSubject = sequelize.define("AdminClassSubject", {
-  class_subject_id: {
-    type: DataTypes.BIGINT,
+const AdminChapterMaster = sequelize.define("AdminChapterMaster", {
+  chapter_id: {
+    type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true
-  },
-  class_id: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: {
-      model: "admin_classes",
-      key: "class_id"
-    }
   },
   subject_id: {
     type: DataTypes.INTEGER,
@@ -23,21 +15,20 @@ const AdminClassSubject = sequelize.define("AdminClassSubject", {
       key: "subject_id"
     }
   },
-  language: {
+  chapter_name: {
     type: DataTypes.STRING,
     allowNull: false
   },
-  ai_enabled: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false
+  chapter_order: {
+    type: DataTypes.INTEGER
   },
   status: {
     type: DataTypes.ENUM("active","inactive"),
     defaultValue: "active"
   }
 },{
-  tableName: "admin_class_subjects",
+  tableName: "admin_chapters_master",
   timestamps: false
 });
 
-export default AdminClassSubject;
+export default AdminChapterMaster;
