@@ -14,6 +14,7 @@ try {
   console.log("API_KEY openrouter required");
   errorMessage.push({ error, msg: "API_KEY openrouter required" });
 }
+
 /**
  * Extract text from uploaded file (PDF or image)
  */
