@@ -5,6 +5,7 @@ import { parseQnA } from "../../util/parceQnA.js";
 import { getPYQ } from "../../modal/questions.modal.js";
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
+import { errorMessage } from "../../../../error.js";
 
 import OpenAI from "openai";
 
@@ -15,7 +16,7 @@ try {
     apiKey: process.env.OPENAI_API_KEY,
   });
 } catch {
-  console.log("API_KEY OPENAI_API_KEY required");
+  errorMessage.push("API_KEY OPENAI_API_KEY required");
 }
 const mcqSchema = z
   .object({
