@@ -1,4 +1,8 @@
-import { streamChatbotResponse } from "./chatbotService.js";
+import {
+  streamChatbotResponse,
+  feedbackThumbUpService,
+  feedbackThumbDownService,
+} from "./chatbotService.js";
 import multer from "multer";
 import { errorMessage } from "../../../../error.js";
 // Use memory storage for simplicity
@@ -10,6 +14,7 @@ export const chatbotController = [
     try {
       // Messages come as a JSON string in multipart/form-data
       const messagesRaw = req.body.messages;
+      const language = req.body.language;
       if (!messagesRaw) {
         return res.status(400).json({ error: "Messages array required" });
       }
@@ -40,7 +45,7 @@ export const chatbotController = [
       res.setHeader("X-Accel-Buffering", "no"); // disable nginx buffering
       res.flushHeaders();
 
-      await streamChatbotResponse(messages, res, uploadedFile);
+      await streamChatbotResponse(messages, res, uploadedFile, language);
     } catch (error) {
       console.error("Streaming Controller Error:", error);
       errorMessage.push({ error, msg: "Streaming Controller Error" });
@@ -50,3 +55,31 @@ export const chatbotController = [
     }
   },
 ];
+
+export const feedbackThumbUpController = async (req, res) => {
+  // console.log(req.body);
+  try {
+    await feedbackThumbUpService(req.body);
+    res.status(200).json({ isSuccessful: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      isSuccessful: false,
+      statusMessage: "something went wrong",
+      err,
+    });
+  }
+};
+export const feedbackThumbDownController = async (req, res) => {
+  try {
+    await feedbackThumbDownService(req.body);
+    res.status(200).json({ isSuccessful: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      isSuccessful: false,
+      statusMessage: "something went wrong",
+      err,
+    });
+  }
+};

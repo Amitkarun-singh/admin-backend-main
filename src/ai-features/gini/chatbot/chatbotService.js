@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import pdf from "@cedrugs/pdf-parse"; // ESM-friendly PDF parser
 import Tesseract from "tesseract.js";
 import { errorMessage } from "../../../../error.js";
+import { ChatBotFeedbackSave } from "../../modal/chatbot.modal.js";
 
 let openai;
 
@@ -11,7 +12,6 @@ try {
     apiKey: process.env.OPENROUTER_API_KEY,
   });
 } catch (error) {
-  console.log("API_KEY openrouter required");
   errorMessage.push({ error, msg: "API_KEY openrouter required" });
 }
 
@@ -31,7 +31,7 @@ const extractFileText = async (file) => {
       const {
         data: { text },
       } = await Tesseract.recognize(file.buffer, "eng", {
-        logger: (m) => console.log(m), // optional progress logging
+        // logger: (m) => console.log(m), // optional progress logging
       });
       return text;
     } else {
@@ -50,7 +50,12 @@ const extractFileText = async (file) => {
  * @param {*} res - Express response object (SSE)
  * @param {*} file - Optional uploaded file
  */
-export const streamChatbotResponse = async (messages, res, file = null) => {
+export const streamChatbotResponse = async (
+  messages,
+  res,
+  file = null,
+  language,
+) => {
   try {
     // Extract file text if uploaded
     let fileContent = "";
@@ -71,6 +76,7 @@ Rules:
 - Be concise and student-friendly
 - Do NOT include internal reasoning
 - Focus only on the question asked
+- reply only in ${language}
 `;
 
     const finalMessages = [
@@ -104,5 +110,32 @@ Rules:
     console.error("Streaming Service Error:", error);
     res.write("data: [DONE]\n\n");
     res.end();
+  }
+};
+
+export const feedbackThumbUpService = async (feedback) => {
+  try {
+    await ChatBotFeedbackSave([
+      feedback.userMessage,
+      feedback.response,
+      "LIKE",
+    ]);
+
+    return true;
+  } catch (err) {
+    console.error(err);
+    throw err;
+  }
+};
+export const feedbackThumbDownService = async (feedback) => {
+  try {
+    await await ChatBotFeedbackSave([
+      feedback.userMessage,
+      feedback.response,
+      feedback.feedback,
+    ]);
+    return true;
+  } catch (err) {
+    throw err;
   }
 };
