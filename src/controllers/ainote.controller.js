@@ -1,9 +1,11 @@
 import AiNote from "../models/ainote.model.js";
 import { Sequelize } from "sequelize";
+import sequelize from "../config/db.js";
 import { GoogleGenAI } from "@google/genai";
 import { OpenRouter } from "@openrouter/sdk";
 import OpenAI from "openai";
 import { parseNotes } from "../utils/parseNotes.js";
+import { uploadOnHostinger } from "../utils/hostingerStorage.js";
 import "dotenv/config";
 
 // Initialize Gemini client
@@ -190,298 +192,6 @@ export const getAiNotes = async (req, res) => {
   }
 };
 
-// export async function generateNotes({
-//     language,
-//     board,
-//     className,
-//     subject,
-//     chapter,
-//     type,
-//     }) {
-//     try {
-//         let instruction = "";
-
-//         if (type === "short") {
-//         instruction = `
-//             You are an AI notes generation assistant designed to help students revise quickly using short, exam-oriented notes.
-
-//             RULES:
-//             - Generate notes strictly based on the selected subject and chapter.
-//             - Use very simple, student-friendly language.
-//             - Keep explanations short and clear.
-//             - Focus only on important exam points.
-//             - Use bullet points and short sections.
-//             - Avoid long paragraphs and unnecessary details.
-
-//             OUTPUT FORMAT (STRICTLY FOLLOW):
-
-//             Class {class} {subject} – Chapter: {chapter}
-
-//             1. Introduction
-//             2–3 line overview of the chapter.
-
-//             2. Key Concepts
-//             Short explanation of the most important concepts.
-
-//             3. Important Formulas
-//             List only essential formulas.
-
-//             4. Important Exam Points
-//             Bullet list of key facts.
-
-//             5. Quick Summary
-//             Very short final revision.
-
-//             EXAMPLE OUTPUT:
-
-//             Class 10 Science – Chapter: Electricity
-
-//             1. Introduction
-//             Electricity deals with the flow of electric charge in a conductor.
-
-//             2. Key Concepts
-//             - Electric current: Flow of charge
-//             - Potential difference: Work done per unit charge
-//             - Resistance: Opposition to current flow
-
-//             3. Important Formulas
-//             - I = Q / t
-//             - V = IR
-//             - P = VI
-
-//             4. Important Exam Points
-//             - Ammeter in series
-//             - Voltmeter in parallel
-//             - Household wiring uses parallel circuits
-
-//             5. Quick Summary
-//             Electricity involves current, voltage, resistance, and power.
-
-//             Now generate notes in the same format for:`;
-//         } else {
-//         instruction = `
-//             You are an AI notes generation assistant designed to help students study and understand concepts using structured, exam-oriented detailed notes.
-
-//             RULES:
-//             - Generate notes strictly based on the selected subject and chapter.
-//             - Organize content into clear numbered sections.
-//             - Explain concepts in simple, student-friendly language.
-//             - Highlight key definitions, formulas, rules, and important points.
-//             - Use bullet points, numbered lists, and short paragraphs.
-//             - Focus more on important exam topics.
-//             - Maintain logical flow and readability.
-
-//             OUTPUT FORMAT (STRICTLY FOLLOW):
-
-//             Class {class} {subject} – Chapter: {chapter}
-
-//             1. Introduction
-//             Short explanation of the chapter.
-
-//             2. Main Concepts
-//             Explain each important concept with headings and short explanations.
-
-//             3. Important Definitions
-//             List key definitions.
-
-//             4. Important Formulas
-//             List all formulas clearly.
-
-//             5. Important Exam Points
-//             Bullet list of important facts.
-
-//             6. Summary
-//             Short final revision summary.
-
-//             EXAMPLE OUTPUT:
-
-//             Class 10 Science – Chapter: Electricity
-
-//             1. Introduction
-//             Electricity is the flow of electric charge through a conductor.
-
-//             2. Main Concepts
-
-//             2.1 Electric Current
-//             Rate of flow of electric charge.
-//             Formula: I = Q / t
-//             Unit: Ampere (A)
-
-//             2.2 Potential Difference
-//             Work done to move a unit charge.
-//             Formula: V = W / Q
-//             Unit: Volt (V)
-
-//             2.3 Ohm’s Law
-//             V = IR
-//             Current is directly proportional to voltage at constant temperature.
-
-//             3. Important Definitions
-//             - Current: Flow of charge
-//             - Resistance: Opposition to current
-
-//             4. Important Formulas
-//             - I = Q / t
-//             - V = IR
-//             - P = VI
-
-//             5. Important Exam Points
-//             - Ammeter is connected in series
-//             - Voltmeter is connected in parallel
-//             - Household circuits use parallel connection
-
-//             6. Summary
-//             Electricity includes current, voltage, resistance, and power relationships.
-
-//             Now generate notes in the same format for:`;
-//         }
-
-//         const prompt = `
-//     Generate ${type} notes in ${language} for:
-
-//     Board: ${board}
-//     Class: ${className}
-//     Subject: ${subject}
-//     Chapter: ${chapter}
-
-//     ${instruction}
-//     Make the content suitable for school students.
-//     `;
-
-//         // const response = await ai.models.generateContent({
-//         // model: "gemini-2.0-flash",
-//         // contents: prompt,
-//         // });
-
-//         const response = await openai.chat.completions.create({
-//             model: "deepseek/deepseek-r1-0528:free",
-//             messages: [
-//                 {
-//                     role: "system",
-//                     content:
-//                         "You are a helpful assistant that generates educational notes for students.",
-//                 },
-//                 {
-//                     role: "user",
-//                     content: prompt,
-//                 },
-//             ],
-//         });
-
-//         return response.choices[0].message.content;
-//     } catch (error) {
-//         console.error("Gemini Note Generation Error:", error.message);
-//         throw error;
-//     }
-// }
-
-// export const generateAiNotes = async (req, res) => {
-//     try {
-//         const {
-//             language,
-//             board,
-//             class: className,
-//             subject,
-//             chapter,
-//         } = req.body;
-
-//         if (!language || !board || !className || !subject || !chapter) {
-//             return res.status(400).json({
-//                 success: false,
-//                 message:
-//                     "language, board, class, subject, and chapter are required",
-//             });
-//         }
-
-//         const chapters = Array.isArray(chapter) ? chapter : [chapter];
-//         const results = [];
-
-//         for (const ch of chapters) {
-//             const topic = ch.trim();
-//             if (!topic) continue;
-
-//             // ---- Generate short notes ----
-//             const shortText = await generateNotes({
-//                 language,
-//                 board,
-//                 className,
-//                 subject,
-//                 chapter: topic,
-//                 type: "short",
-//             });
-//             console.log(shortText);
-
-//             // const shortParsed = parseNotes(shortText);
-
-//             console.log('====================================');
-//             // console.log(shortParsed);
-//             console.log('====================================');
-
-//             // ---- Generate full notes ----
-//             const fullText = await generateNotes({
-//                 language,
-//                 board,
-//                 className,
-//                 subject,
-//                 chapter: topic,
-//                 type: "full",
-//             });
-//             console.log(fullText);
-//             // const fullParsed = parseNotes(fullText);
-
-//             // ---- Store in DB ----
-//             let note = await AiNote.findOne({
-//                 where: {
-//                     language,
-//                     board,
-//                     class: className,
-//                     subject,
-//                     topic,
-//                 },
-//             });
-
-//             if (!note) {
-//                 note = await AiNote.create({
-//                     language,
-//                     board,
-//                     class: className,
-//                     subject,
-//                     topic,
-//                     short_notes: shortText,
-//                     full_notes: fullText,
-//                     generated_by: "AI",
-//                 });
-
-//                 results.push({
-//                     topic,
-//                     status: "created",
-//                 });
-//             } else {
-//                 note.short_notes = shortText;
-//                 note.full_notes = fullText;
-//                 await note.save();
-
-//                 results.push({
-//                     topic,
-//                     status: "updated",
-//                 });
-//             }
-//         }
-
-//         res.status(200).json({
-//             success: true,
-//             message: "Short and full notes generated successfully",
-//             results,
-//         });
-//     } catch (error) {
-//         console.error("Generate AI Notes Error:", error);
-//         res.status(500).json({
-//             success: false,
-//             message: "Failed to generate AI notes",
-//         });
-//     }
-// };
-
 export async function generateNotes({
   language,
   board,
@@ -521,40 +231,6 @@ export async function generateNotes({
 
             5. Quick Summary  
             Very short final revision.
-
-            Now generate notes in the same format for:
-
-            Full Notes:
-            RULES:
-            - Generate notes strictly based on the selected subject and chapter.
-            - Organize content into clear numbered sections.
-            - Explain concepts in simple, student-friendly language.
-            - Highlight key definitions, formulas, rules, and important points.
-            - Use bullet points, numbered lists, and short paragraphs.
-            - Focus more on important exam topics.
-            - Maintain logical flow and readability.
-
-            OUTPUT FORMAT (STRICTLY FOLLOW):
-
-            Class {class} {subject} – Chapter: {chapter}
-
-            1. Introduction  
-            Short explanation of the chapter.
-
-            2. Main Concepts  
-            Explain each important concept with headings and short explanations.
-
-            3. Important Definitions  
-            List key definitions.
-
-            4. Important Formulas  
-            List all formulas clearly.
-
-            5. Important Exam Points  
-            Bullet list of important facts.
-
-            6. Summary  
-            Short final revision summary.
 
             Now generate notes in the same format for:
 
@@ -628,82 +304,140 @@ async function retry(fn, retries = 3) {
 }
 
 export const generateAiNotes = async (req, res) => {
-  try {
-    const { language, board, class: className, subject, chapter } = req.body;
+  const transaction = await sequelize.transaction();
 
-    if (!language || !board || !className || !subject || !chapter) {
+  try {
+    const { language, board, class: className, subject, chapters } = req.body;
+
+    if (!language || !board || !className || !subject || !chapters) {
       return res.status(400).json({
         success: false,
-        message: "language, board, class, subject, and chapter are required",
+        message: "language, board, class, subject and chapters are required",
       });
     }
 
-    const chapters = Array.isArray(chapter) ? chapter : [chapter];
+    const chapterList = JSON.parse(chapters);
+    const files = req.files;
+
+    if (!Array.isArray(chapterList) || chapterList.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "chapters must be a valid array",
+      });
+    }
+
+    if (!files || files.length !== chapterList.length) {
+      return res.status(400).json({
+        success: false,
+        message: "Number of files must match chapters",
+      });
+    }
+
     const results = [];
 
-    for (const ch of chapters) {
-      const topic = ch.trim();
-      if (!topic) continue;
+    for (let i = 0; i < chapterList.length; i++) {
+      const topic = chapterList[i].trim();
+      const file = files[i];
 
-      // single AI call with retry
-      const aiText = await retry(() =>
-        generateNotes({
-          language,
-          board,
-          className,
-          subject,
-          chapter: topic,
-        }),
+      if (!topic || !file) {
+        throw new Error("Invalid chapter or file");
+      }
+
+      /*
+      ------------------------------------------
+      1️⃣ Upload PDF to Hostinger
+      ------------------------------------------
+      */
+
+      const uploadResult = await uploadOnHostinger(
+        file.path,
+        className,
+        subject,
+        topic
       );
+
+      const pdfUrl = uploadResult.url;
+
+      /*
+      ------------------------------------------
+      2️⃣ Generate AI short notes
+      ------------------------------------------
+      */
+
+      const aiText = await generateNotes({
+        language,
+        board,
+        className,
+        subject,
+        chapter: topic,
+      });
 
       const parsed = parseNotes(aiText);
 
-      // DB logic
-      let note = await AiNote.findOne({
-        where: {
-          language,
-          board,
-          class: className,
-          subject,
-          topic,
-        },
-      });
+      if (!parsed.short_notes) {
+        throw new Error(`AI generation failed for ${topic}`);
+      }
 
-      if (!note) {
-        note = await AiNote.create({
+      /*
+      ------------------------------------------
+      3️⃣ Save in DB
+      ------------------------------------------
+      */
+
+      const note = await AiNote.create(
+        {
           language,
           board,
           class: className,
           subject,
           topic,
           short_notes: parsed.short_notes,
-          full_notes: parsed.full_notes,
+          full_notes: pdfUrl,
           generated_by: "AI",
-        });
+        },
+        { transaction }
+      );
 
-        results.push({ topic, status: "created" });
-      } else {
-        note.short_notes = parsed.short_notes;
-        note.full_notes = parsed.full_notes;
-        await note.save();
+      results.push({
+        topic,
+        pdf: pdfUrl,
+        id: note.id,
+      });
 
-        results.push({ topic, status: "updated" });
-      }
+      /*
+      Delay for AI API rate limits
+      */
 
-      // delay between chapters (free-tier safe)
       await sleep(2000);
     }
 
+    /*
+    ------------------------------------------
+    Commit transaction
+    ------------------------------------------
+    */
+
+    await transaction.commit();
+
     res.status(200).json({
       success: true,
-      message: "Notes generated successfully",
+      message: "AI Notes generated successfully",
       results,
     });
   } catch (error) {
+    /*
+    ------------------------------------------
+    Rollback if anything fails
+    ------------------------------------------
+    */
+
+    await transaction.rollback();
+
     console.error("Generate AI Notes Error:", error);
+
     res.status(500).json({
       success: false,
-      message: "Failed to generate AI notes",
+      message: "Failed to generate AI notes. No data stored.",
     });
   }
 };

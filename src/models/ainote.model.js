@@ -42,7 +42,7 @@ const AiNote = sequelize.define(
 
         // Full notes (detailed explanation)
         full_notes: {
-            type: DataTypes.TEXT("long"),
+            type: DataTypes.STRING,
             allowNull: true,
         },
 

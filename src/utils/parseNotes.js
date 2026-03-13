@@ -1,51 +1,54 @@
 export function parseNotes(rawText) {
     if (!rawText || typeof rawText !== "string") {
         return {
-            short_notes: null,
-            full_notes: null,
+        short_notes: null,
         };
     }
 
     let shortNotes = "";
-    let fullNotes = "";
 
     const shortMatch = rawText.match(
-        /short\s*notes\s*[:\-]*([\s\S]*?)(?=full\s*notes)/i
-    );
-
-    const fullMatch = rawText.match(
-        /full\s*notes\s*[:\-]*([\s\S]*)/i
+        /short\s*notes\s*[:\-]*([\s\S]*)/i
     );
 
     if (shortMatch) {
-        shortNotes = cleanMarkdown(shortMatch[1].trim());
-    }
-
-    if (fullMatch) {
-        fullNotes = cleanMarkdown(fullMatch[1].trim());
+        shortNotes = cleanShortNotes(shortMatch[1]);
+    } else {
+        // fallback if heading not found
+        shortNotes = cleanShortNotes(rawText);
     }
 
     return {
         short_notes: shortNotes || null,
-        full_notes: fullNotes || null,
     };
 }
 
-function cleanMarkdown(text) {
+function cleanShortNotes(text) {
     if (!text) return text;
 
-    return text
-        // remove bold/italic
+    let cleaned = text;
+
+    // remove markdown bold / italic
+    cleaned = cleaned
         .replace(/\*\*(.*?)\*\*/g, "$1")
-        .replace(/\*(.*?)\*/g, "$1")
+        .replace(/\*(.*?)\*/g, "$1");
 
-        // remove LaTeX inline math \( \)
-        .replace(/\\\((.*?)\\\)/g, "$1")
+    // normalize bullet symbols
+    cleaned = cleaned.replace(/•/g, "-");
 
-        // replace weird symbols
-        .replace(/\?/g, "-")
+    // remove LaTeX block wrappers \[ \]
+    cleaned = cleaned
+        .replace(/\\\[/g, "\n")
+        .replace(/\\\]/g, "\n");
 
-        // remove extra spaces
-        .replace(/\s+\n/g, "\n")
-        .trim();
+    // fix broken markdown tables
+    cleaned = cleaned.replace(/\|\s*\n\s*\|/g, "\n");
+
+    // normalize spacing
+    cleaned = cleaned
+        .replace(/\r/g, "")
+        .replace(/\n{3,}/g, "\n\n")
+        .replace(/[ \t]+\n/g, "\n");
+
+    return cleaned.trim();
 }

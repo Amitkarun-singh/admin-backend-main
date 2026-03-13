@@ -51,7 +51,7 @@ app.use("/api/students", studentRoutes);
 app.use("/api/parents", parentRoutes);
 
 // AI Feature Routes
-app.use("/api/summarize", summarizeRoute);
+app.use("/api", summarizeRoute);
 app.use("/api/ainote", ainoteRoute);
 
 // Static serving for AI server's papers
