@@ -6,6 +6,7 @@ export default sequelize.define("AdminUser", {
     school_id: DataTypes.BIGINT,
     role_id: DataTypes.INTEGER,
     username: DataTypes.STRING,
+    full_name: DataTypes.STRING,
     password: DataTypes.STRING,
     phone_number: DataTypes.STRING,
     email: DataTypes.STRING,

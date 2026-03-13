@@ -7,6 +7,9 @@ import TeacherProfile from "../models/teacher_profile.model.js";
 import AdminRole from "../models/admin_role.model.js";
 import AdminPermission from "../models/admin_permission.model.js";
 import ParentStudentMap from "../models/parent_student_map.model.js";
+import StudentClassSection from "../models/student_class_section.model.js";
+import AdminClass from "../models/admin_class.model.js";
+import AdminSection from "../models/admin_section.model.js";
 
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -163,6 +166,7 @@ const getLoggedInUserProfile = asyncHandler(async (req, res) => {
 
   // Admin and Subadmin
   if (["ADMIN", "SUBADMIN"].includes(role)) {
+
     const user = await AdminUser.findOne({
       where: { user_id },
       attributes: { exclude: ["password"] }
@@ -183,13 +187,14 @@ const getLoggedInUserProfile = asyncHandler(async (req, res) => {
   }
 
   // Teacher
-
   else if (role === "TEACHER") {
+
     const teacher = await TeacherProfile.findOne({
       where: { user_id }
     });
 
-    if (!teacher) throw new ApiError(404, "Teacher profile not found");
+    if (!teacher)
+      throw new ApiError(404, "Teacher profile not found");
 
     school = await AdminSchool.findOne({
       where: { school_id: teacher.school_id }
@@ -201,26 +206,78 @@ const getLoggedInUserProfile = asyncHandler(async (req, res) => {
     };
   }
 
-  // Student
+  // STUDENT
   else if (role === "STUDENT") {
+
     const student = await StudentProfile.findOne({
       where: { user_id }
     });
 
-    if (!student) throw new ApiError(404, "Student profile not found");
+    if (!student)
+      throw new ApiError(404, "Student profile not found");
+
+
+    const user = await AdminUser.findOne({
+      where: { user_id },
+      attributes: ["full_name", "email", "phone_number", "role_id"]
+    });
+
+
+    const roleData = await AdminRole.findOne({
+      where: { role_id: user.role_id }
+    });
+
 
     school = await AdminSchool.findOne({
       where: { school_id: student.school_id }
     });
 
+
+    const classSection = await StudentClassSection.findOne({
+      where: { student_id: student.student_id }
+    });
+
+    if (!classSection)
+      throw new ApiError(404, "Student class mapping not found");
+
+
+    const classData = await AdminClass.findOne({
+      where: { class_id: classSection.class_id }
+    });
+
+
+    const sectionData = await AdminSection.findOne({
+      where: { section_id: classSection.section_id }
+    });
+
+
     profileData = {
-      student,
-      school
+      school_name: school?.school_name,
+      board: school?.board,
+
+      address: `${school?.city}, ${school?.state}, ${school?.country}, ${school?.pincode}`,
+
+      class: classData?.class_name,
+      div: sectionData?.section_name,
+
+      roll_number: classSection?.roll_number,
+
+      Student_name: user?.full_name,
+      number: user?.phone_number,
+      email: user?.email,
+
+      gender: student?.gender,
+      dob: student?.dob,
+      language: student?.preferred_language,
+      joining_date: student?.onboarding_date,
+
+      role: roleData?.role_name
     };
   }
 
   // Parent
   else if (role === "PARENT") {
+
     const parent = await ParentProfile.findOne({
       where: { user_id }
     });
@@ -228,7 +285,7 @@ const getLoggedInUserProfile = asyncHandler(async (req, res) => {
     if (!parent)
       throw new ApiError(404, "Parent profile not found");
 
-    // Get all mappings (one parent → many students)
+
     const mappings = await ParentStudentMap.findAll({
       where: { parent_id: parent.parent_id }
     });
@@ -236,9 +293,10 @@ const getLoggedInUserProfile = asyncHandler(async (req, res) => {
     if (!mappings.length)
       throw new ApiError(404, "Student mapping not found");
 
+
     const studentIds = mappings.map(m => m.student_id);
 
-    // Get all students
+
     const students = await StudentProfile.findAll({
       where: { student_id: studentIds }
     });
@@ -246,10 +304,11 @@ const getLoggedInUserProfile = asyncHandler(async (req, res) => {
     if (!students.length)
       throw new ApiError(404, "Linked students not found");
 
-    // Get school from first student
+
     school = await AdminSchool.findOne({
       where: { school_id: students[0].school_id }
     });
+
 
     profileData = {
       parent,
@@ -261,6 +320,7 @@ const getLoggedInUserProfile = asyncHandler(async (req, res) => {
   else {
     throw new ApiError(400, "Unsupported role");
   }
+
 
   return res.status(200).json(
     new ApiResponse(

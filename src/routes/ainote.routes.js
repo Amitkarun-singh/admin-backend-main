@@ -7,19 +7,22 @@ import {
     getAiNotes,
     generateAiNotes, // 👈 add this
 } from "../controllers/ainote.controller.js";
+import { upload } from "../middlewares/multer.middleware.js";
+import { aiLogger } from "../middlewares/aiLogger.middleware.js";
+import { authMiddleware } from "../middlewares/auth.middleware.js";
 
 const router = express.Router();
 
 // Dropdown APIs
-router.get("/languages", getLanguages);
-router.get("/classes", getClasses);
-router.get("/subjects", getSubjects);
-router.get("/chapters", getChapters);
+router.get("/languages", authMiddleware, aiLogger("ai_notes", "generate_notes"), getLanguages);
+router.get("/classes", authMiddleware, aiLogger("ai_notes", "generate_notes"), getClasses);
+router.get("/subjects", authMiddleware, aiLogger("ai_notes", "generate_notes"), getSubjects);
+router.get("/chapters",authMiddleware, aiLogger("ai_notes", "generate_notes"), getChapters);
 
 // Generate AI notes (Gemini)
-router.post("/generate", generateAiNotes); // 👈 new route
+router.post("/generate", authMiddleware, aiLogger("ai_notes", "generate_notes"), upload.array("files"), generateAiNotes); // 👈 new route
 
 // Final notes fetch (optional old system)
-router.get("/", getAiNotes);
+router.get("/", authMiddleware, aiLogger("ai_notes", "generate_notes"), getAiNotes);
 
 export default router;
