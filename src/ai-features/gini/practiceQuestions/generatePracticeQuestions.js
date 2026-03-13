@@ -1,8 +1,6 @@
 import dotenv from "dotenv";
 dotenv.config();
-import { parseMCQs } from "../../util/parceMCQ.js";
-import { parseQnA } from "../../util/parceQnA.js";
-import { getPYQ } from "../../modal/questions.modal.js";
+
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import { errorMessage } from "../../../../error.js";
@@ -23,8 +21,10 @@ const mcqSchema = z
     questions: z.array(
       z
         .object({
+          id: z.uuid(),
           question: z.string(),
           options: z.array(z.string()).min(4).max(4),
+          answer: z.string(),
         })
         .strict(), // = additionalProperties: false
     ),
@@ -36,7 +36,9 @@ const saAndLaSchema = z
     questions: z.array(
       z
         .object({
+          id: z.uuid(),
           question: z.string(),
+          answer: z.string(),
         })
         .strict(), // prevents extra fields (additionalProperties: false)
     ),
@@ -105,7 +107,6 @@ const dynamicQnA = async (
     });
 
     const content = response.output_parsed;
-    // console.log(content.questions);
 
     return content.questions;
   } catch (error) {

@@ -1,5 +1,5 @@
 import { generatePracticeQuestions } from "./generatePracticeQuestions.js";
-import OpenAI from "openai";
+import { insertTest, insertQuestions } from "../../modal/questions.modal.js";
 
 export const generatePracticeQuestionsController = async (req, res) => {
   try {
@@ -28,6 +28,14 @@ export const generatePracticeQuestionsController = async (req, res) => {
         );
       }),
     );
+
+    try {
+      const testId = await insertTest([class_, subject, chapter, language]);
+      await insertQuestions(testId, allQuestions);
+      console.log("Test and questions inserted successfully!");
+    } catch (err) {
+      console.error(err);
+    }
 
     res.status(200).json({
       subject,
