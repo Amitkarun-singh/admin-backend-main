@@ -1,4 +1,8 @@
-import { generatePracticeQuestions } from "./generatePracticeQuestions.js";
+import {
+  generatePracticeQuestions,
+  submitAnswer,
+  testResult,
+} from "./generatePracticeQuestions.js";
 import { insertTest, insertQuestions } from "../../modal/questions.modal.js";
 
 export const generatePracticeQuestionsController = async (req, res) => {
@@ -29,8 +33,9 @@ export const generatePracticeQuestionsController = async (req, res) => {
       }),
     );
 
+    let testId;
     try {
-      const testId = await insertTest([class_, subject, chapter, language]);
+      testId = await insertTest([class_, subject, chapter, language]);
       await insertQuestions(testId, allQuestions);
       console.log("Test and questions inserted successfully!");
     } catch (err) {
@@ -38,6 +43,7 @@ export const generatePracticeQuestionsController = async (req, res) => {
     }
 
     res.status(200).json({
+      testId,
       subject,
       chapter,
       questionType,
@@ -50,6 +56,34 @@ export const generatePracticeQuestionsController = async (req, res) => {
     console.error("Error in /generate-practice-questions endpoint:", error);
     res.status(500).json({
       error: "Failed to generate practice questions. Please try again later.",
+    });
+  }
+};
+
+export const submitAnswerController = async (req, res) => {
+  try {
+    const { questionId, testId, answer } = req.body;
+    await submitAnswer(questionId, testId, answer);
+    res.status(200).json({ isSuccessful: true });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({
+      error: "Failed to save answer.",
+      isSuccessful: false,
+    });
+  }
+};
+
+export const testResultController = async (req, res) => {
+  const { testId } = req.params;
+
+  const result = await testResult(testId);
+  res.status(200).json({ isSuccessful: true, result });
+  try {
+  } catch (err) {
+    res.status(500).json({
+      error: "Failed to fetch result.",
+      isSuccessful: false,
     });
   }
 };

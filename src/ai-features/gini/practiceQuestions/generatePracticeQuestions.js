@@ -4,6 +4,10 @@ dotenv.config();
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import { errorMessage } from "../../../../error.js";
+import {
+  insertAnswer,
+  fetchTestResultById,
+} from "../../modal/questions.modal.js";
 
 import OpenAI from "openai";
 
@@ -116,3 +120,12 @@ const dynamicQnA = async (
 };
 
 export { generatePracticeQuestions };
+
+export const submitAnswer = async (questionId, testId, answer) => {
+  await insertAnswer([questionId, testId, answer]);
+};
+
+export const testResult = (testId) => {
+  const result = fetchTestResultById(testId);
+  return result;
+};

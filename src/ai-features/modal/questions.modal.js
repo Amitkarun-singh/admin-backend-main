@@ -47,3 +47,40 @@ const insertQuestions = (testId, questionsData) => {
   });
 };
 export { insertTest, insertQuestions };
+
+export const insertAnswer = (values) => {
+  return new Promise((resolve, reject) => {
+    const query = `
+      UPDATE practice_questions 
+      SET student_answer = ?
+      WHERE question_id = ? AND test_id = ?
+    `;
+
+    pool.query(query, [values[2], values[0], values[1]], (error, results) => {
+      if (error) {
+        return reject(error);
+      }
+
+      resolve(results.affectedRows);
+    });
+  });
+};
+
+export const fetchTestResultById = (testId) => {
+  return new Promise((resolve, reject) => {
+    const query = `
+      SELECT 
+        *
+      FROM practice_questions
+      WHERE test_id = ?
+    `;
+
+    pool.query(query, [testId], (error, results) => {
+      if (error) {
+        return reject(error);
+      }
+
+      resolve(results);
+    });
+  });
+};
