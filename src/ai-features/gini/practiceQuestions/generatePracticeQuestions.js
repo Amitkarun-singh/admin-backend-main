@@ -111,7 +111,7 @@ const dynamicQnA = async (
     });
 
     const content = response.output_parsed;
-
+    console.log("question generated");
     return content.questions;
   } catch (error) {
     console.error(`Error generating ${questionType} questions:`, error);
