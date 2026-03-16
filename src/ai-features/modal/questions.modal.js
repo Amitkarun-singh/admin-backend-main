@@ -1,24 +1,86 @@
 import pool from "../db/db.js";
-
-const getPYQ = (value) => {
-  return new Promise(async (resolve, reject) => {
+const insertTest = (values) => {
+  return new Promise((resolve, reject) => {
     const query = `
-        SELECT question, answer, marks
-        FROM pyq_questions
-        WHERE class = ?
-          AND language = ?
-          AND subject = ?
-          AND chapter = ?
-          
-      `;
+      INSERT INTO practice_tests (class, subject, chapter, language)
+      VALUES (?, ?, ?, ?)
+    `;
 
-    pool.query(query, value, (error, results) => {
+    pool.query(query, values, (error, results) => {
       if (error) {
-        reject(error);
+        return reject(error);
       }
-      resolve(results);
+
+      resolve(results.insertId);
     });
   });
 };
 
-export { getPYQ };
+const insertQuestions = (testId, questionsData) => {
+  // console.log("questionsData", questionsData);
+  return new Promise((resolve, reject) => {
+    const values = [];
+
+    // Loop through each question type
+    for (const type in questionsData) {
+      questionsData[type].forEach((q) => {
+        const options = q.options ? JSON.stringify(q.options) : null;
+        const answer = q.answer || null; // ensure answer exists
+        console.log(q.id);
+
+        values.push([testId, type, q.question, options, answer, null, q.id]);
+      });
+    }
+
+    if (!values.length) return resolve(0);
+
+    const query = `
+      INSERT INTO practice_questions
+        (test_id, type, question, options, answer, student_answer, question_id)
+      VALUES ?
+    `;
+
+    pool.query(query, [values], (error, results) => {
+      if (error) return reject(error);
+      resolve(results.affectedRows);
+    });
+  });
+};
+export { insertTest, insertQuestions };
+
+export const insertAnswer = (values) => {
+  return new Promise((resolve, reject) => {
+    const query = `
+      UPDATE practice_questions 
+      SET student_answer = ?
+      WHERE question_id = ? AND test_id = ?
+    `;
+
+    pool.query(query, [values[2], values[0], values[1]], (error, results) => {
+      if (error) {
+        return reject(error);
+      }
+
+      resolve(results.affectedRows);
+    });
+  });
+};
+
+export const fetchTestResultById = (testId) => {
+  return new Promise((resolve, reject) => {
+    const query = `
+      SELECT 
+        *
+      FROM practice_questions
+      WHERE test_id = ?
+    `;
+
+    pool.query(query, [testId], (error, results) => {
+      if (error) {
+        return reject(error);
+      }
+
+      resolve(results);
+    });
+  });
+};

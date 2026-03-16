@@ -1,11 +1,13 @@
 import dotenv from "dotenv";
 dotenv.config();
-import { parseMCQs } from "../../util/parceMCQ.js";
-import { parseQnA } from "../../util/parceQnA.js";
-import { getPYQ } from "../../modal/questions.modal.js";
+
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import { errorMessage } from "../../../../error.js";
+import {
+  insertAnswer,
+  fetchTestResultById,
+} from "../../modal/questions.modal.js";
 
 import OpenAI from "openai";
 
@@ -23,8 +25,10 @@ const mcqSchema = z
     questions: z.array(
       z
         .object({
+          id: z.uuid(),
           question: z.string(),
           options: z.array(z.string()).min(4).max(4),
+          answer: z.string(),
         })
         .strict(), // = additionalProperties: false
     ),
@@ -36,7 +40,9 @@ const saAndLaSchema = z
     questions: z.array(
       z
         .object({
+          id: z.uuid(),
           question: z.string(),
+          answer: z.string(),
         })
         .strict(), // prevents extra fields (additionalProperties: false)
     ),
@@ -105,8 +111,7 @@ const dynamicQnA = async (
     });
 
     const content = response.output_parsed;
-    // console.log(content.questions);
-
+    console.log("question generated");
     return content.questions;
   } catch (error) {
     console.error(`Error generating ${questionType} questions:`, error);
@@ -115,3 +120,12 @@ const dynamicQnA = async (
 };
 
 export { generatePracticeQuestions };
+
+export const submitAnswer = async (questionId, testId, answer) => {
+  await insertAnswer([questionId, testId, answer]);
+};
+
+export const testResult = (testId) => {
+  const result = fetchTestResultById(testId);
+  return result;
+};

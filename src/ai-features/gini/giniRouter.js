@@ -1,6 +1,10 @@
 import express from "express";
 
-import { generatePracticeQuestionsController } from "./practiceQuestions/generatePracticeQuestions.controller.js";
+import {
+  generatePracticeQuestionsController,
+  submitAnswerController,
+  testResultController,
+} from "./practiceQuestions/generatePracticeQuestions.controller.js";
 import {
   chatbotController,
   feedbackThumbUpController,
@@ -23,4 +27,6 @@ router.post("/ai/gini", chatbotController);
 router.post("/voice-bot", voiceBotController);
 router.post("/ai/feedback/thumbs-up", feedbackThumbUpController);
 router.post("/ai/feedback", feedbackThumbDownController);
+router.post("/practice/questions/answer-submit", submitAnswerController);
+router.get("/practice/questions/test/result/:testId", testResultController);
 export default router;
