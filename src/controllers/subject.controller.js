@@ -58,7 +58,7 @@ export const addSubjectsWithChapters = async (req, res) => {
             {
             class_id: classData.class_id,
             subject_id: subject.subject_id,
-            language: "English",
+            language: req.body.language || "English",
             ai_enabled: false,
             status: "active"
             },
@@ -68,6 +68,9 @@ export const addSubjectsWithChapters = async (req, res) => {
         /* 4️⃣ Create Chapters */
         const chapterPayload = chapters.map((chapterName, index) => ({
             subject_id: subject.subject_id,
+            board_name: req.body.board_name,
+            class_id: classData.class_id,
+            language: req.body.language || "English",
             chapter_name: chapterName,
             chapter_order: index + 1,
             status: "active"
