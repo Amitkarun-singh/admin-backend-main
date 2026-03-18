@@ -41,7 +41,7 @@ export const uploadOnHostinger = async (
         fs.renameSync(localFilePath, finalPath);
 
         // generate public URL
-        const publicUrl = `https://sandybrown-manatee-216868.hostingersite.com/notes/class${className}/${subject.toLowerCase()}/${fileName}`;
+        const publicUrl = `https://sandybrown-manatee-216868.hostingersite.com/full_notes/class${className}/${subject.toLowerCase()}/${fileName}`;
 
         return {
         url: publicUrl,
