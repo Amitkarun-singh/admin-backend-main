@@ -23,8 +23,8 @@ import previousPapersRouter from "./ai-features/previousPapers/previousPapersRou
 import predictPapersRouter from "./ai-features/predictPapers/previousPapersRouter.js";
 import summarizeRoute from "./routes/summarize.routes.js";
 import ainoteRoute from "./routes/ainote.routes.js";
-import dotenv from "dotenv";
-dotenv.config();
+// import dotenv from "dotenv";
+// dotenv.config();
 const app = express();
 
 app.use(express.json({ limit: "16kb" }));

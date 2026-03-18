@@ -6,7 +6,7 @@ import { OpenRouter } from "@openrouter/sdk";
 import OpenAI from "openai";
 import { parseNotes } from "../utils/parseNotes.js";
 import { uploadOnHostinger } from "../utils/hostingerStorage.js";
-import "dotenv/config";
+// import "dotenv/config";
 
 // Initialize Gemini client
 let ai;
@@ -353,7 +353,7 @@ export const generateAiNotes = async (req, res) => {
         file.path,
         className,
         subject,
-        topic
+        topic,
       );
 
       const pdfUrl = uploadResult.url;
@@ -395,7 +395,7 @@ export const generateAiNotes = async (req, res) => {
           full_notes: pdfUrl,
           generated_by: "AI",
         },
-        { transaction }
+        { transaction },
       );
 
       results.push({
@@ -441,4 +441,3 @@ export const generateAiNotes = async (req, res) => {
     });
   }
 };
-

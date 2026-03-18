@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import fs from "fs/promises";
-import "dotenv/config";
+// import "dotenv/config";
 
 // Initialize Gemini client
 let ai;

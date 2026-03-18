@@ -1,4 +1,5 @@
 import express from "express";
+import { authMiddleware } from "../../middlewares/auth.middleware.js";
 
 import {
   generatePracticeQuestionsController,
@@ -18,8 +19,9 @@ const router = express.Router();
 
 router.post(
   "/practice/questions",
-  // logging,
-  rateLimit,
+  authMiddleware,
+  logging,
+  // rateLimit,
   generatePracticeQuestionsController,
 );
 

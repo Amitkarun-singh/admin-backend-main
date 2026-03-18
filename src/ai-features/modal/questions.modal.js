@@ -2,8 +2,8 @@ import pool from "../db/db.js";
 const insertTest = (values) => {
   return new Promise((resolve, reject) => {
     const query = `
-      INSERT INTO practice_tests (class, subject, chapter, language)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO practice_tests (class, subject, chapter, language, student_id)
+      VALUES (?, ?, ?, ?, ?)
     `;
 
     pool.query(query, values, (error, results) => {

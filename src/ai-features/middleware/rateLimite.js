@@ -3,12 +3,12 @@ import NodeCache from "node-cache";
 // 1 day TTL = 86400 seconds
 const cache = new NodeCache({ stdTTL: 86400, checkperiod: 120 });
 
-const RATE_LIMIT = 100; // requests per day
+const RATE_LIMIT = process.env.RATE_LIMIT; // requests per day
 
 export async function rateLimit(req, res, next) {
   try {
     // const userId = req.user.id;
-    const userId = req.body.id;
+    const userId = req.user.user_id;
     const key = `rate:user:${userId}`;
     // const ttlMs = cache.getTtl(key);
     // const ttlSeconds = Math.ceil((ttlMs - Date.now()) / 1000);

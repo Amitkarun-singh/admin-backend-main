@@ -4,5 +4,7 @@ node_modules/
 env/
 combine.log
 src/config/config.json
+config.env
 
 /eng.traineddata
+.gitignore

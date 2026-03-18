@@ -3,16 +3,18 @@ import pdf from "@cedrugs/pdf-parse"; // ESM-friendly PDF parser
 import Tesseract from "tesseract.js";
 import { errorMessage } from "../../../../error.js";
 import { ChatBotFeedbackSave } from "../../modal/chatbot.modal.js";
+import dotEnv from "dotenv";
+dotEnv.config();
 
 let openai;
 
 try {
   openai = new OpenAI({
-    baseURL: "https://openrouter.ai/api/v1",
-    apiKey: process.env.OPENROUTER_API_KEY,
+    apiKey: process.env.OPENAI_API_KEY,
   });
 } catch (error) {
-  errorMessage.push({ error, msg: "API_KEY openrouter required" });
+  console.error("Gini chat bot service | OPENAI_API_KEY required", error);
+  errorMessage.push({ error, msg: "OPENAI_API_KEY required" });
 }
 
 /**
@@ -56,6 +58,7 @@ export const streamChatbotResponse = async (
   file = null,
   language,
 ) => {
+  console.log("Gini chat bot service ");
   try {
     // Extract file text if uploaded
     let fileContent = "";
@@ -86,7 +89,7 @@ Rules:
 
     const stream = await openai.chat.completions.create({
       // model: "tngtech/deepseek-r1t-chimera:free",
-      model: "liquid/lfm-2.5-1.2b-thinking:free",
+      model: "gpt-4o-mini",
       messages: finalMessages,
       stream: true,
       max_tokens: 1200,
@@ -107,7 +110,7 @@ Rules:
     res.write("data: [DONE]\n\n");
     res.end();
   } catch (error) {
-    console.error("Streaming Service Error:", error);
+    console.error("Gini chat bot service  | Streaming Service Error:", error);
     res.write("data: [DONE]\n\n");
     res.end();
   }

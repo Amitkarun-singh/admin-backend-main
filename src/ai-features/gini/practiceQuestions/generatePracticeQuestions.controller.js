@@ -34,8 +34,16 @@ export const generatePracticeQuestionsController = async (req, res) => {
     );
 
     let testId;
+    const studentId = req.user.user_id;
+    console.log("user details", req.user.user_id);
     try {
-      testId = await insertTest([class_, subject, chapter, language]);
+      testId = await insertTest([
+        class_,
+        subject,
+        chapter,
+        language,
+        studentId,
+      ]);
       await insertQuestions(testId, allQuestions);
       console.log("Test and questions inserted successfully!");
     } catch (err) {

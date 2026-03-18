@@ -11,6 +11,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 export const chatbotController = [
   upload.single("file"), // 'file' matches frontend FormData
   async (req, res) => {
+    console.log("Gini chat bot controller");
     try {
       // Messages come as a JSON string in multipart/form-data
       const messagesRaw = req.body.messages;
@@ -23,10 +24,12 @@ export const chatbotController = [
       try {
         messages = JSON.parse(messagesRaw);
       } catch (err) {
+        console.log("Gini chat bot controller | Invalid messages JSON");
         return res.status(400).json({ error: "Invalid messages JSON" });
       }
 
       if (!Array.isArray(messages)) {
+        console.log("Gini chat bot controller | Messages must be an array");
         return res.status(400).json({ error: "Messages must be an array" });
       }
 
@@ -47,7 +50,7 @@ export const chatbotController = [
 
       await streamChatbotResponse(messages, res, uploadedFile, language);
     } catch (error) {
-      console.error("Streaming Controller Error:", error);
+      console.error("Gini chat bot controller ", error);
       errorMessage.push({ error, msg: "Streaming Controller Error" });
       res.write(`data: ${JSON.stringify({ error: "Streaming failed" })}\n\n`);
       res.write("data: [DONE]\n\n");

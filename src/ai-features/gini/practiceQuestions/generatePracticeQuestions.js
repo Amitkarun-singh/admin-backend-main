@@ -1,5 +1,5 @@
-import dotenv from "dotenv";
-dotenv.config();
+// import dotenv from "dotenv";
+// dotenv.config();
 
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
