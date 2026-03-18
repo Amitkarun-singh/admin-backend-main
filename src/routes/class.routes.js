@@ -16,7 +16,7 @@ const router = express.Router();
 // Create class
 router.post(
   "/class",
-  // authMiddleware,
+  authMiddleware,
   // requirePermission("MANAGE_SCHOOL"),
   createClass,
 );
@@ -24,7 +24,7 @@ router.post(
 // Create multiple classes with sections (bulk)
 router.post(
   "/classes/bulk",
-  // authMiddleware,
+  authMiddleware,
   // requirePermission("MANAGE_SCHOOL"),
   bulkCreateClasses,
 );
@@ -40,7 +40,7 @@ router.get(
 // Get single class
 router.get(
   "/class/:id",
-  // authMiddleware,
+  authMiddleware,
   // requirePermission("MANAGE_SCHOOL"),
   getClassById,
 );
@@ -48,7 +48,7 @@ router.get(
 // Update class
 router.put(
   "/class/:id",
-  // authMiddleware,
+  authMiddleware,
   // requirePermission("MANAGE_SCHOOL"),
   updateClass,
 );
@@ -56,7 +56,7 @@ router.put(
 // Delete class (with cascade logic)
 router.delete(
   "/class/:id",
-  // authMiddleware,
+  authMiddleware,
   // requirePermission("MANAGE_SCHOOL"),
   deleteClass,
 );

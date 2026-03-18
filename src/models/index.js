@@ -227,6 +227,7 @@ AdminClassSubject.belongsTo(AdminSubjectMaster, {
   as: "subject"
 });
 
+
 AdminSubjectMaster.hasMany(AdminClassSubject, {
   foreignKey: "subject_id",
   as: "classSubjects"
