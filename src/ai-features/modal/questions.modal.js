@@ -28,7 +28,16 @@ const insertQuestions = (testId, questionsData) => {
         const answer = q.answer || null; // ensure answer exists
         console.log(q.id);
 
-        values.push([testId, type, q.question, options, answer, null, q.id]);
+        values.push([
+          testId,
+          type,
+          q.question,
+          options,
+          answer,
+          null,
+          q.id,
+          q.answer_explanation,
+        ]);
       });
     }
 
@@ -36,7 +45,7 @@ const insertQuestions = (testId, questionsData) => {
 
     const query = `
       INSERT INTO practice_questions
-        (test_id, type, question, options, answer, student_answer, question_id)
+        (test_id, type, question, options, answer, student_answer, question_id, answer_explanation)
       VALUES ?
     `;
 

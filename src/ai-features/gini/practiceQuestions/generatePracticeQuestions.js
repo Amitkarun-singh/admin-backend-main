@@ -29,6 +29,7 @@ const mcqSchema = z
           question: z.string(),
           options: z.array(z.string()).min(4).max(4),
           answer: z.string(),
+          answer_explanation: z.string(),
         })
         .strict(), // = additionalProperties: false
     ),

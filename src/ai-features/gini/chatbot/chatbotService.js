@@ -57,8 +57,11 @@ export const streamChatbotResponse = async (
   res,
   file = null,
   language,
+  className = "",
+  chapter = "",
 ) => {
   console.log("Gini chat bot service ");
+
   try {
     // Extract file text if uploaded
     let fileContent = "";
@@ -73,13 +76,14 @@ export const streamChatbotResponse = async (
     }
 
     const systemPrompt = `
-You are an AI tutor for students.
+You are an AI tutor for students .
 Rules:
 - Give clear, step-by-step explanations
 - Be concise and student-friendly
 - Do NOT include internal reasoning
 - Focus only on the question asked
 - reply only in ${language}
+- reply from class ${className} and subject ${className}
 `;
 
     const finalMessages = [

@@ -16,6 +16,8 @@ export const chatbotController = [
       // Messages come as a JSON string in multipart/form-data
       const messagesRaw = req.body.messages;
       const language = req.body.language;
+      const className = req.body.class;
+      const chapter = req.body.subject;
       if (!messagesRaw) {
         return res.status(400).json({ error: "Messages array required" });
       }
@@ -48,7 +50,14 @@ export const chatbotController = [
       res.setHeader("X-Accel-Buffering", "no"); // disable nginx buffering
       res.flushHeaders();
 
-      await streamChatbotResponse(messages, res, uploadedFile, language);
+      await streamChatbotResponse(
+        messages,
+        res,
+        uploadedFile,
+        language,
+        className,
+        chapter,
+      );
     } catch (error) {
       console.error("Gini chat bot controller ", error);
       errorMessage.push({ error, msg: "Streaming Controller Error" });
