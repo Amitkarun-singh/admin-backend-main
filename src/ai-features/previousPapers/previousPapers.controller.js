@@ -4,6 +4,7 @@ import {
   getFileDownloadUrl,
   getYears,
   getSubjects,
+  getClasses,
 } from "./previousPapers.service.js";
 
 export const fetchPaper = async (req, res) => {
@@ -88,6 +89,24 @@ export const getSubjectsController = async (req, res) => {
 
   try {
     const result = await getSubjects({ board, year, className });
+    return res.status(200).json(result);
+  } catch (err) {
+    console.error("Failed to fetch subjects:", err);
+    return res.status(500).json({ error: "Failed to fetch subjects" });
+  }
+};
+
+export const getClassesController = async (req, res) => {
+  const { board, year } = req.query;
+
+  if (!board || !year) {
+    return res
+      .status(400)
+      .json({ error: "board, year and className are required" });
+  }
+
+  try {
+    const result = await getClasses({ board, year });
     return res.status(200).json(result);
   } catch (err) {
     console.error("Failed to fetch subjects:", err);

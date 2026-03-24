@@ -124,3 +124,20 @@ export const getSubjects = async ({ board, year, className }) => {
 
   return { board, year, className, subjects };
 };
+
+export const getClasses = async ({ board, year }) => {
+  const command = new ListObjectsV2Command({
+    Bucket: bucketName,
+    Prefix: `papers/${board}/${year}/`,
+    Delimiter: "/",
+  });
+
+  const response = await s3Client.send(command);
+
+  const subjects = (response.CommonPrefixes || []).map((prefix) => {
+    const parts = prefix.Prefix.split("/");
+    return parts[parts.length - 2];
+  });
+
+  return { board, year, subjects };
+};
