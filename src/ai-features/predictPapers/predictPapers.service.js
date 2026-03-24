@@ -13,10 +13,10 @@ const s3Client = new S3Client({
   },
 });
 const bucketName = process.env.AWS_S3_BUCKET;
-export const getPapers = async ({ board, year, className, subject }) => {
+export const getPapers = async ({ board, className, subject }) => {
   const command = new ListObjectsV2Command({
     Bucket: bucketName,
-    Prefix: `papers/${board}/${year}/class-${className}/${subject}`,
+    Prefix: `predict/${board}/class-${className}/${subject}`,
   });
   const response = await s3Client.send(command);
   // console.log(response[1].Key);
@@ -25,7 +25,7 @@ export const getPapers = async ({ board, year, className, subject }) => {
     .filter((item) => item.Size > 0)
     .map((item) => ({
       board,
-      year,
+
       className,
       subject,
       filePath: item.Key,
@@ -81,4 +81,42 @@ export const getFileDownloadUrl = async (
     downloadUrl: presignedUrl,
     expiresIn,
   };
+};
+
+/**
+ * Get all available subjects for a given board, year, and class
+ * e.g. papers/CBSE/2025/class-10/ → ["math", "science", "english"]
+ */
+export const getSubjects = async ({ board, className }) => {
+  const command = new ListObjectsV2Command({
+    Bucket: bucketName,
+    Prefix: `predict/${board}/class-${className}/`,
+    Delimiter: "/",
+  });
+
+  const response = await s3Client.send(command);
+
+  const subjects = (response.CommonPrefixes || []).map((prefix) => {
+    const parts = prefix.Prefix.split("/");
+    return parts[parts.length - 2];
+  });
+
+  return { board, className, subjects };
+};
+
+export const getClasses = async ({ board }) => {
+  const command = new ListObjectsV2Command({
+    Bucket: bucketName,
+    Prefix: `predict/${board}/`,
+    Delimiter: "/",
+  });
+
+  const response = await s3Client.send(command);
+
+  const subjects = (response.CommonPrefixes || []).map((prefix) => {
+    const parts = prefix.Prefix.split("/");
+    return parts[parts.length - 2];
+  });
+
+  return { board, subjects };
 };
