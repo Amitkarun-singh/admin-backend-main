@@ -1,6 +1,10 @@
-import { getPapers } from "./previousPapers.service.js";
+import {
+  getPapers,
+  getFilePreviewUrl,
+  getFileDownloadUrl,
+} from "./previousPapers.service.js";
 
-export const fetchPaper = (req, res) => {
+export const fetchPaper = async (req, res) => {
   try {
     const { board, year, className, subject } = req.query;
 
@@ -10,7 +14,7 @@ export const fetchPaper = (req, res) => {
       });
     }
 
-    const papers = getPapers({ board, year, className, subject });
+    const papers = await getPapers({ board, year, className, subject });
 
     if (!papers || papers.length === 0) {
       return res.status(404).json({ message: "Paper not found" });
@@ -20,5 +24,37 @@ export const fetchPaper = (req, res) => {
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Something went wrong" });
+  }
+};
+
+export const previewPaper = async (req, res) => {
+  const { filePath } = req.query;
+
+  if (!filePath) {
+    return res.status(400).json({ error: "filePath query param is required" });
+  }
+
+  try {
+    const result = await getFilePreviewUrl(filePath);
+    return res.status(200).json(result);
+  } catch (err) {
+    console.error("Preview URL generation failed:", err);
+    return res.status(500).json({ error: "Failed to generate preview URL" });
+  }
+};
+
+export const downloadPaper = async (req, res) => {
+  const { filePath, fileName } = req.query;
+
+  if (!filePath) {
+    return res.status(400).json({ error: "filePath query param is required" });
+  }
+
+  try {
+    const result = await getFileDownloadUrl(filePath, fileName);
+    return res.status(200).json(result);
+  } catch (err) {
+    console.error("Download URL generation failed:", err);
+    return res.status(500).json({ error: "Failed to generate download URL" });
   }
 };
