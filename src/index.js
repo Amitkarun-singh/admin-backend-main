@@ -20,7 +20,7 @@ import { errorMessage } from "../error.js";
 import giniRouter from "./ai-features/gini/giniRouter.js";
 import performanceRouter from "./ai-features/studentPerformance/studentPerformanceRouter.js";
 import previousPapersRouter from "./ai-features/previousPapers/previousPapersRouter.js";
-import predictPapersRouter from "./ai-features/predictPapers/previousPapersRouter.js";
+import predictPapersRouter from "./ai-features/predictPapers/predictPapersRouter.js";
 import summarizeRoute from "./routes/summarize.routes.js";
 import ainoteRoute from "./routes/ainote.routes.js";
 // import dotenv from "dotenv";

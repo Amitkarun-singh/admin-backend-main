@@ -2,9 +2,7 @@ import {
   getPapers,
   getFilePreviewUrl,
   getFileDownloadUrl,
-  getYears,
-  getSubjects,
-} from "./previousPapers.service.js";
+} from "./predictPapers.service.js";
 
 export const fetchPaper = async (req, res) => {
   try {
@@ -58,39 +56,5 @@ export const downloadPaper = async (req, res) => {
   } catch (err) {
     console.error("Download URL generation failed:", err);
     return res.status(500).json({ error: "Failed to generate download URL" });
-  }
-};
-
-export const getYearsController = async (req, res) => {
-  const { board } = req.query;
-
-  if (!board) {
-    return res.status(400).json({ error: "board query param is required" });
-  }
-
-  try {
-    const result = await getYears({ board });
-    return res.status(200).json(result);
-  } catch (err) {
-    console.error("Failed to fetch years:", err);
-    return res.status(500).json({ error: "Failed to fetch years" });
-  }
-};
-
-export const getSubjectsController = async (req, res) => {
-  const { board, year, className } = req.query;
-
-  if (!board || !year || !className) {
-    return res
-      .status(400)
-      .json({ error: "board, year and className are required" });
-  }
-
-  try {
-    const result = await getSubjects({ board, year, className });
-    return res.status(200).json(result);
-  } catch (err) {
-    console.error("Failed to fetch subjects:", err);
-    return res.status(500).json({ error: "Failed to fetch subjects" });
   }
 };

@@ -3,16 +3,12 @@ import {
   fetchPaper,
   previewPaper,
   downloadPaper,
-  getYearsController,
-  getSubjectsController,
-} from "./previousPapers.controller.js";
+} from "./predictPapers.controller.js";
 
 const router = express.Router();
 
 router.get("/papers", fetchPaper);
 router.get("/papers/preview", previewPaper);
 router.get("/papers/download", downloadPaper);
-router.get("/papers/years", getYearsController);
-router.get("/papers/subject", getSubjectsController);
 
 export default router;
