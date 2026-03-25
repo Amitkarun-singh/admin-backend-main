@@ -20,7 +20,10 @@ router.get("/subjects", authMiddleware, aiLogger("ai_notes", "generate_notes"), 
 router.get("/chapters",authMiddleware, aiLogger("ai_notes", "generate_notes"), getChapters);
 
 // Generate AI notes (Gemini)
-router.post("/generate", authMiddleware, aiLogger("ai_notes", "generate_notes"), upload.array("files"), generateAiNotes); // 👈 new route
+router.post("/generate", authMiddleware, aiLogger("ai_notes", "generate_notes"), upload.fields([
+    { name: "notes", maxCount: 20 },
+    { name: "books", maxCount: 20 },
+]), generateAiNotes); // 👈 new route
 
 // Final notes fetch (optional old system)
 router.get("/", authMiddleware, aiLogger("ai_notes", "generate_notes"), getAiNotes);

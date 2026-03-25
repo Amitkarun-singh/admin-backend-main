@@ -5,7 +5,9 @@ import { GoogleGenAI } from "@google/genai";
 import { OpenRouter } from "@openrouter/sdk";
 import OpenAI from "openai";
 import { parseNotes } from "../utils/parseNotes.js";
-import { uploadOnHostinger } from "../utils/hostingerStorage.js";
+import { uploadToS3 } from "../utils/s3Upload.js";
+import fs from "fs";
+import { getSignedPdfUrl } from "../utils/signedUrl.js";
 // import "dotenv/config";
 
 // Initialize Gemini client
@@ -178,10 +180,24 @@ export const getAiNotes = async (req, res) => {
       order: [["created_at", "ASC"]],
     });
 
+    const updatedNotes = await Promise.all(
+      notes.map(async (note) => {
+        const signedUrl = await getSignedPdfUrl(note.full_notes);
+        const signedBookUrl = await getSignedPdfUrl(note.book_url);
+
+        return {
+          ...note.toJSON(),
+          pdfUrl: signedUrl, // ✅ frontend will use this
+          bookUrl: signedBookUrl, // ✅ frontend will use this
+        };
+      })
+    );
+
+
     res.status(200).json({
       success: true,
       count: notes.length,
-      data: notes,
+      data: updatedNotes,
     });
   } catch (error) {
     console.error("Get AI Notes Error:", error);
@@ -309,61 +325,70 @@ export const generateAiNotes = async (req, res) => {
   try {
     const { language, board, class: className, subject, chapters } = req.body;
 
-    if (!language || !board || !className || !subject || !chapters) {
-      return res.status(400).json({
-        success: false,
-        message: "language, board, class, subject and chapters are required",
-      });
-    }
-
     const chapterList = JSON.parse(chapters);
-    const files = req.files;
 
-    if (!Array.isArray(chapterList) || chapterList.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "chapters must be a valid array",
-      });
+    const noteFiles = req.files.notes; // ✅ notes PDFs
+    const bookFiles = req.files.books; // ✅ books PDFs
+
+    if (!noteFiles || noteFiles.length !== chapterList.length) {
+      throw new Error("Notes files mismatch");
     }
 
-    if (!files || files.length !== chapterList.length) {
-      return res.status(400).json({
-        success: false,
-        message: "Number of files must match chapters",
-      });
+    if (!bookFiles || bookFiles.length !== chapterList.length) {
+      throw new Error("Books files mismatch");
     }
 
     const results = [];
 
     for (let i = 0; i < chapterList.length; i++) {
       const topic = chapterList[i].trim();
-      const file = files[i];
 
-      if (!topic || !file) {
-        throw new Error("Invalid chapter or file");
-      }
+      const noteFile = noteFiles[i];
+      const bookFile = bookFiles[i];
 
       /*
       ------------------------------------------
-      1️⃣ Upload PDF to Hostinger
+      1️⃣ Upload BOOK
       ------------------------------------------
       */
-
-      const uploadResult = await uploadOnHostinger(
-        file.path,
+      const bookUpload = await uploadToS3(
+        bookFile,
+        "Books",
+        language,
+        board,
         className,
         subject,
-        topic,
+        topic
       );
 
-      const pdfUrl = uploadResult.url;
+      const bookKey = bookUpload.key;
+
+      fs.unlinkSync(bookFile.path);
 
       /*
       ------------------------------------------
-      2️⃣ Generate AI short notes
+      2️⃣ Upload NOTES
       ------------------------------------------
       */
+      const noteUpload = await uploadToS3(
+        noteFile,
+        "Notes",
+        language,
+        board,
+        className,
+        subject,
+        topic
+      );
 
+      const noteKey = noteUpload.key;
+
+      fs.unlinkSync(noteFile.path);
+
+      /*
+      ------------------------------------------
+      3️⃣ Generate AI Notes
+      ------------------------------------------
+      */
       const aiText = await generateNotes({
         language,
         board,
@@ -374,16 +399,11 @@ export const generateAiNotes = async (req, res) => {
 
       const parsed = parseNotes(aiText);
 
-      if (!parsed.short_notes) {
-        throw new Error(`AI generation failed for ${topic}`);
-      }
-
       /*
       ------------------------------------------
-      3️⃣ Save in DB
+      4️⃣ Save in DB
       ------------------------------------------
       */
-
       const note = await AiNote.create(
         {
           language,
@@ -392,52 +412,38 @@ export const generateAiNotes = async (req, res) => {
           subject,
           topic,
           short_notes: parsed.short_notes,
-          full_notes: pdfUrl,
+          full_notes: noteKey,   // ✅ Notes key
+          book_url: bookKey,    // ✅ Book key (NEW COLUMN)
           generated_by: "AI",
         },
-        { transaction },
+        { transaction }
       );
 
       results.push({
         topic,
-        pdf: pdfUrl,
+        noteKey,
+        bookKey,
         id: note.id,
       });
 
-      /*
-      Delay for AI API rate limits
-      */
-
       await sleep(2000);
     }
-
-    /*
-    ------------------------------------------
-    Commit transaction
-    ------------------------------------------
-    */
 
     await transaction.commit();
 
     res.status(200).json({
       success: true,
-      message: "AI Notes generated successfully",
+      message: "AI Notes + Books uploaded successfully",
       results,
     });
   } catch (error) {
-    /*
-    ------------------------------------------
-    Rollback if anything fails
-    ------------------------------------------
-    */
-
     await transaction.rollback();
 
     console.error("Generate AI Notes Error:", error);
 
     res.status(500).json({
       success: false,
-      message: "Failed to generate AI notes. No data stored.",
+      message: "Failed to generate AI notes",
     });
   }
 };
