@@ -2,19 +2,21 @@ import {
   getPapers,
   getFilePreviewUrl,
   getFileDownloadUrl,
+  getClasses,
+  getSubjects,
 } from "./predictPapers.service.js";
 
 export const fetchPaper = async (req, res) => {
   try {
-    const { board, year, className, subject } = req.query;
+    const { board, className, subject } = req.query;
 
-    if (!board || !year || !className || !subject) {
+    if (!board || !className || !subject) {
       return res.status(400).json({
         message: "board, year, className and subject are required",
       });
     }
 
-    const papers = await getPapers({ board, year, className, subject });
+    const papers = await getPapers({ board, className, subject });
 
     if (!papers || papers.length === 0) {
       return res.status(404).json({ message: "Paper not found" });
@@ -56,5 +58,41 @@ export const downloadPaper = async (req, res) => {
   } catch (err) {
     console.error("Download URL generation failed:", err);
     return res.status(500).json({ error: "Failed to generate download URL" });
+  }
+};
+
+export const getSubjectsController = async (req, res) => {
+  const { board, className } = req.query;
+
+  if (!board || !className) {
+    return res
+      .status(400)
+      .json({ error: "board, year and className are required" });
+  }
+
+  try {
+    const result = await getSubjects({ board, className });
+    return res.status(200).json(result);
+  } catch (err) {
+    console.error("Failed to fetch subjects:", err);
+    return res.status(500).json({ error: "Failed to fetch subjects" });
+  }
+};
+
+export const getClassesController = async (req, res) => {
+  const { board } = req.query;
+
+  if (!board) {
+    return res
+      .status(400)
+      .json({ error: "board, year and className are required" });
+  }
+
+  try {
+    const result = await getClasses({ board });
+    return res.status(200).json(result);
+  } catch (err) {
+    console.error("Failed to fetch subjects:", err);
+    return res.status(500).json({ error: "Failed to fetch subjects" });
   }
 };
