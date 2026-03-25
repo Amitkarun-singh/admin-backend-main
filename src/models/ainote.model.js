@@ -46,6 +46,11 @@ const AiNote = sequelize.define(
             allowNull: true,
         },
 
+        book_url: {
+            type: DataTypes.STRING,
+            allowNull: true,
+        },
+
         // Who generated the notes (AI / Teacher / Admin)
         generated_by: {
             type: DataTypes.STRING,

@@ -13,6 +13,47 @@ try {
   console.log("GEMINI_API_KEY is required");
 }
 
+const SUMMARY_PROMPT_MAXLENGHT = (language, maxlength) => `
+  You are an intelligent AI summarisation assistant designed to help students revise study material quickly.
+
+  Read the provided content carefully and generate structured revision notes.
+
+  Generate the response completely in **${language} language**.
+
+  ${
+    maxlength
+      ? `The total length of the response must be within approximately ${maxlength} words. Keep it concise while covering all important points.`
+      : `Keep the explanation clear, structured, and easy to understand.`
+  }
+
+  Use the following structure:
+
+  INTRODUCTION
+  Short overview of the topic.
+
+  KEY CONCEPTS
+  Use bullet points.
+
+  IMPORTANT FORMULAS
+  Include formulas if present.
+
+  IMPORTANT EXAM POINTS
+  Important facts or rules useful for exams.
+
+  QUICK SUMMARY
+  Short revision recap.
+
+  Guidelines:
+  - Use simple student friendly language.
+  - Preserve formulas exactly.
+  - Do not add information outside the content.
+  ${
+    maxlength
+      ? `- Prioritize the most important points to stay within the word limit.`
+      : ``
+  }
+  `;
+
 const SUMMARY_PROMPT = (language) => `
 You are an intelligent AI summarisation assistant designed to help students revise study material quickly.
 
@@ -43,18 +84,23 @@ Guidelines:
 - Do not add information outside the content.
 `;
 
-export async function summarizeFile({ language, filePath, mimeType }) {
+export async function summarizeFile({ language, maxlength, filePath, mimeType }) {
 
   try {
-
+    
     const file = await ai.files.upload({
       file: filePath,
       config: { mimeType }
     });
 
+    console.log(maxlength);
+    console.log(language);
+    
+    
+
     const contents = [
       {
-        text: SUMMARY_PROMPT(language)
+        text: maxlength ? SUMMARY_PROMPT_MAXLENGHT(language, maxlength) : SUMMARY_PROMPT(language)
       },
       {
         fileData: {
@@ -157,7 +203,7 @@ export function parseNotes(rawText) {
 export const generateSummary = async (req, res) => {
   try {
 
-    const { language } = req.body;
+    const { language, maxlength } = req.body;
     const file = req.file;
 
     /*
@@ -188,6 +234,7 @@ export const generateSummary = async (req, res) => {
 
     const aiText = await summarizeFile({
       language,
+      maxlength,
       filePath: file.path,
       mimeType: file.mimetype,
     });

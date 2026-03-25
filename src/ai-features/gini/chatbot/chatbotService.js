@@ -10,14 +10,14 @@ let openai;
 
 try {
   openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
+    apiKey: process.env.OPENROUTER_API_KEY,
   });
 } catch (error) {
-  console.error("Gini chat bot service | OPENAI_API_KEY required", error);
-  errorMessage.push({ error, msg: "OPENAI_API_KEY required" });
+  console.error("Gini chat bot service | OPENROUTER_API_KEY required", error);
+  errorMessage.push({ error, msg: "OPENROUTER_API_KEY required" });
 }
 
-/**
+/** 
  * Extract text from uploaded file (PDF or image)
  */
 const extractFileText = async (file) => {

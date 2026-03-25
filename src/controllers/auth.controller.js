@@ -331,6 +331,10 @@ const getLoggedInUserProfile = asyncHandler(async (req, res) => {
   );
 });
 
+const editProfile = asyncHandler(async (req, res) => {
+  
+});
+
 
 export {
   sendLoginOtp,
