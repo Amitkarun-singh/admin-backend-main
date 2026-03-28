@@ -40,7 +40,7 @@ export const generatePracticeQuestionsController = async (req, res) => {
       testId = await insertTest([
         class_,
         subject,
-        chapter,
+        chapter.toString(),
         language,
         studentId,
       ]);

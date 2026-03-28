@@ -1,7 +1,9 @@
 import { DataTypes } from "sequelize";
 import sequelize from "../config/db.js";
 
-export default sequelize.define("AdminUser", {
+export default sequelize.define(
+  "AdminUser",
+  {
     user_id: { type: DataTypes.BIGINT, primaryKey: true, autoIncrement: true },
     school_id: DataTypes.BIGINT,
     role_id: DataTypes.INTEGER,
@@ -10,9 +12,11 @@ export default sequelize.define("AdminUser", {
     password: DataTypes.STRING,
     phone_number: DataTypes.STRING,
     email: DataTypes.STRING,
-    status: DataTypes.ENUM("active","suspended","blocked")
-},{
-    tableName: "admin_users",
+    status: DataTypes.ENUM("active", "suspended", "blocked"),
+  },
+  {
+    tableName: "users",
     underscored: true,
-    timestamps: true
-});
+    timestamps: true,
+  },
+);
