@@ -71,7 +71,9 @@ const login = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid login payload");
   }
 
-  if (user.status !== "active") throw new ApiError(403, "User inactive");
+  console.log(user);
+
+  if (user.status !== "Active") throw new ApiError(403, "User inactive");
 
   /* LOAD ROLE + PERMISSIONS */
   const userWithRole = await AdminUser.findOne({

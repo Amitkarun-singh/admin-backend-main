@@ -15,7 +15,7 @@ export default sequelize.define(
     status: DataTypes.ENUM("active", "suspended", "blocked"),
   },
   {
-    tableName: "users",
+    tableName: "admin_users",
     underscored: true,
     timestamps: true,
   },
