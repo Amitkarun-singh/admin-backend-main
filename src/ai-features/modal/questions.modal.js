@@ -37,6 +37,7 @@ const insertQuestions = (testId, questionsData) => {
           null,
           q.id,
           q.answer_explanation,
+          q.marks,
         ]);
       });
     }
@@ -45,7 +46,7 @@ const insertQuestions = (testId, questionsData) => {
 
     const query = `
       INSERT INTO practice_questions
-        (test_id, type, question, options, answer, student_answer, question_id, answer_explanation)
+        (test_id, type, question, options, answer, student_answer, question_id, answer_explanation, marks)
       VALUES ?
     `;
 

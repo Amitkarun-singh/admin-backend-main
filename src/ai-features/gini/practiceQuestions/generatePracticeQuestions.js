@@ -30,6 +30,7 @@ const mcqSchema = z
           options: z.array(z.string()).min(4).max(4),
           answer: z.string(),
           answer_explanation: z.string(),
+          marks: z.number(),
         })
         .strict(), // = additionalProperties: false
     ),
@@ -83,7 +84,7 @@ const dynamicQnA = async (
   const getQueationPromp = (qt) => {
     switch (qt) {
       case qt == "MCQ":
-        return `-  provide ${count} multiple choice questions with 4 options each and indicate the correct answer.`;
+        return `-  provide ${count} multiple choice questions with 4 options each and indicate the correct answer and have 1 marks.`;
       case qt == "SA":
         return ` -   provide ${count} questions that can be answered in 2-3 lines.`;
       case qt == "LA":
@@ -101,6 +102,7 @@ const dynamicQnA = async (
       
 
       Provide the questions clearly, numbered, and in an easy-to-read format.
+
     `;
 
     const response = await openai.responses.parse({
