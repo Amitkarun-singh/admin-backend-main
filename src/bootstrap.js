@@ -1,5 +1,5 @@
 import dotenv from "dotenv";
-console.log(process.cwd() + "/config.env");
+console.log("env => ", process.cwd() + "/config.env");
 
 dotenv.config({ path: process.cwd() + "/config.env" });
 

@@ -10,14 +10,14 @@ let openai;
 
 try {
   openai = new OpenAI({
-    apiKey: process.env.OPENROUTER_API_KEY,
+    apiKey: process.env.OPENAI_API_KEY,
   });
 } catch (error) {
-  console.error("Gini chat bot service | OPENROUTER_API_KEY required", error);
-  errorMessage.push({ error, msg: "OPENROUTER_API_KEY required" });
+  console.error("Gini chat bot service | OPENAI_API_KEY required", error);
+  errorMessage.push({ error, msg: "OPENAI_API_KEY required" });
 }
 
-/** 
+/**
  * Extract text from uploaded file (PDF or image)
  */
 const extractFileText = async (file) => {
@@ -83,7 +83,7 @@ Rules:
 - Do NOT include internal reasoning
 - Focus only on the question asked
 - reply only in ${language}
-- reply from class ${className} and subject ${className}
+- reply from class ${className} and subject ${chapter}
 `;
 
     const finalMessages = [
@@ -99,8 +99,9 @@ Rules:
       max_tokens: 1200,
     });
 
-    // Stream AI response to frontend
+    //Stream AI response to frontend
     for await (const chunk of stream) {
+      console.log(chunk);
       const content = chunk.choices?.[0]?.delta?.content;
       if (content) {
         res.write(
@@ -110,6 +111,18 @@ Rules:
         );
       }
     }
+
+    // for await (const chunk of stream) {
+    //   const content = chunk.choices?.[0]?.delta?.content;
+
+    //   if (typeof content === "string" && content.length > 0) {
+    //     res.write(
+    //       `data: ${JSON.stringify({
+    //         choices: [{ delta: { content } }],
+    //       })}\n\n`,
+    //     );
+    //   }
+    // }
 
     res.write("data: [DONE]\n\n");
     res.end();
