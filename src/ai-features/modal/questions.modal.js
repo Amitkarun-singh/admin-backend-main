@@ -61,18 +61,27 @@ export { insertTest, insertQuestions };
 export const insertAnswer = (values) => {
   return new Promise((resolve, reject) => {
     const query = `
-      UPDATE practice_questions 
-      SET student_answer = ?
+      UPDATE practice_questions
+      SET 
+        student_answer = ?,
+        is_correct = CASE 
+            WHEN TRIM(LOWER(answer)) = TRIM(LOWER(?)) THEN 1
+            ELSE 0
+        END
       WHERE question_id = ? AND test_id = ?
     `;
 
-    pool.query(query, [values[2], values[0], values[1]], (error, results) => {
-      if (error) {
-        return reject(error);
-      }
+    pool.query(
+      query,
+      [values[2], values[2], values[0], values[1]],
+      (error, results) => {
+        if (error) {
+          return reject(error);
+        }
 
-      resolve(results.affectedRows);
-    });
+        resolve(results.affectedRows);
+      },
+    );
   });
 };
 
