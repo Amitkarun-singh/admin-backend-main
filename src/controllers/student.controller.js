@@ -25,7 +25,8 @@ const VALID_GENDERS   = ["male", "female", "other"];
    ===================================================== */
 const createStudent = asyncHandler(async (req, res) => {
   const school_id = req.user.school_id;
-
+  const school = await AdminSchool.findByPk(school_id);
+    if (!school) throw new ApiError(404, "School not found");
   const {
     // Student user fields
     student_username,

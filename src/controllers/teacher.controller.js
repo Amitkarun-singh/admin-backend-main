@@ -19,7 +19,8 @@ import { parseExcel } from "../utils/excel.util.js";
    ===================================================== */
 const createTeacher = asyncHandler(async (req, res) => {
   const school_id = req.user.school_id;
-
+  const school = await AdminSchool.findByPk(school_id);
+  if (!school) throw new ApiError(404, "School not found");
   const {
     // User fields
     username,
