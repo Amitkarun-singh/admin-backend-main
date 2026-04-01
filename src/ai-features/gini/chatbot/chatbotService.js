@@ -5,6 +5,7 @@ import { errorMessage } from "../../../../error.js";
 import { ChatBotFeedbackSave } from "../../modal/chatbot.modal.js";
 import dotEnv from "dotenv";
 dotEnv.config();
+import { fromBuffer } from "pdf2pic";
 
 let openai;
 
@@ -20,28 +21,85 @@ try {
 /**
  * Extract text from uploaded file (PDF or image)
  */
+// const extractFileText = async (file) => {
+//   if (!file) return "";
+
+//   const mime = file.mimetype;
+
+//   try {
+//     if (mime === "application/pdf") {
+//       const data = await pdf(file.buffer);
+//       return data.text;
+//     } else if (mime.startsWith("image/")) {
+//       const {
+//         data: { text },
+//       } = await Tesseract.recognize(file.buffer, "eng", {
+//         // logger: (m) => console.log(m), // optional progress logging
+//       });
+//       return text;
+//     } else {
+//       return ""; // unsupported file
+//     }
+//   } catch (err) {
+//     console.error("File extraction error:", err);
+//     errorMessage.push(err);
+//     return "";
+//   }
+// };
+
 const extractFileText = async (file) => {
   if (!file) return "";
 
-  const mime = file.mimetype;
-
   try {
-    if (mime === "application/pdf") {
-      const data = await pdf(file.buffer);
-      return data.text;
-    } else if (mime.startsWith("image/")) {
+    const mime = file.mimetype;
+
+    /* IMAGE */
+    if (mime.startsWith("image/")) {
       const {
         data: { text },
-      } = await Tesseract.recognize(file.buffer, "eng", {
-        // logger: (m) => console.log(m), // optional progress logging
-      });
-      return text;
-    } else {
-      return ""; // unsupported file
+      } = await Tesseract.recognize(file.buffer, "eng");
+      return text.trim();
     }
-  } catch (err) {
-    console.error("File extraction error:", err);
-    errorMessage.push(err);
+
+    /* PDF */
+    if (mime === "application/pdf") {
+      const pdfData = await pdf(file.buffer);
+
+      if (pdfData.text && pdfData.text.trim().length > 50) {
+        return pdfData.text.trim();
+      }
+
+      // fallback OCR
+      try {
+        const convert = fromBuffer(file.buffer, {
+          density: 200,
+          format: "png",
+          width: 1200,
+          height: 1600,
+        });
+
+        const pages = await convert.bulk(-1);
+
+        let fullText = "";
+
+        for (const page of pages) {
+          const {
+            data: { text },
+          } = await Tesseract.recognize(page.base64, "eng");
+
+          fullText += text + "\n";
+        }
+
+        return fullText.trim();
+      } catch (ocrError) {
+        console.error("OCR tools missing. Skipping OCR.");
+        return pdfData.text || "";
+      }
+    }
+
+    return "Unable to read File";
+  } catch (error) {
+    console.error("File extraction error:", error);
     return "";
   }
 };
@@ -74,8 +132,6 @@ export const streamChatbotResponse = async (
         });
       }
     }
-
-    console.log("className", className);
 
     const systemPrompt = `
 You are a friendly AI tutor helping a school student learn.
