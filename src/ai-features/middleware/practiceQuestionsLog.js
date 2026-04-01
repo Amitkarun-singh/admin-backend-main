@@ -1,12 +1,12 @@
 import { v4 as uuidv4 } from "uuid";
 import pool from "../db/db.js";
-export const logging = (req, res, next) => {
+export const practiceQuestionsLog = (req, res, next) => {
   console.log("logging");
   const originalJson = res.json;
   let responseBody;
 
   const insertQuery = `
-  INSERT INTO logs 
+  INSERT INTO practice_questions_logs 
   (conversation_id, method, url, status_code, device, request_body, response_body, created_at , user_details) 
   VALUES (?, ?, ?, ?, ?, ?, ?, ?,?)
 `;

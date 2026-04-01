@@ -11,21 +11,22 @@ import {
   feedbackThumbUpController,
   feedbackThumbDownController,
 } from "./chatbot/chatbotController.js";
-import { logging } from "../middleware/Logging.js";
+import { practiceQuestionsLog } from "../middleware/practiceQuestionsLog.js";
 import { rateLimit } from "../middleware/rateLimite.js";
 import { voiceBotController } from "./voiceBot/voiceBotController.js";
+import { chatbotLogs } from "../middleware/chatbotLogs.js";
 
 const router = express.Router();
 
 router.post(
   "/practice/questions",
   authMiddleware,
-  logging,
+  practiceQuestionsLog,
   // rateLimit,
   generatePracticeQuestionsController,
 );
 
-router.post("/ai/gini", chatbotController);
+router.post("/ai/gini", chatbotLogs, chatbotController);
 router.post("/voice-bot", voiceBotController);
 router.post("/ai/feedback/thumbs-up", feedbackThumbUpController);
 router.post("/ai/feedback", feedbackThumbDownController);
