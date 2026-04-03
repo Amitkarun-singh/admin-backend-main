@@ -28,6 +28,10 @@ import AdminClassCourseMap        from "./admin_class_course_map.model.js";
 
 import AdminSubjectMaster         from "./admin_subject_master.model.js";
 
+import GiniLog     from "./gini_log.model.js";
+import PracticeLog from "./practice_log.model.js";
+import UserSession from "./user_session.model.js";
+
 
 /* =====================================================
    USER ↔ ROLE  (RBAC)
@@ -232,6 +236,18 @@ TeacherAnalytics.belongsTo(TeacherProfile, {
   as:         "teacher",
 });
 
+// USER ↔ USER SESSIONS
+User.hasMany(UserSession,  { foreignKey: "user_id", as: "sessions" });
+UserSession.belongsTo(User, { foreignKey: "user_id", as: "user" });
+
+// USER ↔ GINI LOGS
+User.hasMany(GiniLog,    { foreignKey: "user_id", as: "giniLogs" });
+GiniLog.belongsTo(User,  { foreignKey: "user_id", as: "user" });
+
+// USER ↔ PRACTICE LOGS
+User.hasMany(PracticeLog,    { foreignKey: "user_id", as: "practiceLogs" });
+PracticeLog.belongsTo(User,  { foreignKey: "user_id", as: "user" });
+
 
 /* =====================================================
    EXPORT ALL MODELS
@@ -261,4 +277,8 @@ export {
   AdminClassCourseMap,
 
   AdminSubjectMaster,
+
+  GiniLog,
+  PracticeLog,
+  UserSession,
 };

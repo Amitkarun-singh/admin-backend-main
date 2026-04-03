@@ -15,6 +15,7 @@ import teacherRoutes from "./routes/teacher.routes.js";
 import studentRoutes from "./routes/student.routes.js";
 import parentRoutes from "./routes/parent.routes.js";
 import { errorMessage } from "../error.js";
+import historyRoutes from "./routes/history.routes.js";
 
 // Imports for AI features
 import giniRouter from "./ai-features/gini/giniRouter.js";
@@ -53,6 +54,9 @@ app.use("/api/parents", parentRoutes);
 // AI Feature Routes
 app.use("/api", summarizeRoute);
 app.use("/api/ainote", ainoteRoute);
+
+// History and Analytics Routes
+app.use("/api/history", historyRoutes);
 
 // Static serving for AI server's papers
 app.use("/api/ai/papers", express.static("papers"));
