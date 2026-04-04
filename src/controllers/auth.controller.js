@@ -270,12 +270,14 @@ const getLoggedInUserProfile = asyncHandler(async (req, res) => {
       console.log(avatarUrl)
 
       profileData = {
+        role: role,
         user,
         school,
         avatarUrl
       };
     } else {
       profileData = {
+        role: role,
         user,
         school
       };
@@ -297,6 +299,7 @@ const getLoggedInUserProfile = asyncHandler(async (req, res) => {
     });
 
     profileData = {
+      role: role,
       teacher,
       school
     };
@@ -315,7 +318,7 @@ const getLoggedInUserProfile = asyncHandler(async (req, res) => {
 
     const user = await User.findOne({
       where: { user_id },
-      attributes: ["full_name", "email", "phone_number", "role_id"]
+      attributes: ["full_name", "email", "phone_number", "role_id", "avatar"]
     });
 
 
