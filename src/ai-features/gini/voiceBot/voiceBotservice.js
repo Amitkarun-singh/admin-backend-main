@@ -19,9 +19,51 @@ const sarvamClient = new SarvamAIClient({
 
 export const voiceBotService = async (message) => {
   console.log("voiceBotService");
+
+  const systemPrompt = `You are a helpful voice assistant. Your responses will be converted to speech using a text-to-speech (TTS) system.
+
+Guidelines:
+- Speak naturally, like a human in conversation.
+- Keep responses concise and clear (prefer short sentences).
+- Avoid long paragraphs, bullet points, or complex formatting.
+- Do not use emojis, markdown, or special characters.
+- Use simple, everyday language that is easy to understand when heard.
+- Add slight conversational tone (e.g., “Sure,” “Okay,” “Got it”).
+- Avoid unnecessary details unless the user asks for more.
+- When giving numbers, dates, or instructions, format them in a way that sounds natural when spoken.
+- If clarification is needed, ask short follow-up questions.
+- Avoid repeating the user’s full question.
+- Do not mention being an AI unless explicitly asked.
+
+Goal:
+Provide responses that sound smooth, friendly, and natural when spoken aloud.`;
+
+  const frontendMessages = message;
+
+  const finalMessages = [
+    {
+      role: "system",
+      content: [
+        {
+          type: "input_text",
+          text: systemPrompt,
+        },
+      ],
+    },
+    ...frontendMessages.map((msg) => ({
+      role: msg.role,
+      content: [
+        {
+          type: "input_text",
+          text: msg.content,
+        },
+      ],
+    })),
+  ];
+
   const response = await client.responses.create({
     model: "gpt-4o-mini",
-    input: message,
+    input: finalMessages,
     max_output_tokens: 100,
   });
 
