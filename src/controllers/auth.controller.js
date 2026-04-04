@@ -12,6 +12,7 @@ import ParentStudentMap from "../models/parent_student_map.model.js";
 import StudentClassSection from "../models/student_class_section.model.js";
 import AdminClass from "../models/admin_class.model.js";
 import AdminSection from "../models/admin_section.model.js";
+import { recordSession, closeSession } from "./history.controller.js";
 
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -133,18 +134,21 @@ const login = asyncHandler(async (req, res) => {
     maxAge: 7 * 24 * 60 * 60 * 1000
   });
 
+  await recordSession({
+      user_id: user.user_id,
+      ua:      req.headers["user-agent"],
+      ip:      req.ip || req.headers["x-forwarded-for"],
+  });
+
   return res.status(200).json(
-    new ApiResponse(
-      200,
-      {
-        accessToken,
-        role: payload.role,
-        permissions,
-        school_id: user.school_id,
-        profile: userWithRole
-      },
-      "Login successful"
-    )
+    new ApiResponse(200, 
+      { 
+        accessToken, 
+        role: payload.role, 
+        permissions, 
+        school_id: user.school_id, 
+        profile: userWithRole 
+      }, "Login successful")
   );
 });
 
@@ -225,6 +229,8 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 
 // LOGOUT
 const logout = asyncHandler(async (req, res) => {
+  await closeSession(req.user.user_id);
+
   res.clearCookie("refreshToken", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -261,6 +267,7 @@ const getLoggedInUserProfile = asyncHandler(async (req, res) => {
 
     if (user.avatar !== null) {
       const avatarUrl = await getSignedPdfUrl(user?.avatar);
+      console.log(avatarUrl)
 
       profileData = {
         user,
@@ -340,6 +347,7 @@ const getLoggedInUserProfile = asyncHandler(async (req, res) => {
     });
 
     const avatarUrl = await getSignedPdfUrl(user?.avatar);
+    console.log(avatarUrl)
 
     profileData = {
       school_name: school?.school_name,
