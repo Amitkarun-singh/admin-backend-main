@@ -7,8 +7,8 @@ export const chatbotLogs = (req, res, next) => {
 
   const insertQuery = `
     INSERT INTO chatbot_logs
-    (conversation_id, method, url, status_code, device, messages, language, class, subject, file_name, response_body, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (conversation_id, method, url, status_code, device, messages, language, class, subject, file_name, response_body, created_at, user_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   let responseChunks = [];
@@ -27,6 +27,8 @@ export const chatbotLogs = (req, res, next) => {
       let messages = req.body.messages ? JSON.parse(req.body.messages) : null;
       messages = messages[messages.length - 1];
 
+      const userId = req.user.user_id;
+
       const responseBody = parseSSEChunks(responseChunks); // responseChunks.join("");
 
       const values = [
@@ -42,6 +44,7 @@ export const chatbotLogs = (req, res, next) => {
         req.file ? req.file.originalname : null,
         JSON.stringify(responseBody),
         now,
+        userId,
       ];
 
       pool.query(insertQuery, values, (err) => {
