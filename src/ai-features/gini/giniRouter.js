@@ -6,6 +6,7 @@ import {
   submitAnswerController,
   testResultController,
 } from "./practiceQuestions/generatePracticeQuestions.controller.js";
+
 import {
   chatbotController,
   feedbackThumbUpController,
@@ -26,10 +27,22 @@ router.post(
   generatePracticeQuestionsController,
 );
 
-router.post("/ai/gini", chatbotLogs, chatbotController);
-router.post("/voice-bot", voiceBotController);
-router.post("/ai/feedback/thumbs-up", feedbackThumbUpController);
-router.post("/ai/feedback", feedbackThumbDownController);
-router.post("/practice/questions/answer-submit", submitAnswerController);
-router.get("/practice/questions/test/result/:testId", testResultController);
+router.post("/ai/gini", authMiddleware, chatbotLogs, chatbotController);
+router.post("/voice-bot", authMiddleware, voiceBotController);
+router.post(
+  "/ai/feedback/thumbs-up",
+  authMiddleware,
+  feedbackThumbUpController,
+);
+router.post("/ai/feedback", authMiddleware, feedbackThumbDownController);
+router.post(
+  "/practice/questions/answer-submit",
+  authMiddleware,
+  submitAnswerController,
+);
+router.get(
+  "/practice/questions/test/result/:testId",
+  authMiddleware,
+  testResultController,
+);
 export default router;
