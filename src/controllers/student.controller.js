@@ -145,7 +145,7 @@ const createStudent = asyncHandler(async (req, res) => {
         gender:             gender             || null,
         analytics_enabled:  analytics_enabled  ?? false,
         // status removed – field no longer exists on StudentProfile model
-      },
+      }, 
       { transaction }
     );
 
