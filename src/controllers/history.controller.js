@@ -19,7 +19,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 function parseDevice(ua = "") {
   if (!ua) return "Desktop";
   const s = ua.toLowerCase();
-  if (s.includes("tablet") || s.includes("ipad"))                          return "Tablet";
+  if (s.includes("tablet") || s.includes("ipad"))                             return "Tablet";
   if (s.includes("mobile") || s.includes("android") || s.includes("iphone")) return "Mobile";
   return "Desktop";
 }
@@ -247,14 +247,9 @@ export const getFeaturesExplored = asyncHandler(async (req, res) => {
   const practiceLast  = await PracticeLog.findOne({
     where:  { user_id },
     order:  [["created_at", "DESC"]],
-    // No attributes filter — let Sequelize return all fields so
-    // createdAt / created_at is always accessible regardless of model config
   });
 
-  /* ── AI Notes ──
-     Op.notLike against NULL evaluates to NULL in SQL (not TRUE),
-     so rows with a NULL endpoint were silently excluded.
-     Op.or explicitly keeps NULL endpoints. */
+  /* ── AI Notes ── */
   const aiNotesWhere = {
     user_id,
     feature: "ai_notes",
@@ -268,7 +263,6 @@ export const getFeaturesExplored = asyncHandler(async (req, res) => {
   const aiNotesLast  = await AiUsageLog.findOne({
     where: aiNotesWhere,
     order: [["created_at", "DESC"]],
-    // No attributes filter — ensures createdAt/created_at is always present
   });
 
   /* ── Doc Summariser ── */
@@ -278,7 +272,6 @@ export const getFeaturesExplored = asyncHandler(async (req, res) => {
   const summaryLast  = await AiUsageLog.findOne({
     where:  { user_id, feature: "summarizer" },
     order:  [["created_at", "DESC"]],
-    // No attributes filter
   });
 
   const features = [
@@ -563,4 +556,42 @@ export const getConversation = asyncHandler(async (req, res) => {
   }
 
   throw new ApiError(400, `Unknown source "${source}". Use gini or practice.`);
+});
+
+/* =====================================================
+   9. GET LATEST TESTS  (Exam History)
+      GET /api/history/latest-tests
+   ===================================================== */
+export const getLatestTests = asyncHandler(async (req, res) => {
+  const user_id = Number(req.user.user_id);
+
+  // Resolve student_id from user_id via StudentProfile
+  const student = await StudentProfile.findOne({ where: { user_id } });
+  if (!student) {
+    return res.status(200).json(
+      new ApiResponse(200, [], "No student profile found")
+    );
+  }
+
+  const student_id = student.student_id;
+
+  const results = await sequelize.query(
+    `SELECT
+        pt.subject,
+        ROUND(AVG(pq.is_correct) * 100) AS score
+     FROM   practice_tests pt
+     JOIN   practice_questions pq ON pt.id = pq.test_id
+     WHERE  pt.student_id = :student_id
+     GROUP  BY pt.id
+     ORDER  BY pt.created_at DESC
+     LIMIT  3`,
+    {
+      replacements: { student_id },
+      type: sequelize.QueryTypes.SELECT,
+    }
+  );
+
+  return res.status(200).json(
+    new ApiResponse(200, results, "Latest tests fetched")
+  );
 });
