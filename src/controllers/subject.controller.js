@@ -2,6 +2,10 @@ import sequelize from "../config/db.js";
 import AdminClass from "../models/admin_class.model.js";
 import AdminSubject from "../models/admin_subject_master.model.js";
 import AdminChapterMaster from "../models/admin_chapter_master.model.js";
+import User                from "../models/user.model.js";
+import StudentProfile      from "../models/student_profile.model.js";
+import StudentClassSection from "../models/student_class_section.model.js";
+import AdminSchool from "../models/admin_school.model.js";
 
 /* =====================================================
    ADD SUBJECTS + CHAPTERS (class_id based)
@@ -84,25 +88,83 @@ export const addSubjectsWithChapters = async (req, res) => {
 ===================================================== */
 export const getSubjects = async (req, res) => {
   try {
-    const { class_id, board, language } = req.query;
+    let { class_id, board, language } = req.query;
 
+    // ─────────────────────────────────────────────────────
+    // If any param is missing, auto-resolve from user profile
+    // ─────────────────────────────────────────────────────
+
+    console.log(req);
+    
+    if (!class_id || !board || !language) {
+      const user_id = req.user.user_id; // from authMiddleware
+
+      // 1️⃣ Get user → school_id
+      const user = await User.findOne({
+        where:      { user_id },
+        attributes: ["user_id", "school_id"],
+      });
+
+      if (!user) {
+        return res.status(404).json({ success: false, message: "User not found" });
+      }
+
+      // 2️⃣ Get board from school
+      if (!board && user.school_id) {
+        const school = await AdminSchool.findOne({
+          where:      { school_id: user.school_id },
+          attributes: ["board"],
+        });
+        if (school?.board) board = school.board;
+      }
+
+      // 3️⃣ Get preferred_language from student_profiles
+      const studentProfile = await StudentProfile.findOne({
+        where:      { user_id },
+        attributes: ["student_id", "preferred_language"],
+      });
+
+      if (!language && studentProfile?.preferred_language) {
+        language = studentProfile.preferred_language;
+      }
+
+      // 4️⃣ Get class_id from student_class_section
+      if (!class_id && studentProfile?.student_id) {
+        const classSection = await StudentClassSection.findOne({
+          where:      { student_id: studentProfile.student_id, status: "active" },
+          attributes: ["class_id"],
+        });
+        if (classSection?.class_id) class_id = classSection.class_id;
+      }
+    }
+
+    // ─────────────────────────────────────────────────────
+    // Build where clause with whatever we have
+    // ─────────────────────────────────────────────────────
     const where = {};
-
     if (class_id) where.class_id = class_id;
-    if (board) where.board = board;
+    if (board)    where.board    = board;
     if (language) where.language = language;
+
+    if (Object.keys(where).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Could not resolve class, board or language. Please provide them explicitly.",
+      });
+    }
 
     const subjects = await AdminSubject.findAll({ where });
 
     return res.status(200).json({
       success: true,
-      data: subjects
+      resolved: { class_id, board, language }, // helpful for debugging
+      data: subjects,
     });
 
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };

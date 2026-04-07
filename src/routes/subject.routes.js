@@ -21,7 +21,7 @@ const router = express.Router();
    ===================================================== */
 router.post(
   "/subjects",
-  // authMiddleware,
+  authMiddleware,
   // requirePermission("MANAGE_SCHOOL"),
   addSubjectsWithChapters
 );
@@ -33,7 +33,7 @@ router.post(
    ===================================================== */
 router.get(
   "/subjects",
-  // authMiddleware,
+  authMiddleware,
   // requirePermission("MANAGE_SCHOOL"),
   getSubjects
 );
@@ -45,7 +45,7 @@ router.get(
    ===================================================== */
 router.get(
   "/subjects/:class_id/chapters/:subject_id",
-  // authMiddleware,
+  authMiddleware,
   // requirePermission("MANAGE_SCHOOL"),
   getChapters
 );
@@ -57,7 +57,7 @@ router.get(
    ===================================================== */
 router.put(
   "/subjects/:subject_id",
-  // authMiddleware,
+  authMiddleware,
   // requirePermission("MANAGE_SCHOOL"),
   updateSubjectName
 );
@@ -69,7 +69,7 @@ router.put(
    ===================================================== */
 router.delete(
   "/subjects/:subject_id",
-  // authMiddleware,
+  authMiddleware,
   // requirePermission("MANAGE_SCHOOL"),
   deleteSubject
 );
@@ -81,7 +81,7 @@ router.delete(
    ===================================================== */
 router.post(
   "/subjects/:subject_id/chapters",
-  // authMiddleware,
+  authMiddleware,
   // requirePermission("MANAGE_SCHOOL"),
   addChaptersToSubject
 );
@@ -93,7 +93,7 @@ router.post(
    ===================================================== */
 router.put(
   "/chapters/:chapter_id",
-  // authMiddleware,
+  authMiddleware,
   // requirePermission("MANAGE_SCHOOL"),
   updateChapter
 );
@@ -105,7 +105,7 @@ router.put(
    ===================================================== */
 router.delete(
   "/chapters/:chapter_id",
-  // authMiddleware,
+  authMiddleware,
   // requirePermission("MANAGE_SCHOOL"),
   deleteChapter
 );
