@@ -564,6 +564,8 @@ export const getConversation = asyncHandler(async (req, res) => {
    ===================================================== */
 export const getLatestTests = asyncHandler(async (req, res) => {
   const user_id = Number(req.user.user_id);
+  console.log(user_id);
+  
 
   // Resolve student_id from user_id via StudentProfile
   const student = await StudentProfile.findOne({ where: { user_id } });
@@ -590,6 +592,9 @@ export const getLatestTests = asyncHandler(async (req, res) => {
       type: sequelize.QueryTypes.SELECT,
     }
   );
+
+  console.log(results);
+  
 
   return res.status(200).json(
     new ApiResponse(200, results, "Latest tests fetched")

@@ -322,88 +322,52 @@ async function retry(fn, retries = 3) {
 export const generateAiNotes = async (req, res) => {
   const transaction = await sequelize.transaction();
 
+  // ✅ Collect all temp paths BEFORE try block so finally can always access them
+  const allTempFiles = [
+    ...(req.files?.notes || []),
+    ...(req.files?.books || []),
+  ].map(f => f.path);
+
   try {
     const { language, board, class: className, subject, chapters } = req.body;
 
     const chapterList = JSON.parse(chapters);
 
-    const noteFiles = req.files.notes; // ✅ notes PDFs
-    const bookFiles = req.files.books; // ✅ books PDFs
+    console.log("chapterList length:", chapterList.length);
+    console.log("noteFiles length:", req.files?.notes?.length);
+    console.log("bookFiles length:", req.files?.books?.length);
+
+    const noteFiles = req.files.notes;
+    const bookFiles = req.files.books;
 
     if (!noteFiles || noteFiles.length !== chapterList.length) {
-      throw new Error("Notes files mismatch");
+      throw new Error(
+        `Notes files mismatch: expected ${chapterList.length}, got ${noteFiles?.length ?? 0}`
+      );
     }
 
     if (!bookFiles || bookFiles.length !== chapterList.length) {
-      throw new Error("Books files mismatch");
+      throw new Error(
+        `Books files mismatch: expected ${chapterList.length}, got ${bookFiles?.length ?? 0}`
+      );
     }
 
     const results = [];
 
     for (let i = 0; i < chapterList.length; i++) {
       const topic = chapterList[i].trim();
-
       const noteFile = noteFiles[i];
       const bookFile = bookFiles[i];
 
-      /*
-      ------------------------------------------
-      1️⃣ Upload BOOK
-      ------------------------------------------
-      */
-      const bookUpload = await uploadToS3(
-        bookFile,
-        "Books",
-        language,
-        board,
-        className,
-        subject,
-        topic
-      );
-
+      const bookUpload = await uploadToS3(bookFile, "Books", language, board, className, subject, topic);
       const bookKey = bookUpload.key;
 
-      fs.unlinkSync(bookFile.path);
-
-      /*
-      ------------------------------------------
-      2️⃣ Upload NOTES
-      ------------------------------------------
-      */
-      const noteUpload = await uploadToS3(
-        noteFile,
-        "Notes",
-        language,
-        board,
-        className,
-        subject,
-        topic
-      );
-
+      const noteUpload = await uploadToS3(noteFile, "Notes", language, board, className, subject, topic);
       const noteKey = noteUpload.key;
 
-      fs.unlinkSync(noteFile.path);
-
-      /*
-      ------------------------------------------
-      3️⃣ Generate AI Notes
-      ------------------------------------------
-      */
-      const aiText = await generateNotes({
-        language,
-        board,
-        className,
-        subject,
-        chapter: topic,
-      });
-
+      const aiText = await generateNotes({ language, board, className, subject, chapter: topic });
       const parsed = parseNotes(aiText);
 
-      /*
-      ------------------------------------------
-      4️⃣ Save in DB
-      ------------------------------------------
-      */
       const note = await AiNote.create(
         {
           language,
@@ -412,19 +376,14 @@ export const generateAiNotes = async (req, res) => {
           subject,
           topic,
           short_notes: parsed.short_notes,
-          full_notes: noteKey,   // ✅ Notes key
-          book_url: bookKey,    // ✅ Book key (NEW COLUMN)
+          full_notes: noteKey,
+          book_url: bookKey,
           generated_by: "AI",
         },
         { transaction }
       );
 
-      results.push({
-        topic,
-        noteKey,
-        bookKey,
-        id: note.id,
-      });
+      results.push({ topic, noteKey, bookKey, id: note.id });
 
       await sleep(2000);
     }
@@ -436,14 +395,27 @@ export const generateAiNotes = async (req, res) => {
       message: "AI Notes + Books uploaded successfully",
       results,
     });
+
   } catch (error) {
     await transaction.rollback();
-
     console.error("Generate AI Notes Error:", error);
 
     res.status(500).json({
       success: false,
-      message: "Failed to generate AI notes",
+      message: error.message,
     });
+
+  } finally {
+    // ✅ Always runs — deletes ALL temp files after success or failure
+    for (const filePath of allTempFiles) {
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          console.log(`🗑️ Deleted temp file: ${filePath}`);
+        }
+      } catch (err) {
+        console.warn(`⚠️ Could not delete temp file ${filePath}:`, err.message);
+      }
+    }
   }
 };
