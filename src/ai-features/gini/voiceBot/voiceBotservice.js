@@ -38,37 +38,14 @@ Guidelines:
 Goal:
 Provide responses that sound smooth, friendly, and natural when spoken aloud.`;
 
-  const frontendMessages = message;
-
-  const finalMessages = [
-    {
-      role: "system",
-      content: [
-        {
-          type: "input_text",
-          text: systemPrompt,
-        },
-      ],
-    },
-    ...frontendMessages.map((msg) => ({
-      role: msg.role,
-      content: [
-        {
-          type: "input_text",
-          text: msg.content,
-        },
-      ],
-    })),
-  ];
-
-  const response = await client.responses.create({
+  const finalMessages = [{ role: "system", content: systemPrompt }, ...message];
+  const response = await client.chat.completions.create({
     model: "gpt-4o-mini",
-    input: finalMessages,
-    max_output_tokens: 100,
+    messages: finalMessages,
   });
-
+  const outputText = response.choices[0].message.content;
   const sarvamResponse = await sarvamClient.textToSpeech.convert({
-    text: response.output_text,
+    text: outputText,
     target_language_code: "hi-IN",
     speaker: "arya",
     pace: 1.1,
@@ -81,9 +58,11 @@ Provide responses that sound smooth, friendly, and natural when spoken aloud.`;
   // console.log(sarvamResponse);
 
   // console.log(response.output_text);
+
+  // console.log(outputText);
   return {
     role: "assistant",
-    content: response.output_text,
+    content: outputText,
     audio: sarvamResponse.audios[0],
   };
 };
