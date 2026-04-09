@@ -40,17 +40,20 @@ Goal:
 Provide responses that sound smooth, friendly, and natural when spoken aloud.`;
 
   //speach to text
-  const STT = await sarvamClient.speechToText.transcribe({
-    file: Readable.from(file.buffer),
-    model: "saaras:v3",
-    mode: "transcribe", // default mode
-  });
+  let STT = null;
+  if (file !== undefined) {
+    STT = await sarvamClient.speechToText.transcribe({
+      file: Readable.from(file.buffer),
+      model: "saaras:v3",
+      mode: "transcribe", // default mode
+    });
+  }
 
   const finalMessages = [
     { role: "system", content: systemPrompt },
     ...message.map((msg) =>
       msg.content === "[Voice message]"
-        ? { ...msg, content: STT.transcript }
+        ? { ...msg, content: STT?.transcript }
         : msg,
     ),
   ];
@@ -80,5 +83,6 @@ Provide responses that sound smooth, friendly, and natural when spoken aloud.`;
     role: "assistant",
     content: outputText,
     audio: sarvamResponse.audios[0],
+    userQuery: STT !== null ? STT?.transcript : null,
   };
 };
