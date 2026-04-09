@@ -2,8 +2,8 @@ import sequelize from "../config/db.js";
 import AdminClass from "../models/admin_class.model.js";
 import AdminSubject from "../models/admin_subject_master.model.js";
 import AdminChapterMaster from "../models/admin_chapter_master.model.js";
-import User                from "../models/user.model.js";
-import StudentProfile      from "../models/student_profile.model.js";
+import User from "../models/user.model.js";
+import StudentProfile from "../models/student_profile.model.js";
 import StudentClassSection from "../models/student_class_section.model.js";
 import AdminSchool from "../models/admin_school.model.js";
 
@@ -19,18 +19,17 @@ export const addSubjectsWithChapters = async (req, res) => {
     if (!class_id || !board || !language || !subjects?.length) {
       return res.status(400).json({
         success: false,
-        message: "class_id, board, language and subjects required"
+        message: "class_id, board, language and subjects required",
       });
     }
 
     const classData = await AdminClass.findByPk(class_id);
     console.log("Class Data:", classData);
-    
 
     if (!classData) {
       return res.status(404).json({
         success: false,
-        message: "Class not found"
+        message: "Class not found",
       });
     }
 
@@ -43,13 +42,13 @@ export const addSubjectsWithChapters = async (req, res) => {
 
       // ✅ create or find subject
       let subject = await AdminSubject.findOne({
-        where: { class_id, board, language, subject_name }
+        where: { class_id, board, language, subject_name },
       });
 
       if (!subject) {
         subject = await AdminSubject.create(
           { class_id, board, language, subject_name },
-          { transaction }
+          { transaction },
         );
       }
 
@@ -61,7 +60,7 @@ export const addSubjectsWithChapters = async (req, res) => {
         language,
         chapter_name: chapterName,
         chapter_order: index + 1,
-        status: "active"
+        status: "active",
       }));
 
       await AdminChapterMaster.bulkCreate(chapterPayload, { transaction });
@@ -71,14 +70,13 @@ export const addSubjectsWithChapters = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: "Subjects and Chapters added successfully"
+      message: "Subjects and Chapters added successfully",
     });
-
   } catch (error) {
     await transaction.rollback();
     return res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -94,25 +92,25 @@ export const getSubjects = async (req, res) => {
     // If any param is missing, auto-resolve from user profile
     // ─────────────────────────────────────────────────────
 
-    console.log(req);
-    
     if (!class_id || !board || !language) {
       const user_id = req.user.user_id; // from authMiddleware
 
       // 1️⃣ Get user → school_id
       const user = await User.findOne({
-        where:      { user_id },
+        where: { user_id },
         attributes: ["user_id", "school_id"],
       });
 
       if (!user) {
-        return res.status(404).json({ success: false, message: "User not found" });
+        return res
+          .status(404)
+          .json({ success: false, message: "User not found" });
       }
 
       // 2️⃣ Get board from school
       if (!board && user.school_id) {
         const school = await AdminSchool.findOne({
-          where:      { school_id: user.school_id },
+          where: { school_id: user.school_id },
           attributes: ["board"],
         });
         if (school?.board) board = school.board;
@@ -120,7 +118,7 @@ export const getSubjects = async (req, res) => {
 
       // 3️⃣ Get preferred_language from student_profiles
       const studentProfile = await StudentProfile.findOne({
-        where:      { user_id },
+        where: { user_id },
         attributes: ["student_id", "preferred_language"],
       });
 
@@ -131,7 +129,7 @@ export const getSubjects = async (req, res) => {
       // 4️⃣ Get class_id from student_class_section
       if (!class_id && studentProfile?.student_id) {
         const classSection = await StudentClassSection.findOne({
-          where:      { student_id: studentProfile.student_id, status: "active" },
+          where: { student_id: studentProfile.student_id, status: "active" },
           attributes: ["class_id"],
         });
         if (classSection?.class_id) class_id = classSection.class_id;
@@ -143,13 +141,14 @@ export const getSubjects = async (req, res) => {
     // ─────────────────────────────────────────────────────
     const where = {};
     if (class_id) where.class_id = class_id;
-    if (board)    where.board    = board;
+    if (board) where.board = board;
     if (language) where.language = language;
 
     if (Object.keys(where).length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Could not resolve class, board or language. Please provide them explicitly.",
+        message:
+          "Could not resolve class, board or language. Please provide them explicitly.",
       });
     }
 
@@ -160,7 +159,6 @@ export const getSubjects = async (req, res) => {
       resolved: { class_id, board, language }, // helpful for debugging
       data: subjects,
     });
-
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -180,20 +178,20 @@ export const getChapters = async (req, res) => {
       where: {
         class_id,
         subject_id,
-        status: "active"
+        status: "active",
       },
-      order: [["chapter_order", "ASC"]]
+      order: [["chapter_order", "ASC"]],
+      raw: true,
     });
 
     return res.status(200).json({
       success: true,
-      data: chapters
+      data: chapters,
     });
-
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -209,7 +207,7 @@ export const updateSubjectName = async (req, res) => {
     if (!subject_name) {
       return res.status(400).json({
         success: false,
-        message: "subject_name is required"
+        message: "subject_name is required",
       });
     }
 
@@ -218,7 +216,7 @@ export const updateSubjectName = async (req, res) => {
     if (!subject) {
       return res.status(404).json({
         success: false,
-        message: "Subject not found"
+        message: "Subject not found",
       });
     }
 
@@ -227,13 +225,12 @@ export const updateSubjectName = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Subject updated successfully"
+      message: "Subject updated successfully",
     });
-
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -249,26 +246,25 @@ export const deleteSubject = async (req, res) => {
 
     await AdminChapterMaster.destroy({
       where: { subject_id },
-      transaction
+      transaction,
     });
 
     await AdminSubject.destroy({
       where: { subject_id },
-      transaction
+      transaction,
     });
 
     await transaction.commit();
 
     return res.status(200).json({
       success: true,
-      message: "Subject deleted successfully"
+      message: "Subject deleted successfully",
     });
-
   } catch (error) {
     await transaction.rollback();
     return res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -281,11 +277,10 @@ export const addChaptersToSubject = async (req, res) => {
     const { subject_id } = req.params;
     const { class_id, board, language, chapters } = req.body;
 
-    
     if (!chapters?.length) {
       return res.status(400).json({
         success: false,
-        message: "chapters array required"
+        message: "chapters array required",
       });
     }
 
@@ -294,7 +289,7 @@ export const addChaptersToSubject = async (req, res) => {
     if (!classData) {
       return res.status(404).json({
         success: false,
-        message: "Class not found"
+        message: "Class not found",
       });
     }
 
@@ -303,39 +298,38 @@ export const addChaptersToSubject = async (req, res) => {
     if (!subject) {
       return res.status(404).json({
         success: false,
-        message: "Subject not found"
+        message: "Subject not found",
       });
     }
 
     const existingChapters = await AdminChapterMaster.findAll({
-        where: { subject_id }
-      });
+      where: { subject_id },
+    });
 
-      const existingNames = existingChapters.map(c => c.chapter_name);
+    const existingNames = existingChapters.map((c) => c.chapter_name);
 
     const payload = chapters
-    .filter(name => !existingNames.includes(name))
-    .map((name, index) => ({
-      subject_id,
-      class_id: subject.class_id,
-      board_name: subject.board,
-      language: subject.language,
-      chapter_name: name.trim(),
-      chapter_order: index + 1,
-      status: "active"
-    }));
+      .filter((name) => !existingNames.includes(name))
+      .map((name, index) => ({
+        subject_id,
+        class_id: subject.class_id,
+        board_name: subject.board,
+        language: subject.language,
+        chapter_name: name.trim(),
+        chapter_order: index + 1,
+        status: "active",
+      }));
 
     await AdminChapterMaster.bulkCreate(payload);
 
     return res.status(201).json({
       success: true,
-      message: "Chapters added successfully"
+      message: "Chapters added successfully",
     });
-
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -353,7 +347,7 @@ export const updateChapter = async (req, res) => {
     if (!chapter) {
       return res.status(404).json({
         success: false,
-        message: "Chapter not found"
+        message: "Chapter not found",
       });
     }
 
@@ -362,13 +356,12 @@ export const updateChapter = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Chapter updated successfully"
+      message: "Chapter updated successfully",
     });
-
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -381,25 +374,24 @@ export const deleteChapter = async (req, res) => {
     const { chapter_id } = req.params;
 
     const deleted = await AdminChapterMaster.destroy({
-      where: { chapter_id }
+      where: { chapter_id },
     });
 
     if (!deleted) {
       return res.status(404).json({
         success: false,
-        message: "Chapter not found"
+        message: "Chapter not found",
       });
     }
 
     return res.status(200).json({
       success: true,
-      message: "Chapter deleted successfully"
+      message: "Chapter deleted successfully",
     });
-
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
