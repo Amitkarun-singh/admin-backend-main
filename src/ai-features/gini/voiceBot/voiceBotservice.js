@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { errorMessage } from "../../../../error.js";
 
 import { SarvamAIClient } from "sarvamai";
+import { Readable } from "stream";
 
 let client;
 
@@ -17,7 +18,7 @@ const sarvamClient = new SarvamAIClient({
   apiSubscriptionKey: process.env.SARVAM_API_KEY,
 });
 
-export const voiceBotService = async (message) => {
+export const voiceBotService = async (message, file) => {
   console.log("voiceBotService");
 
   const systemPrompt = `You are a helpful voice assistant. Your responses will be converted to speech using a text-to-speech (TTS) system.
@@ -38,12 +39,32 @@ Guidelines:
 Goal:
 Provide responses that sound smooth, friendly, and natural when spoken aloud.`;
 
-  const finalMessages = [{ role: "system", content: systemPrompt }, ...message];
+  //speach to text
+  const STT = await sarvamClient.speechToText.transcribe({
+    file: Readable.from(file.buffer),
+    model: "saaras:v3",
+    mode: "transcribe", // default mode
+  });
+
+  const finalMessages = [
+    { role: "system", content: systemPrompt },
+    ...message.map((msg) =>
+      msg.content === "[Voice message]"
+        ? { ...msg, content: STT.transcript }
+        : msg,
+    ),
+  ];
+
+  console.log("finalMessages ", finalMessages);
+
+  //LLM call
   const response = await client.chat.completions.create({
     model: "gpt-4o-mini",
     messages: finalMessages,
   });
   const outputText = response.choices[0].message.content;
+
+  //text to speech
   const sarvamResponse = await sarvamClient.textToSpeech.convert({
     text: outputText,
     target_language_code: "hi-IN",
@@ -55,11 +76,6 @@ Provide responses that sound smooth, friendly, and natural when spoken aloud.`;
     dict_id: "p_c7b89ab3", // Pronunciation dictionary
   });
 
-  // console.log(sarvamResponse);
-
-  // console.log(response.output_text);
-
-  // console.log(outputText);
   return {
     role: "assistant",
     content: outputText,
