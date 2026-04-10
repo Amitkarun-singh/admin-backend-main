@@ -22,7 +22,7 @@ export const voiceBotService = async (message, audio) => {
   } else {
     messageWithPrompt = mergeSystemPromptWithMessage(message);
   }
-  console.log(messageWithPrompt);
+
   const response = await generateResponse(messageWithPrompt);
 
   const responseAudio = await textToSpeech(response);
