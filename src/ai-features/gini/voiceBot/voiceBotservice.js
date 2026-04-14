@@ -1,51 +1,91 @@
 import OpenAI from "openai";
-import { errorMessage } from "../../../../error.js";
-
 import { SarvamAIClient } from "sarvamai";
+import { Readable } from "stream";
 
-let client;
-
-try {
-  client = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
-} catch {
-  errorMessage.push("API_KEY OPENAI_API_KEY required");
-}
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 const sarvamClient = new SarvamAIClient({
   apiSubscriptionKey: process.env.SARVAM_API_KEY,
 });
 
-export const voiceBotService = async (message) => {
+export const voiceBotService = async (message, audio) => {
   console.log("voiceBotService");
 
-  const systemPrompt = `You are a helpful voice assistant. Your responses will be converted to speech using a text-to-speech (TTS) system.
+  let STT = null;
+  let messageWithPrompt;
+  if (audio) {
+    STT = await speechToText(audio);
+    const messageWithTranscript = mergeTranscriptWithMessage(message, STT);
+    messageWithPrompt = mergeSystemPromptWithMessage(messageWithTranscript);
+  } else {
+    messageWithPrompt = mergeSystemPromptWithMessage(message);
+  }
 
-Guidelines:
-- Speak naturally, like a human in conversation.
-- Keep responses concise and clear (prefer short sentences).
-- Avoid long paragraphs, bullet points, or complex formatting.
-- Do not use emojis, markdown, or special characters.
-- Use simple, everyday language that is easy to understand when heard.
-- Add slight conversational tone (e.g., “Sure,” “Okay,” “Got it”).
-- Avoid unnecessary details unless the user asks for more.
-- When giving numbers, dates, or instructions, format them in a way that sounds natural when spoken.
-- If clarification is needed, ask short follow-up questions.
-- Avoid repeating the user’s full question.
-- Do not mention being an AI unless explicitly asked.
+  const response = await generateResponse(messageWithPrompt);
 
-Goal:
-Provide responses that sound smooth, friendly, and natural when spoken aloud.`;
+  const responseAudio = await textToSpeech(response);
 
-  const finalMessages = [{ role: "system", content: systemPrompt }, ...message];
+  return {
+    role: "assistant",
+    content: response,
+    audio: responseAudio.audios[0],
+    userQuery: STT !== null ? STT?.transcript : null,
+  };
+};
+
+function getSystemPrompt() {
+  return `You are a helpful voice assistant. Your responses will be converted to speech using a text-to-speech (TTS) system.
+  
+  Guidelines:
+  - Speak naturally, like a human in conversation.
+  - Keep responses concise and clear (prefer short sentences).
+  - Avoid long paragraphs, bullet points, or complex formatting.
+  - Do not use emojis, markdown, or special characters.
+  - Use simple, everyday language that is easy to understand when heard.
+  - Add slight conversational tone (e.g., “Sure,” “Okay,” “Got it”).
+  - Avoid unnecessary details unless the user asks for more.
+  - When giving numbers, dates, or instructions, format them in a way that sounds natural when spoken.
+  - If clarification is needed, ask short follow-up questions.
+  - Avoid repeating the user’s full question.
+  - Do not mention being an AI unless explicitly asked.
+  
+  Goal:
+  Provide responses that sound smooth, friendly, and natural when spoken aloud.`;
+}
+
+async function speechToText(audio) {
+  return await sarvamClient.speechToText.transcribe({
+    file: Readable.from(audio.buffer),
+    model: "saaras:v3",
+    mode: "transcribe", // default mode
+  });
+}
+
+function mergeTranscriptWithMessage(message, STT) {
+  return message.map((msg) =>
+    msg.content === "[Voice message]"
+      ? { ...msg, content: STT?.transcript }
+      : msg,
+  );
+}
+
+function mergeSystemPromptWithMessage(message) {
+  return [{ role: "system", content: getSystemPrompt() }, ...message];
+}
+
+async function generateResponse(message) {
   const response = await client.chat.completions.create({
     model: "gpt-4o-mini",
-    messages: finalMessages,
+    messages: message,
   });
-  const outputText = response.choices[0].message.content;
-  const sarvamResponse = await sarvamClient.textToSpeech.convert({
-    text: outputText,
+  return response.choices[0].message.content;
+}
+
+async function textToSpeech(response) {
+  return await sarvamClient.textToSpeech.convert({
+    text: response,
     target_language_code: "hi-IN",
     speaker: "arya",
     pace: 1.1,
@@ -54,15 +94,4 @@ Provide responses that sound smooth, friendly, and natural when spoken aloud.`;
     model: "bulbul:v2",
     dict_id: "p_c7b89ab3", // Pronunciation dictionary
   });
-
-  // console.log(sarvamResponse);
-
-  // console.log(response.output_text);
-
-  // console.log(outputText);
-  return {
-    role: "assistant",
-    content: outputText,
-    audio: sarvamResponse.audios[0],
-  };
-};
+}

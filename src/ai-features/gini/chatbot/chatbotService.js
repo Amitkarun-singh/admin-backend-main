@@ -7,45 +7,97 @@ import dotEnv from "dotenv";
 dotEnv.config();
 import { fromBuffer } from "pdf2pic";
 
-let openai;
-
-try {
-  openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
-} catch (error) {
-  console.error("Gini chat bot service | OPENAI_API_KEY required", error);
-  errorMessage.push({ error, msg: "OPENAI_API_KEY required" });
-}
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 /**
- * Extract text from uploaded file (PDF or image)
+ * Stream AI response to client
+ * @param {*} messages - Array of user messages
+ * @param {*} res - Express response object (SSE)
+ * @param {*} file - Optional uploaded file
  */
-// const extractFileText = async (file) => {
-//   if (!file) return "";
+export const streamChatbotResponse = async (
+  messages,
+  res,
+  file = null,
+  language = "",
+  className = "",
+  chapter = "",
+) => {
+  console.log("Gini chat bot service ");
+  let messageWithPrompt;
+  try {
+    if (file) {
+      const messageWithFile = await mergeMessagesWithFile(messages, file);
+      messageWithPrompt = mergeMessageWithPrompt(messageWithFile, {
+        language,
+        className,
+        chapter,
+      });
+    } else {
+      messageWithPrompt = mergeMessageWithPrompt(messages, {
+        language,
+        className,
+        chapter,
+      });
+    }
 
-//   const mime = file.mimetype;
+    const stream = await openai.chat.completions.create({
+      // model: "tngtech/deepseek-r1t-chimera:free",
+      model: "gpt-4o-mini",
+      messages: messageWithPrompt,
+      stream: true,
+      max_tokens: 1200,
+    });
 
-//   try {
-//     if (mime === "application/pdf") {
-//       const data = await pdf(file.buffer);
-//       return data.text;
-//     } else if (mime.startsWith("image/")) {
-//       const {
-//         data: { text },
-//       } = await Tesseract.recognize(file.buffer, "eng", {
-//         // logger: (m) => console.log(m), // optional progress logging
-//       });
-//       return text;
-//     } else {
-//       return ""; // unsupported file
-//     }
-//   } catch (err) {
-//     console.error("File extraction error:", err);
-//     errorMessage.push(err);
-//     return "";
-//   }
-// };
+    //Stream AI response to frontend
+    for await (const chunk of stream) {
+      const content = chunk.choices?.[0]?.delta?.content;
+      if (content) {
+        res.write(
+          `data: ${JSON.stringify({
+            choices: [{ delta: { content } }],
+          })}\n\n`,
+        );
+      }
+    }
+
+    res.write("data: [DONE]\n\n");
+    res.end();
+  } catch (error) {
+    console.error("Gini chat bot service  | Streaming Service Error:", error);
+    res.write("data: [DONE]\n\n");
+    res.end();
+  }
+};
+
+export const feedbackThumbUpService = async (feedback) => {
+  try {
+    await ChatBotFeedbackSave([
+      feedback.userMessage,
+      feedback.response,
+      "LIKE",
+    ]);
+
+    return true;
+  } catch (err) {
+    console.error(err);
+    throw err;
+  }
+};
+export const feedbackThumbDownService = async (feedback) => {
+  try {
+    await await ChatBotFeedbackSave([
+      feedback.userMessage,
+      feedback.response,
+      feedback.feedback,
+    ]);
+    return true;
+  } catch (err) {
+    throw err;
+  }
+};
 
 const extractFileText = async (file) => {
   if (!file) return "";
@@ -104,36 +156,32 @@ const extractFileText = async (file) => {
   }
 };
 
-/**
- * Stream AI response to client
- * @param {*} messages - Array of user messages
- * @param {*} res - Express response object (SSE)
- * @param {*} file - Optional uploaded file
- */
-export const streamChatbotResponse = async (
-  messages,
-  res,
-  file = null,
-  language,
-  className = "",
-  chapter = "",
-) => {
-  console.log("Gini chat bot service ");
+async function mergeMessagesWithFile(messages, file) {
+  const fileContent = await extractFileText(file);
 
-  try {
-    // Extract file text if uploaded
-    let fileContent = "";
-    if (file) {
-      fileContent = await extractFileText(file);
-      if (fileContent) {
-        messages.push({
-          role: "user",
-          content: `The following content is from the uploaded file (${file.originalname}):\n\n${fileContent}`,
-        });
-      }
-    }
+  if (!fileContent) return messages;
 
-    const systemPrompt = `
+  return [
+    ...messages,
+    {
+      role: "user",
+      content: `The following content is from the uploaded file (${file.originalname}):\n\n${fileContent}`,
+    },
+  ];
+}
+
+function mergeMessageWithPrompt(messages, { language, className, chapter }) {
+  return [
+    {
+      role: "system",
+      content: getSystemPrompt({ language, className, chapter }),
+    },
+    ...messages,
+  ];
+}
+
+function getSystemPrompt({ language, className, chapter }) {
+  return `
 You are a friendly AI tutor helping a school student learn.
 
 STUDENT CONTEXT
@@ -189,64 +237,4 @@ Instead encourage learning and understanding.
 GOAL
 Your goal is to help the student understand the topic "${chapter}" clearly and safely.
 `;
-
-    const finalMessages = [
-      { role: "system", content: systemPrompt },
-      ...messages,
-    ];
-
-    const stream = await openai.chat.completions.create({
-      // model: "tngtech/deepseek-r1t-chimera:free",
-      model: "gpt-4o-mini",
-      messages: finalMessages,
-      stream: true,
-      max_tokens: 1200,
-    });
-
-    //Stream AI response to frontend
-    for await (const chunk of stream) {
-      const content = chunk.choices?.[0]?.delta?.content;
-      if (content) {
-        res.write(
-          `data: ${JSON.stringify({
-            choices: [{ delta: { content } }],
-          })}\n\n`,
-        );
-      }
-    }
-
-    res.write("data: [DONE]\n\n");
-    res.end();
-  } catch (error) {
-    console.error("Gini chat bot service  | Streaming Service Error:", error);
-    res.write("data: [DONE]\n\n");
-    res.end();
-  }
-};
-
-export const feedbackThumbUpService = async (feedback) => {
-  try {
-    await ChatBotFeedbackSave([
-      feedback.userMessage,
-      feedback.response,
-      "LIKE",
-    ]);
-
-    return true;
-  } catch (err) {
-    console.error(err);
-    throw err;
-  }
-};
-export const feedbackThumbDownService = async (feedback) => {
-  try {
-    await await ChatBotFeedbackSave([
-      feedback.userMessage,
-      feedback.response,
-      feedback.feedback,
-    ]);
-    return true;
-  } catch (err) {
-    throw err;
-  }
-};
+}

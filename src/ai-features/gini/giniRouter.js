@@ -1,6 +1,6 @@
 import express from "express";
 import { authMiddleware } from "../../middlewares/auth.middleware.js";
-
+import multer from "multer";
 import {
   generatePracticeQuestionsController,
   submitAnswerController,
@@ -28,7 +28,13 @@ router.post(
 );
 
 router.post("/ai/gini", authMiddleware, chatbotLogs, chatbotController);
-router.post("/voice-bot", authMiddleware, voiceBotController);
+const upload = multer({ storage: multer.memoryStorage() });
+router.post(
+  "/voice-bot",
+  authMiddleware,
+  upload.single("user_audio"),
+  voiceBotController,
+);
 router.post(
   "/ai/feedback/thumbs-up",
   authMiddleware,
