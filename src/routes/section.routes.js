@@ -36,7 +36,7 @@ router.post(
 router.get(
   "/class/:class_id/sections",
   authMiddleware,
-  requirePermission("MANAGE_SCHOOL"),
+  // requirePermission("MANAGE_SCHOOL"),
   getSectionsByClass
 );
 

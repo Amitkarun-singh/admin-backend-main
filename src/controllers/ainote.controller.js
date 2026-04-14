@@ -337,6 +337,7 @@ export const generateAiNotes = async (req, res) => {
     console.log("noteFiles length:", req.files?.notes?.length);
     console.log("bookFiles length:", req.files?.books?.length);
 
+
     const noteFiles = req.files.notes;
     const bookFiles = req.files.books;
 
@@ -365,7 +366,15 @@ export const generateAiNotes = async (req, res) => {
       const noteUpload = await uploadToS3(noteFile, "Notes", language, board, className, subject, topic);
       const noteKey = noteUpload.key;
 
-      const aiText = await generateNotes({ language, board, className, subject, chapter: topic });
+      let subjectLanguage;
+
+      if (subject === "Hindi" || subject === "English") {
+        subjectLanguage = subject;
+      }else{
+        subjectLanguage = language;
+      }
+
+      const aiText = await generateNotes({ subjectLanguage, board, className, subject, chapter: topic });
       const parsed = parseNotes(aiText);
 
       const note = await AiNote.create(
