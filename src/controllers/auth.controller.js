@@ -350,7 +350,6 @@ const getLoggedInUserProfile = asyncHandler(async (req, res) => {
     });
 
     const avatarUrl = await getSignedPdfUrl(user?.avatar);
-    console.log(avatarUrl)
 
     profileData = {
       school_name: school?.school_name,

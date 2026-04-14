@@ -7,6 +7,7 @@ import AiUsageLog       from "../models/ai_usage_log.model.js";
 import UserSession      from "../models/user_session.model.js";
 import StudentAnalytics from "../models/student_analytics.model.js";
 import StudentProfile   from "../models/student_profile.model.js";
+import {getSummary} from "../ai-features/studentPerformance/studentPerformance.model.js";
 
 import { ApiError }     from "../utils/ApiError.js";
 import { ApiResponse }  from "../utils/ApiResponse.js";
@@ -320,10 +321,10 @@ export const getLoginHistory = asyncHandler(async (req, res) => {
   const history = sessions.map(s => ({
     session_id: s.session_id,
     date:       new Date(s.login_at).toLocaleDateString("en-IN", {
-                  month: "short", day: "numeric", year: "numeric"
+                  month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Kolkata"
                 }),
     time:       new Date(s.login_at).toLocaleTimeString("en-IN", {
-                  hour: "2-digit", minute: "2-digit"
+                  hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata"
                 }),
     device:     s.device || "Desktop",
     location:   s.city && s.country
@@ -564,36 +565,28 @@ export const getConversation = asyncHandler(async (req, res) => {
    ===================================================== */
 export const getLatestTests = asyncHandler(async (req, res) => {
   const user_id = Number(req.user.user_id);
-  console.log(user_id);
   
 
   // Resolve student_id from user_id via StudentProfile
-  const student = await StudentProfile.findOne({ where: { user_id } });
-  if (!student) {
-    return res.status(200).json(
-      new ApiResponse(200, [], "No student profile found")
-    );
-  }
 
-  const student_id = student.student_id;
+  const student_id = user_id;
 
   const results = await sequelize.query(
-    `SELECT
+    `SELECT 
         pt.subject,
         ROUND(AVG(pq.is_correct) * 100) AS score
-     FROM   practice_tests pt
-     JOIN   practice_questions pq ON pt.id = pq.test_id
-     WHERE  pt.student_id = :student_id
-     GROUP  BY pt.id
-     ORDER  BY pt.created_at DESC
-     LIMIT  3`,
+    FROM practice_tests pt
+    JOIN practice_questions pq 
+        ON pt.id = pq.test_id
+    WHERE pt.student_id = ${student_id}
+    GROUP BY pt.id
+    ORDER BY pt.created_at DESC
+  `,
     {
       replacements: { student_id },
       type: sequelize.QueryTypes.SELECT,
     }
   );
-
-  console.log(results);
   
 
   return res.status(200).json(
