@@ -6,6 +6,7 @@ const getDashboard = async (req, res) => {
     const userId = req.user?.user_id;
 
     const data = await getDashboardData(userId);
+    console.log(data);
 
     res.status(200).json({
       success: true,
