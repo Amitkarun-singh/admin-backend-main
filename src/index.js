@@ -24,6 +24,7 @@ import previousPapersRouter from "./ai-features/previousPapers/previousPapersRou
 import predictPapersRouter from "./ai-features/predictPapers/predictPapersRouter.js";
 import summarizeRoute from "./routes/summarize.routes.js";
 import ainoteRoute from "./routes/ainote.routes.js";
+import assessmentRoutes from "./routes/assessment.routes.js";
 // import dotenv from "dotenv";
 // dotenv.config();
 const app = express();
@@ -54,6 +55,7 @@ app.use("/api/parents", parentRoutes);
 // AI Feature Routes
 app.use("/api", summarizeRoute);
 app.use("/api/ainote", ainoteRoute);
+app.use("/api/assessments", assessmentRoutes);
 
 // History and Analytics Routes
 app.use("/api/history", historyRoutes);

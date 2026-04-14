@@ -32,6 +32,11 @@ import GiniLog     from "./gini_log.model.js";
 import PracticeLog from "./practice_log.model.js";
 import UserSession from "./user_session.model.js";
 
+import Assessment           from "./assessment.model.js";
+import AssessmentQuestion   from "./assessment_question.model.js";
+import AssessmentAssignment from "./assessment_assignment.model.js";
+import { StudentAttempt, StudentAnswer } from "./student_attempt.model.js";
+
 
 /* =====================================================
    USER ↔ ROLE  (RBAC)
@@ -248,6 +253,69 @@ GiniLog.belongsTo(User,  { foreignKey: "user_id", as: "user" });
 User.hasMany(PracticeLog,    { foreignKey: "user_id", as: "practiceLogs" });
 PracticeLog.belongsTo(User,  { foreignKey: "user_id", as: "user" });
 
+/* =====================================================
+   ASSESSMENT ENGINE ASSOCIATIONS  ← NEW
+   ===================================================== */
+ 
+/* Teacher (User) creates Assessments */
+User.hasMany(Assessment, { foreignKey: "created_by", as: "assessments" });
+Assessment.belongsTo(User, { foreignKey: "created_by", as: "creator" });
+ 
+/* Assessment ↔ Questions */
+Assessment.hasMany(AssessmentQuestion, {
+  foreignKey: "assessment_id",
+  as:         "questions",
+});
+AssessmentQuestion.belongsTo(Assessment, {
+  foreignKey: "assessment_id",
+  as:         "assessment",
+});
+ 
+/* Assessment ↔ Assignments */
+Assessment.hasMany(AssessmentAssignment, {
+  foreignKey: "assessment_id",
+  as:         "assignments",
+});
+AssessmentAssignment.belongsTo(Assessment, {
+  foreignKey: "assessment_id",
+  as:         "assessment",
+});
+ 
+/* Assignment ↔ Attempts */
+AssessmentAssignment.hasMany(StudentAttempt, {
+  foreignKey: "assignment_id",
+  as:         "attempts",
+});
+StudentAttempt.belongsTo(AssessmentAssignment, {
+  foreignKey: "assignment_id",
+  as:         "assignment",
+});
+ 
+/* Attempt ↔ Answers */
+StudentAttempt.hasMany(StudentAnswer, {
+  foreignKey: "attempt_id",
+  as:         "answers",
+});
+StudentAnswer.belongsTo(StudentAttempt, {
+  foreignKey: "attempt_id",
+  as:         "attempt",
+});
+ 
+/* Answer ↔ Question (to fetch correct answer when reviewing) */
+StudentAnswer.belongsTo(AssessmentQuestion, {
+  foreignKey: "question_id",
+  as:         "question",
+});
+ 
+/* StudentProfile ↔ Attempts */
+StudentProfile.hasMany(StudentAttempt, {
+  foreignKey: "student_id",
+  as:         "attempts",
+});
+StudentAttempt.belongsTo(StudentProfile, {
+  foreignKey: "student_id",
+  as:         "student",
+});
 
 /* =====================================================
    EXPORT ALL MODELS
@@ -281,4 +349,10 @@ export {
   GiniLog,
   PracticeLog,
   UserSession,
+
+  Assessment,
+  AssessmentQuestion,
+  AssessmentAssignment,
+  StudentAttempt,
+  StudentAnswer,
 };
