@@ -368,7 +368,7 @@ export const generateAiNotes = async (req, res) => {
 
       let subjectLanguage;
 
-      if (subject === "Hindi" || subject === "English") {
+      if (subject.includes("Hindi") || subject.includes("English")) {
         subjectLanguage = subject;
       }else{
         subjectLanguage = language;
