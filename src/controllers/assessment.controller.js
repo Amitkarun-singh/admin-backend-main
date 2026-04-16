@@ -12,6 +12,7 @@ import AdminSection        from "../models/admin_section.model.js";
 import AdminSubject        from "../models/admin_subject_master.model.js";
 import StudentClassSection from "../models/student_class_section.model.js";
 import StudentProfile      from "../models/student_profile.model.js";
+import User from "../models/user.model.js";
 
 import { ApiError }    from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -178,6 +179,38 @@ Rules:
 
 
 /* ═══════════════════════════════════════════════════
+   Helper: normalize options before DB storage.
+   Ensures options is ALWAYS stored as a JS array [{key,text},...]
+   so Sequelize DataTypes.JSON stringifies it exactly ONCE.
+═══════════════════════════════════════════════════ */
+function normalizeOptions(raw) {
+  if (raw === null || raw === undefined) return null;
+
+  // Already a proper array of objects with key+text → use as-is
+  if (Array.isArray(raw) && raw.length > 0 && raw[0] && typeof raw[0] === "object" && raw[0].key !== undefined) {
+    return raw;  // e.g. [{key:"A",text:"..."}, ...]
+  }
+
+  // JSON string → parse once
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      // If parsed is an array of {key,text} objects, return it
+      if (Array.isArray(parsed) && parsed[0]?.key !== undefined) return parsed;
+      // If parsed is still a string, try one more parse
+      if (typeof parsed === "string") {
+        const p2 = JSON.parse(parsed);
+        if (Array.isArray(p2)) return p2;
+      }
+      return parsed;
+    } catch { return null; }
+  }
+
+  return raw; // fallback: store as-is
+}
+
+
+/* ═══════════════════════════════════════════════════
    TEACHER: Create assessment + AI-generate questions
    POST /api/assessments
 ═══════════════════════════════════════════════════ */
@@ -261,7 +294,7 @@ export const createAssessment = asyncHandler(async (req, res) => {
     assessment_id:  assessment.assessment_id,
     question_text:  q.question_text,
     question_type:  q.question_type,
-    options:        q.options        ?? null,
+    options:        normalizeOptions(q.options),  // ← normalize before storage
     correct_answer: q.correct_answer ?? null,
     hint:           q.hint           ?? null,
     marks:          q.marks          ?? 1,
@@ -299,7 +332,7 @@ export const deleteAssessment = asyncHandler(async (req, res) => {
   const assessment = await Assessment.findByPk(assessment_id);
   if (!assessment) throw new ApiError(404, "Assessment not found");
 
-  if (assessment.created_by !== user_id)
+  if (Number(assessment.created_by) !== Number(user_id))
     throw new ApiError(403, "You can only delete your own assessments");
 
   // Check if any student has already started an attempt — hard-delete is unsafe then
@@ -354,17 +387,19 @@ export const getTeacherAssessments = asyncHandler(async (req, res) => {
   });
 
   const data = await Promise.all(assessments.map(async (a) => {
-    const [total, pending, approved, assignmentCount, classRow] = await Promise.all([
+    const [total, pending, approved, assignmentCount, classRow, subjectRow] = await Promise.all([
       AssessmentQuestion.count({ where: { assessment_id: a.assessment_id } }),
       AssessmentQuestion.count({ where: { assessment_id: a.assessment_id, status: "pending"  } }),
       AssessmentQuestion.count({ where: { assessment_id: a.assessment_id, status: "approved" } }),
       AssessmentAssignment.count({ where: { assessment_id: a.assessment_id } }),
       AdminClass.findByPk(a.class_id),
+      AdminSubject.findByPk(a.subject_id)
     ]);
 
     return {
       ...a.toJSON(),
       class_name:       classRow?.class_name ?? null,
+      subject_name:     subjectRow?.subject_name ?? null,
       question_summary: { total, pending, approved },
       assignment_count: assignmentCount,
     };
@@ -913,23 +948,52 @@ export const startAttempt = asyncHandler(async (req, res) => {
 
   let questions = await AssessmentQuestion.findAll({
     where:      { assessment_id: assignment.assessment_id, status: "approved" },
-    attributes: { exclude: ["correct_answer", "hint"] },
+    attributes: { exclude: ["correct_answer"] },   // hint stays — students need it
     order:      [["order", "ASC"]],
   });
 
   if (assignment.shuffle_questions)
     questions = questions.sort(() => Math.random() - 0.5);
 
-  if (assignment.shuffle_options) {
-    questions = questions.map(q => {
-      const json = q.toJSON();
-      if (json.options) json.options = [...json.options].sort(() => Math.random() - 0.5);
-      return json;
-    });
-  }
+  // Normalize every question to a plain object with options as a proper [{key,text}] array.
+  // IMPORTANT: DataTypes.JSON on a LONGTEXT column may return the stored JSON as a raw
+  // string — we must parse it here. If shuffle_options was previously spreading that
+  // string with [...str], each character became an element (the corruption bug).
+  const normalizedQuestions = questions.map(q => {
+    const json = q.toJSON ? q.toJSON() : q;
+
+    // Normalize options → always [{key,text},...] or null
+    let opts = json.options;
+    if (typeof opts === "string") {
+      try { opts = JSON.parse(opts); } catch { opts = null; }
+      // Double-encoded: if still a string after one parse, parse again
+      if (typeof opts === "string") {
+        try { opts = JSON.parse(opts); } catch { opts = null; }
+      }
+    }
+    // If it came back as a character array (legacy corrupt data), attempt recovery
+    if (Array.isArray(opts) && opts.length > 8 && typeof opts[0] === "string" && opts[0].length <= 2) {
+      try {
+        const recovered = JSON.parse(opts.join(""));
+        if (Array.isArray(recovered) && recovered[0]?.key) opts = recovered;
+        else if (typeof recovered === "string") {
+          const r2 = JSON.parse(recovered);
+          if (Array.isArray(r2)) opts = r2;
+        }
+      } catch { opts = null; }
+    }
+    json.options = opts ?? null;
+
+    // Shuffle options AFTER properly parsing them (not the raw string)
+    if (assignment.shuffle_options && Array.isArray(json.options)) {
+      json.options = [...json.options].sort(() => Math.random() - 0.5);
+    }
+
+    return json;
+  });
 
   return res.status(200).json(
-    new ApiResponse(200, { attempt, questions }, "Attempt started")
+    new ApiResponse(200, { attempt, questions: normalizedQuestions }, "Attempt started")
   );
 });
 
@@ -946,7 +1010,7 @@ export const submitAttempt = asyncHandler(async (req, res) => {
   const attempt        = await StudentAttempt.findByPk(attempt_id);
 
   if (!attempt) throw new ApiError(404, "Attempt not found");
-  if (attempt.student_id !== studentProfile.student_id) throw new ApiError(403, "Not your attempt");
+  if (Number(attempt.student_id) !== Number(studentProfile.student_id)) throw new ApiError(403, "Not your attempt");
   if (attempt.status === "submitted") throw new ApiError(409, "Already submitted");
 
   const questions = await AssessmentQuestion.findAll({
@@ -1030,6 +1094,36 @@ export const getAttemptResult = asyncHandler(async (req, res) => {
 
   const answers = await StudentAnswer.findAll({ where: { attempt_id } });
 
+  // Enrich each answer with question details so the frontend can render full review
+  const qIds = answers.map(a => a.question_id).filter(Boolean);
+  const questions = qIds.length
+    ? await AssessmentQuestion.findAll({ where: { question_id: qIds } })
+    : [];
+  const qMap = Object.fromEntries(questions.map(q => [q.question_id, q]));
+
+  const enrichedAnswers = answers.map(a => {
+    const q = qMap[a.question_id];
+    let opts = q?.options ?? null;
+    // Normalize options (same logic as startAttempt)
+    if (typeof opts === "string") {
+      try { opts = JSON.parse(opts); } catch { opts = null; }
+      if (typeof opts === "string") { try { opts = JSON.parse(opts); } catch { opts = null; } }
+    }
+    if (Array.isArray(opts) && opts.length > 8 && typeof opts[0] === "string" && opts[0].length <= 2) {
+      try {
+        const rec = JSON.parse(opts.join(""));
+        if (Array.isArray(rec) && rec[0]?.key) opts = rec;
+      } catch { opts = null; }
+    }
+    return {
+      ...a.toJSON(),
+      question_text:  q?.question_text  ?? "",
+      question_type:  q?.question_type  ?? "mcq",
+      correct_answer: q?.correct_answer ?? "",
+      options:        opts,
+    };
+  });
+
   return res.status(200).json(
     new ApiResponse(200, {
       attempt: {
@@ -1043,7 +1137,7 @@ export const getAttemptResult = asyncHandler(async (req, res) => {
         class_name:   classRow?.class_name    ?? null,
         section_name: sectionRow?.section_name ?? null,
       },
-      answers,
+      answers: enrichedAnswers,
     }, "Result fetched")
   );
 });
@@ -1106,5 +1200,183 @@ export const getAssignmentResults = asyncHandler(async (req, res) => {
       min_score:        scores.length ? Math.min(...scores) : 0,
       attempts:         enrichedAttempts,
     }, "Assignment results fetched")
+  );
+});
+
+
+/* ═══════════════════════════════════════════════════
+   STUDENT: Get questions for an existing attempt
+   GET /api/assessments/attempt/:attempt_id/questions
+   Used by the frontend after startAttempt to optionally
+   re-fetch questions (e.g. for hints after a page refresh).
+═══════════════════════════════════════════════════ */
+export const getAttemptQuestions = asyncHandler(async (req, res) => {
+  const { attempt_id } = req.params;
+  const { user_id }    = req.user;
+
+  const studentProfile = await StudentProfile.findOne({ where: { user_id } });
+  if (!studentProfile) throw new ApiError(404, "Student profile not found");
+
+  const attempt = await StudentAttempt.findByPk(attempt_id);
+  if (!attempt) throw new ApiError(404, "Attempt not found");
+  if (Number(attempt.student_id) !== Number(studentProfile.student_id))
+    throw new ApiError(403, "Access denied");
+
+  const assignment = await AssessmentAssignment.findByPk(attempt.assignment_id);
+  if (!assignment) throw new ApiError(404, "Assignment not found");
+
+  // Check the window is still open (or attempt is in_progress)
+  const now = new Date();
+  if (attempt.status !== "in_progress")
+    throw new ApiError(403, "Attempt is not in progress");
+  if (now > new Date(assignment.end_datetime))
+    throw new ApiError(403, "Test deadline has passed");
+
+  let questions = await AssessmentQuestion.findAll({
+    where:      { assessment_id: assignment.assessment_id, status: "approved" },
+    attributes: { exclude: ["correct_answer"] },  // hint included, correct_answer excluded
+    order:      [["order", "ASC"]],
+  });
+
+  if (assignment.shuffle_questions)
+    questions = questions.sort(() => Math.random() - 0.5);
+
+  // Same normalization as startAttempt — parse options string, recover character arrays
+  const normalizedQuestions = questions.map(q => {
+    const json = q.toJSON ? q.toJSON() : q;
+    let opts = json.options;
+    if (typeof opts === "string") {
+      try { opts = JSON.parse(opts); } catch { opts = null; }
+      if (typeof opts === "string") { try { opts = JSON.parse(opts); } catch { opts = null; } }
+    }
+    if (Array.isArray(opts) && opts.length > 8 && typeof opts[0] === "string" && opts[0].length <= 2) {
+      try {
+        const recovered = JSON.parse(opts.join(""));
+        if (Array.isArray(recovered) && recovered[0]?.key) opts = recovered;
+        else if (typeof recovered === "string") { const r2 = JSON.parse(recovered); if (Array.isArray(r2)) opts = r2; }
+      } catch { opts = null; }
+    }
+    json.options = opts ?? null;
+    if (assignment.shuffle_options && Array.isArray(json.options)) {
+      json.options = [...json.options].sort(() => Math.random() - 0.5);
+    }
+    return json;
+  });
+
+  return res.status(200).json(
+    new ApiResponse(200, { attempt_id: attempt.attempt_id, questions: normalizedQuestions }, "Questions fetched")
+  );
+});
+
+
+/* ═══════════════════════════════════════════════════
+   TEACHER: All student results for one assessment
+   GET /api/assessments/:assessment_id/all-results
+═══════════════════════════════════════════════════ */
+export const getAssessmentResults = asyncHandler(async (req, res) => {
+  const { assessment_id } = req.params;
+
+  const assessment = await Assessment.findByPk(assessment_id);
+  if (!assessment) throw new ApiError(404, "Assessment not found");
+
+  const assignments = await AssessmentAssignment.findAll({ where: { assessment_id } });
+  if (!assignments.length) {
+    return res.status(200).json(
+      new ApiResponse(200, {
+        assessment_title: assessment.title,
+        total_marks:      assessment.total_marks,
+        total_students:   0,
+        avg_score:        0,
+        max_score:        0,
+        min_score:        0,
+        attempts:         [],
+      }, "No assignments found")
+    );
+  }
+
+  const assignmentIds = assignments.map(a => a.assignment_id);
+  const attempts = await StudentAttempt.findAll({
+    where: { assignment_id: { [Op.in]: assignmentIds }, status: "submitted" },
+    order: [["submitted_at", "ASC"]],
+  });
+
+  if (!attempts.length) {
+    return res.status(200).json(
+      new ApiResponse(200, {
+        assessment_title: assessment.title,
+        total_marks:      assessment.total_marks,
+        total_students:   0,
+        avg_score:        0,
+        max_score:        0,
+        min_score:        0,
+        attempts:         [],
+      }, "No submissions yet")
+    );
+  }
+
+  // Batch-fetch all related data
+  const studentIds = [...new Set(attempts.map(a => a.student_id))];
+
+  const [profiles, classSections] = await Promise.all([
+    StudentProfile.findAll({ where: { student_id: { [Op.in]: studentIds } } }),
+    StudentClassSection.findAll({ where: { student_id: { [Op.in]: studentIds } } }),
+  ]);
+
+  const profileByStudentId      = Object.fromEntries(profiles.map(p => [Number(p.student_id), p]));
+  const classSectionByStudentId = Object.fromEntries(classSections.map(cs => [Number(cs.student_id), cs]));
+
+  const userIds    = [...new Set(profiles.map(p => p.user_id).filter(Boolean))];
+  const classIds   = [...new Set(classSections.map(cs => cs.class_id).filter(Boolean))];
+  const sectionIds = [...new Set(classSections.map(cs => cs.section_id).filter(Boolean))];
+
+  const [users, classRows, sectionRows] = await Promise.all([
+    User.findAll({ where: { user_id: { [Op.in]: userIds } } }),
+    AdminClass.findAll({ where: { class_id: { [Op.in]: classIds } } }),
+    AdminSection.findAll({ where: { section_id: { [Op.in]: sectionIds } } }),
+  ]);
+
+  const userByUserId   = Object.fromEntries(users.map(u => [Number(u.user_id), u]));
+  const classById      = Object.fromEntries(classRows.map(c => [Number(c.class_id), c]));
+  const sectionById    = Object.fromEntries(sectionRows.map(s => [Number(s.section_id), s]));
+
+  // Enrich attempts
+  const enrichedAttempts = attempts.map((a) => {
+    const profile    = profileByStudentId[Number(a.student_id)];
+    const cs         = classSectionByStudentId[Number(a.student_id)];
+    const user       = profile ? userByUserId[Number(profile.user_id)] : null;
+    const classRow   = cs ? classById[Number(cs.class_id)] : null;
+    const sectionRow = cs ? sectionById[Number(cs.section_id)] : null;
+
+    const score      = Number(a.total_marks_obtained ?? 0);
+    const totalMarks = Number(a.total_marks_possible ?? assessment.total_marks ?? 0);
+
+    return {
+      attempt_id:   a.attempt_id,
+      student_id:   a.student_id,
+      student_name: user?.full_name ?? `Student #${a.student_id}`,
+      roll_number:  profile?.roll_number ?? "—",
+      class_name:   classRow?.class_name    ?? null,
+      section_name: sectionRow?.section_name ?? null,
+      score,
+      total_marks:  totalMarks,
+      percentage:   totalMarks > 0 ? Math.round((score / totalMarks) * 100) : 0,
+      submitted_at: a.submitted_at,
+      status:       a.status,
+    };
+  });
+
+  const scores = enrichedAttempts.map(a => a.score);
+  const avg    = scores.reduce((s, v) => s + v, 0) / scores.length;
+
+  return res.status(200).json(
+    new ApiResponse(200, {
+      assessment_title: assessment.title,
+      total_marks:      assessment.total_marks,
+      total_students:   enrichedAttempts.length,
+      avg_score:        Math.round(avg * 100) / 100,
+      max_score:        Math.max(...scores),
+      min_score:        Math.min(...scores),
+      attempts:         enrichedAttempts,
+    }, "Assessment results fetched")
   );
 });
