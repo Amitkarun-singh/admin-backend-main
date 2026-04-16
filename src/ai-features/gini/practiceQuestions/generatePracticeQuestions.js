@@ -1,9 +1,6 @@
-// import dotenv from "dotenv";
-// dotenv.config();
-
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
-import { errorMessage } from "../../../../error.js";
+
 import {
   insertAnswer,
   fetchTestResultById,
@@ -11,16 +8,7 @@ import {
 
 import OpenAI from "openai";
 
-let openai;
-
-try {
-  openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
-} catch {
-  errorMessage.push("API_KEY OPENAI_API_KEY required");
-}
-const mcqSchema = z
+export const mcqSchema = z
   .object({
     questions: z.array(
       z
@@ -37,7 +25,7 @@ const mcqSchema = z
   })
   .strict();
 
-const saAndLaSchema = z
+export const saAndLaSchema = z
   .object({
     questions: z.array(
       z
@@ -49,8 +37,18 @@ const saAndLaSchema = z
         .strict(), // prevents extra fields (additionalProperties: false)
     ),
   })
-  .strict(); // prevents extra root-level fields
-const generatePracticeQuestions = async (
+  .strict();
+
+let _openai = null;
+
+export function getOpenAIClient() {
+  if (!_openai) {
+    _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return _openai;
+}
+
+export const generatePracticeQuestions = async (
   class_,
   language,
   subject,
@@ -58,63 +56,30 @@ const generatePracticeQuestions = async (
   questionType,
   count,
 ) => {
-  const schema = questionType === "MCQ" ? mcqSchema : saAndLaSchema;
-  return await dynamicQnA(
-    class_,
-    language,
-    subject,
-    chapter,
-    questionType,
-    count,
-    schema,
-  );
-};
-
-const dynamicQnA = async (
-  class_,
-  language,
-  subject,
-  chapter,
-  questionType,
-  count,
-  schema,
-) => {
-  console.log(questionType, count);
-
-  const getQueationPromp = (qt) => {
-    switch (qt) {
-      case qt == "MCQ":
-        return `-  provide ${count} multiple choice questions with 4 options each and indicate the correct answer and have 1 marks.`;
-      case qt == "SA":
-        return ` -   provide ${count} questions that can be answered in 2-3 lines.`;
-      case qt == "LA":
-        return `-   provide ${count} questions that require detailed answers.`;
-    }
-  };
   try {
-    const prompt = `
-      You are an expert educator. Generate **${count} ${questionType} question${count > 1 ? "s" : ""}**
-      for students studying in ${class_}, subject ${subject}, chapter "${chapter}".
-      Response should be in ${language}.
-
-      Instructions:
-       ${getQueationPromp(questionType)}
-      
-
-      Provide the questions clearly, numbered, and in an easy-to-read format.
-
-    `;
-
+    const openai = getOpenAIClient();
     const response = await openai.responses.parse({
       model: "gpt-4o-mini",
-      input: [{ role: "user", content: prompt }],
+      input: [
+        {
+          role: "user",
+          content: getprompt({
+            class_,
+            language,
+            subject,
+            chapter,
+            questionType,
+            count,
+          }),
+        },
+      ],
       text: {
-        format: zodTextFormat(schema, "event"),
+        format: zodTextFormat(getSchema(questionType), "event"),
       },
     });
 
     const content = response.output_parsed;
-    console.log("question generated");
+
     return content.questions;
   } catch (error) {
     console.error(`Error generating ${questionType} questions:`, error);
@@ -122,7 +87,44 @@ const dynamicQnA = async (
   }
 };
 
-export { generatePracticeQuestions };
+function getprompt({
+  class_,
+  language,
+  subject,
+  chapter,
+  questionType,
+  count,
+}) {
+  return `
+      You are an expert educator. Generate **${count} ${questionType} question${count > 1 ? "s" : ""}**
+      for students studying in ${class_}, subject ${subject}, chapter "${chapter}".
+      Response should be in ${language}.
+
+      Instructions:
+       ${getQuestionPrompt(questionType, count)}
+      
+
+      Provide the questions clearly, numbered, and in an easy-to-read format.
+
+    `;
+}
+
+function getQuestionPrompt(questionType, count) {
+  switch (questionType) {
+    case "MCQ":
+      return `Provide ${count} multiple choice questions with 4 options each, indicate the correct answer, and assign 1 mark each.`;
+    case "SA":
+      return `Provide ${count} short-answer questions that can be answered in 2-3 lines.`;
+    case "LA":
+      return `Provide ${count} long-answer questions that require detailed answers.`;
+    default:
+      throw new Error(`Unknown question type: ${questionType}`);
+  }
+}
+
+export function getSchema(questionType) {
+  return questionType === "MCQ" ? mcqSchema : saAndLaSchema;
+}
 
 export const submitAnswer = async (questionId, testId, answer) => {
   await insertAnswer([questionId, testId, answer]);
