@@ -25,6 +25,7 @@ import predictPapersRouter from "./ai-features/predictPapers/predictPapersRouter
 import summarizeRoute from "./routes/summarize.routes.js";
 import ainoteRoute from "./routes/ainote.routes.js";
 import assessmentRoutes from "./routes/assessment.routes.js";
+import appFeedbackRouter from "./ai-features/app_feedback/appFeedbackRoute.js";
 // import dotenv from "dotenv";
 // dotenv.config();
 const app = express();
@@ -65,6 +66,7 @@ app.use("/api/ai/papers", express.static("papers"));
 
 // AI Server Routes
 app.use("/gini", giniRouter);
+app.use("/feedback", appFeedbackRouter);
 app.use("/student", performanceRouter);
 app.use("/pyq", previousPapersRouter);
 app.use("/predict", predictPapersRouter);

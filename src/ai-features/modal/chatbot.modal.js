@@ -1,25 +1,20 @@
 import pool from "../db/db.js";
 
-const ChatBotFeedbackSave = (value) => {
+export const ChatBotFeedbackSave = async (value) => {
   console.log(value);
-  return new Promise(async (resolve, reject) => {
-    const query = `
-        INSERT into Chat_feedback  (userMessage, botResponse, feedback) VALUE (?,?,?)
-          
-      `;
-    const formattedValues = [
-      JSON.stringify(value[0]),
-      JSON.stringify(value[1]),
-      JSON.stringify(value[2]),
-    ];
 
-    pool.query(query, formattedValues, (error, results) => {
-      if (error) {
-        reject(error);
-      }
-      resolve(results);
-    });
-  });
+  const query = `
+    INSERT INTO Chat_feedback (userMessage, botResponse, feedback)
+    VALUES (?, ?, ?)
+  `;
+
+  const formattedValues = [
+    JSON.stringify(value[0]),
+    JSON.stringify(value[1]),
+    JSON.stringify(value[2]),
+  ];
+
+  const [result] = await pool.query(query, formattedValues);
+
+  return result;
 };
-
-export { ChatBotFeedbackSave };

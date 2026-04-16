@@ -36,19 +36,15 @@ export const generatePracticeQuestionsController = async (req, res) => {
     let testId;
     const studentId = req.user.user_id;
     console.log("user details", req.user.user_id);
-    try {
-      testId = await insertTest([
-        class_,
-        subject,
-        chapter.toString(),
-        language,
-        studentId,
-      ]);
-      await insertQuestions(testId, allQuestions);
-      console.log("Test and questions inserted successfully!");
-    } catch (err) {
-      console.error(err);
-    }
+
+    testId = await insertTest([
+      class_,
+      subject,
+      chapter.toString(),
+      language,
+      studentId,
+    ]);
+    await insertQuestions(testId, allQuestions);
 
     res.status(200).json({
       testId,
@@ -74,7 +70,7 @@ export const submitAnswerController = async (req, res) => {
     await submitAnswer(questionId, testId, answer);
     res.status(200).json({ isSuccessful: true });
   } catch (err) {
-    console.log(err);
+    console.error(err);
     res.status(500).json({
       error: "Failed to save answer.",
       isSuccessful: false,
@@ -85,9 +81,9 @@ export const submitAnswerController = async (req, res) => {
 export const testResultController = async (req, res) => {
   const { testId } = req.params;
 
-  const result = await testResult(testId);
-  res.status(200).json({ isSuccessful: true, result });
   try {
+    const result = await testResult(testId);
+    res.status(200).json({ isSuccessful: true, result });
   } catch (err) {
     res.status(500).json({
       error: "Failed to fetch result.",

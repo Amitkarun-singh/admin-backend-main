@@ -1,105 +1,75 @@
 import pool from "../db/db.js";
-const insertTest = (values) => {
-  return new Promise((resolve, reject) => {
-    const query = `
-      INSERT INTO practice_tests (class, subject, chapter, language, student_id)
-      VALUES (?, ?, ?, ?, ?)
-    `;
 
-    pool.query(query, values, (error, results) => {
-      if (error) {
-        return reject(error);
-      }
+export const insertTest = async (values) => {
+  const query = `
+    INSERT INTO practice_tests (class, subject, chapter, language, student_id)
+    VALUES (?, ?, ?, ?, ?)
+  `;
 
-      resolve(results.insertId);
-    });
-  });
+  const [result] = await pool.query(query, values);
+  return result.insertId;
 };
 
-const insertQuestions = (testId, questionsData) => {
-  // console.log("questionsData", questionsData);
-  return new Promise((resolve, reject) => {
-    const values = [];
+export const insertQuestions = async (testId, questionsData) => {
+  const values = [];
 
-    // Loop through each question type
-    for (const type in questionsData) {
-      questionsData[type].forEach((q) => {
-        const options = q.options ? JSON.stringify(q.options) : null;
-        const answer = q.answer || null; // ensure answer exists
-        console.log(q.id);
-
-        values.push([
-          testId,
-          type,
-          q.question,
-          options,
-          answer,
-          null,
-          q.id,
-          q.answer_explanation,
-          q.marks,
-        ]);
-      });
-    }
-
-    if (!values.length) return resolve(0);
-
-    const query = `
-      INSERT INTO practice_questions
-        (test_id, type, question, options, answer, student_answer, question_id, answer_explanation, marks)
-      VALUES ?
-    `;
-
-    pool.query(query, [values], (error, results) => {
-      if (error) return reject(error);
-      resolve(results.affectedRows);
+  for (const type in questionsData) {
+    questionsData[type].forEach((q) => {
+      values.push([
+        testId,
+        type,
+        q.question,
+        q.options ? JSON.stringify(q.options) : null,
+        q.answer || null,
+        null,
+        q.id,
+        q.answer_explanation,
+        q.marks,
+      ]);
     });
-  });
-};
-export { insertTest, insertQuestions };
+  }
 
-export const insertAnswer = (values) => {
-  return new Promise((resolve, reject) => {
-    const query = `
-      UPDATE practice_questions
-      SET 
-        student_answer = ?,
-        is_correct = CASE 
-            WHEN TRIM(LOWER(answer)) = TRIM(LOWER(?)) THEN 1
-            ELSE 0
-        END
-      WHERE question_id = ? AND test_id = ?
-    `;
+  if (!values.length) return 0;
 
-    pool.query(
-      query,
-      [values[2], values[2], values[0], values[1]],
-      (error, results) => {
-        if (error) {
-          return reject(error);
-        }
+  const query = `
+    INSERT INTO practice_questions
+      (test_id, type, question, options, answer, student_answer, question_id, answer_explanation, marks)
+    VALUES ?
+  `;
 
-        resolve(results.affectedRows);
-      },
-    );
-  });
+  const [result] = await pool.query(query, [values]);
+  return result.affectedRows;
 };
 
-export const fetchTestResultById = (testId) => {
-  return new Promise((resolve, reject) => {
-    const query = `
-      SELECT 
-        *
-      FROM practice_questions
-      WHERE test_id = ?
-    `;
+export const insertAnswer = async (values) => {
+  const query = `
+    UPDATE practice_questions
+    SET 
+      student_answer = ?,
+      is_correct = CASE 
+        WHEN TRIM(LOWER(answer)) = TRIM(LOWER(?)) THEN 1
+        ELSE 0
+      END
+    WHERE question_id = ? AND test_id = ?
+  `;
 
-    pool.query(query, [testId], (error, results) => {
-      if (error) {
-        return reject(error);
-      }
+  const [result] = await pool.query(query, [
+    values[2], // student_answer
+    values[2], // compare answer
+    values[0], // question_id
+    values[1], // test_id
+  ]);
 
-      resolve(results);
-    });
-  });
+  return result.affectedRows;
+};
+
+export const fetchTestResultById = async (testId) => {
+  const query = `
+    SELECT *
+    FROM practice_questions
+    WHERE test_id = ?
+  `;
+
+  const [rows] = await pool.query(query, [testId]);
+  return rows;
 };
