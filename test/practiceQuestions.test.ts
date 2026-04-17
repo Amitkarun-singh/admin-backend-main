@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import dotenv from "dotenv";
-console.log("env => ", process.cwd() + "/config.env");
+// import dotenv from "dotenv";
+// console.log("env => ", process.cwd() + "/config.env");
 
-dotenv.config({ path: process.cwd() + "/config.env" });
+// dotenv.config({ path: process.cwd() + "/config.env" });
 
 import {
   getSchema,

@@ -1,14 +1,24 @@
 import { appFeedbackService } from "./appFeedbackService.js";
 export const appFeedbackController = async (req, res) => {
-  console.log("working, ", req.body);
-  const { name, email, subject, message } = req.body;
-  if (!name || !email || !subject || !message) {
-    res.status(400).send("all fields are required");
-  }
   try {
+    const { name, email, subject, message } = req.body;
+    if (!name || !email || !subject || !message) {
+      throw { status: 400, message: "All fields are required" };
+    }
+    if (!validateEmail(email)) {
+      throw { status: 400, message: "Invalid email" };
+    }
+
     await appFeedbackService({ name, email, subject, message });
     return res.status(201).send();
   } catch (err) {
-    res.status(err.status || 500).json({ errorMessage: err.message });
+    const status = err?.status || 500;
+    const message = err?.message || "Something went wrong";
+    res.status(status).json({ message });
   }
 };
+
+function validateEmail(email) {
+  const pattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  return pattern.test(email);
+}

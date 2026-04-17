@@ -5,15 +5,11 @@ const cache = new NodeCache({ stdTTL: 86400, checkperiod: 120 });
 
 const RATE_LIMIT = process.env.RATE_LIMIT; // requests per day
 
-export async function rateLimit(req, res, next) {
+export const rateLimit = (feature) => (req, res, next) => {
   try {
-    // const userId = req.user.id;
     const userId = req.user.user_id;
-    const key = `rate:user:${userId}`;
-    // const ttlMs = cache.getTtl(key);
-    // const ttlSeconds = Math.ceil((ttlMs - Date.now()) / 1000);
-    // console.log(ttlSeconds);
-    // Get current request count
+    const key = `${feature}:${userId}`;
+
     let requestCount = cache.get(key);
 
     if (!requestCount) {
@@ -36,4 +32,4 @@ export async function rateLimit(req, res, next) {
     console.error("Rate limit error:", err);
     next();
   }
-}
+};
