@@ -4,6 +4,8 @@ import AdminSubject from "../models/admin_subject_master.model.js";
 import AdminCourse from "../models/admin_course.model.js";
 import AdminClassCourseMap from "../models/admin_class_course_map.model.js";
 import AdminSchool from "../models/admin_school.model.js";
+import StudentProfile      from "../models/student_profile.model.js";
+import StudentClassSection from "../models/student_class_section.model.js";
 import sequelize from "../config/db.js";
 import { Op } from "sequelize";
 import { ApiError } from "../utils/ApiError.js";
@@ -102,6 +104,39 @@ const getAllClasses = asyncHandler(async (req, res) => {
 
   return res.status(200).json(
     new ApiResponse(200, filteredClasses, "Classes fetched")
+  );
+});
+
+// Get student Classes
+const getStudentClass = asyncHandler(async (req, res) => {
+  const { user_id } = req.user;
+
+  // 1. Get student profile
+  const profile = await StudentProfile.findOne({ where: { user_id } });
+  if (!profile) throw new ApiError(404, "Student profile not found");
+
+  // 2. Get class-section assignment
+  const classSection = await StudentClassSection.findOne({
+    where: { student_id: profile.student_id },
+  });
+  if (!classSection) throw new ApiError(404, "Class not assigned to this student");
+
+  // 3. Fetch class and section details in parallel
+  const [classRow, sectionRow] = await Promise.all([
+    AdminClass.findByPk(classSection.class_id),
+    AdminSection.findByPk(classSection.section_id),
+  ]);
+
+  if (!classRow) throw new ApiError(404, "Class not found");
+
+  return res.status(200).json(
+    new ApiResponse(200, {
+      student_id:   profile.student_id,
+      class_id:     classRow.class_id,
+      class_name:   classRow.class_name,
+      section_id:   sectionRow?.section_id   ?? null,
+      section_name: sectionRow?.section_name ?? null,
+    }, "Student class fetched")
   );
 });
 
@@ -493,6 +528,7 @@ export {
     createClass,
     bulkCreateClasses,
     getAllClasses,
+    getStudentClass,
     getClassById,
     updateClass,
     deleteClass,

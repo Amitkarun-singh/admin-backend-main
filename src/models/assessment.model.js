@@ -58,7 +58,7 @@ const Assessment = sequelize.define("Assessment", {
   question_types_allowed: {
     type: DataTypes.JSON,
     defaultValue: ["mcq"],
-    comment: "['mcq','true_false','short','essay']",
+    comment: "['mcq','true_false']",
   },
 
   status: {

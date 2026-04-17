@@ -13,7 +13,9 @@ import {
   startAttempt,
   submitAttempt,
   getAttemptResult,
+  getAttemptQuestions,
   getAssignmentResults,
+  getAssessmentResults,
   getAssessmentsByUser,
 } from "../controllers/assessment.controller.js";
 import { authMiddleware } from "../middlewares/auth.middleware.js";
@@ -55,6 +57,10 @@ router.post("/attempt/start", startAttempt);
 // POST /api/assessments/attempt/submit
 router.post("/attempt/submit", submitAttempt);
 
+// Get questions for an in-progress attempt (includes hints, excludes correct_answer)
+// GET /api/assessments/attempt/:attempt_id/questions
+router.get("/attempt/:attempt_id/questions", getAttemptQuestions);
+
 // Create assessment + AI-generate questions
 // POST /api/assessments
 router.post("/", createAssessment);
@@ -62,6 +68,10 @@ router.post("/", createAssessment);
 // Get single assessment with all questions
 // GET /api/assessments/:assessment_id
 router.get("/:assessment_id", getAssessment);
+
+// All student results for an assessment (Teacher)
+// GET /api/assessments/:assessment_id/all-results
+router.get("/:assessment_id/all-results", getAssessmentResults);
 
 // Delete (archive) an assessment — soft-deletes if students have attempts
 // DELETE /api/assessments/:assessment_id

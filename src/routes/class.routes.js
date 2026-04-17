@@ -3,6 +3,7 @@ import {
   createClass,
   bulkCreateClasses,
   getAllClasses,
+  getStudentClass,
   getClassById,
   updateClass,
   deleteClass,
@@ -36,6 +37,9 @@ router.get(
   // requirePermission("MANAGE_SCHOOL"),
   getAllClasses,
 );
+
+// Get class for a student
+router.get("/class/student", authMiddleware, getStudentClass);
 
 // Get single class
 router.get(
