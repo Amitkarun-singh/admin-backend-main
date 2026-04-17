@@ -1,7 +1,7 @@
-import db from "../db/db.js";
+import pool from "../db/db.js";
 
 /* Summary */
-export const getSummary = (studentId) => {
+export const getSummary = async (studentId) => {
   const sql = `
     SELECT 
         COUNT(DISTINCT pt.id) AS totalTests,
@@ -12,18 +12,18 @@ export const getSummary = (studentId) => {
     JOIN practice_questions pq 
         ON pt.id = pq.test_id
     WHERE pt.student_id = ?
-`;
+  `;
 
-  return new Promise((resolve, reject) => {
-    db.query(sql, [studentId], (err, result) => {
-      if (err) return reject(err);
-      resolve(result[0]);
-    });
-  });
+  try {
+    const [rows] = await pool.execute(sql, [studentId]);
+    return rows[0];
+  } catch (err) {
+    throw err;
+  }
 };
 
 /* Subject Mastery */
-export const getSubjectMastery = (studentId) => {
+export const getSubjectMastery = async (studentId) => {
   const sql = `
     SELECT 
         pt.subject AS label,
@@ -35,16 +35,16 @@ export const getSubjectMastery = (studentId) => {
     GROUP BY pt.subject
   `;
 
-  return new Promise((resolve, reject) => {
-    db.query(sql, [studentId], (err, result) => {
-      if (err) return reject(err);
-      resolve(result);
-    });
-  });
+  try {
+    const [rows] = await pool.execute(sql, [studentId]);
+    return rows;
+  } catch (err) {
+    throw err;
+  }
 };
 
 /* Monthly Progress */
-export const getMonthlyProgress = (studentId) => {
+export const getMonthlyProgress = async (studentId) => {
   const sql = `
     SELECT 
         MONTH(pt.created_at) AS month,
@@ -58,16 +58,16 @@ export const getMonthlyProgress = (studentId) => {
     ORDER BY month
   `;
 
-  return new Promise((resolve, reject) => {
-    db.query(sql, [studentId], (err, result) => {
-      if (err) return reject(err);
-      resolve(result);
-    });
-  });
+  try {
+    const [rows] = await pool.execute(sql, [studentId]);
+    return rows;
+  } catch (err) {
+    throw err;
+  }
 };
 
 /* Latest Tests */
-export const getLatestTests = (studentId) => {
+export const getLatestTests = async (studentId) => {
   const sql = `
     SELECT 
         pt.subject,
@@ -81,10 +81,10 @@ export const getLatestTests = (studentId) => {
     LIMIT 3
   `;
 
-  return new Promise((resolve, reject) => {
-    db.query(sql, [studentId], (err, result) => {
-      if (err) return reject(err);
-      resolve(result);
-    });
-  });
+  try {
+    const [rows] = await pool.execute(sql, [studentId]);
+    return rows;
+  } catch (err) {
+    throw err;
+  }
 };
