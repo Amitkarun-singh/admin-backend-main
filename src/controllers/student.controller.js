@@ -10,6 +10,8 @@ import ParentStudentMap from "../models/parent_student_map.model.js";
 import StudentClassSection from "../models/student_class_section.model.js";
 import StudentAnalytics from "../models/student_analytics.model.js";
 import AdminSchool from "../models/admin_school.model.js";
+import AdminClass from "../models/admin_class.model.js";
+import AdminSection from "../models/admin_section.model.js";
 
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -217,17 +219,43 @@ const bulkStudentUpload = asyncHandler(async (req, res) => {
     for (const [index, row] of records.entries()) {
       const rowLabel = `Row ${index + 2}`;
 
-      // Required field validation per row
       if (!row.student_username || !row.student_password || !row.parent_username || !row.parent_password) {
         throw new ApiError(400, `${rowLabel}: Missing required fields (student_username, student_password, parent_username, parent_password)`);
       }
 
-      // ENUM validations per row
       if (row.relation && !VALID_RELATIONS.includes(row.relation)) {
         throw new ApiError(400, `${rowLabel}: Invalid relation "${row.relation}". Must be one of: ${VALID_RELATIONS.join(", ")}`);
       }
       if (row.gender && !VALID_GENDERS.includes(row.gender)) {
         throw new ApiError(400, `${rowLabel}: Invalid gender "${row.gender}". Must be one of: ${VALID_GENDERS.join(", ")}`);
+      }
+
+      /* ---- Resolve class_id and section_id from names ---- */
+      let resolvedClassId   = null;
+      let resolvedSectionId = null;
+
+      if (row.class_name) {
+        const classRecord = await AdminClass.findOne({
+          where: { class_name: row.class_name },
+          transaction,
+        });
+
+        if (classRecord) {
+          resolvedClassId = classRecord.class_id;
+
+          // Only look up section if we have a valid class
+          if (row.section_name) {
+            const sectionRecord = await AdminSection.findOne({
+              where: {
+                class_id:     resolvedClassId,   // ✅ scoped to the found class
+                section_name: row.section_name,
+              },
+              transaction,
+            });
+
+            resolvedSectionId = sectionRecord?.section_id ?? null;
+          }
+        }
       }
 
       /* ---- Parent ---- */
@@ -236,13 +264,13 @@ const bulkStudentUpload = asyncHandler(async (req, res) => {
       const parentUser = await User.create(
         {
           username:     row.parent_username,
-          full_name:    row.parent_full_name   || null,
+          full_name:    row.parent_full_name || null,
           password:     parentHashed,
-          phone_number: row.parent_phone       || null,
-          email:        row.parent_email       || null,
+          phone_number: row.parent_phone     || null,
+          email:        row.parent_email     || null,
           role_id:      parentRole.role_id,
           school_id,
-          status:       "Active",               // ← capital A per ENUM definition
+          status:       "Active",
         },
         { transaction }
       );
@@ -253,7 +281,6 @@ const bulkStudentUpload = asyncHandler(async (req, res) => {
           school_id,
           parent_name: row.parent_name || null,
           relation:    row.relation    || null,
-          // status removed – field no longer exists on ParentProfile model
         },
         { transaction }
       );
@@ -264,13 +291,13 @@ const bulkStudentUpload = asyncHandler(async (req, res) => {
       const studentUser = await User.create(
         {
           username:     row.student_username,
-          full_name:    row.student_full_name  || null,
+          full_name:    row.student_full_name || null,
           password:     studentHashed,
-          phone_number: row.student_phone      || null,
-          email:        row.student_email      || null,
+          phone_number: row.student_phone     || null,
+          email:        row.student_email     || null,
           role_id:      studentRole.role_id,
           school_id,
-          status:       "Active",               // ← capital A per ENUM definition
+          status:       "Active",
         },
         { transaction }
       );
@@ -285,7 +312,6 @@ const bulkStudentUpload = asyncHandler(async (req, res) => {
           dob:                row.dob                || null,
           gender:             row.gender             || null,
           analytics_enabled:  row.analytics_enabled  ?? false,
-          // status removed – field no longer exists on StudentProfile model
         },
         { transaction }
       );
@@ -301,8 +327,8 @@ const bulkStudentUpload = asyncHandler(async (req, res) => {
       await StudentClassSection.create(
         {
           student_id:    student.student_id,
-          class_id:      row.class_id      || null,
-          section_id:    row.section_id    || null,
+          class_id:      resolvedClassId,          // ✅ resolved from class_name
+          section_id:    resolvedSectionId,        // ✅ resolved from section_name + class_id
           roll_number:   row.roll_number   || null,
           academic_year: row.academic_year || null,
           status:        "active",
@@ -335,7 +361,6 @@ const bulkStudentUpload = asyncHandler(async (req, res) => {
 /* =====================================================
    GET ALL STUDENTS
    ===================================================== */
-
 const getAllStudents = asyncHandler(async (req, res) => {
   const school_id = req.user.school_id;
 
@@ -344,36 +369,7 @@ const getAllStudents = asyncHandler(async (req, res) => {
     include: [
       {
         model: User,
-        as:         "user",
-        attributes: [
-          "user_id",
-          "username",
-          "full_name",
-          "email",
-          "phone_number",
-          "status",
-          "avatar",
-        ],
-      },
-    ],
-  });
-
-  return res
-    .status(200)
-    .json(new ApiResponse(200, students));
-});
-
-/* =====================================================
-   GET SINGLE STUDENT
-   ===================================================== */
-const getStudentById = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-
-  const student = await StudentProfile.findByPk(id, {
-    include: [
-      {
-        model:      User,
-        as:         "user",
+        as: "user",
         attributes: [
           "user_id",
           "username",
@@ -386,7 +382,66 @@ const getStudentById = asyncHandler(async (req, res) => {
       },
       {
         model: StudentClassSection,
-        as:    "classSection",
+        as: "classSection",
+        attributes: ["class_id", "section_id", "academic_year", "roll_number", "status"],
+        include: [
+          {
+            model: AdminClass,
+            as: "class",
+            attributes: ["class_id", "class_name"],
+          },
+          {
+            model: AdminSection,
+            as: "section",
+            attributes: ["section_id", "section_name"],
+          },
+        ],
+      },
+    ],
+  });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, students, "Students fetched"));
+});
+
+/* =====================================================
+   GET SINGLE STUDENT
+   ===================================================== */
+const getStudentById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const student = await StudentProfile.findByPk(id, {
+    include: [
+      {
+        model: User,
+        as: "user",
+        attributes: [
+          "user_id",
+          "username",
+          "full_name",
+          "email",
+          "phone_number",
+          "status",
+          "avatar",
+        ],
+      },
+      {
+        model: StudentClassSection,
+        as: "classSection",
+        attributes: ["class_id", "section_id", "academic_year", "roll_number", "status"],
+        include: [
+          {
+            model: AdminClass,
+            as: "class",
+            attributes: ["class_id", "class_name"],
+          },
+          {
+            model: AdminSection,
+            as: "section",
+            attributes: ["section_id", "section_name"],
+          },
+        ],
       },
     ],
   });
@@ -395,7 +450,7 @@ const getStudentById = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, student));
+    .json(new ApiResponse(200, student, "Student fetched"));
 });
 
 /* =====================================================

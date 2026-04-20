@@ -26,7 +26,7 @@ import AdminSection               from "./admin_section.model.js";
 import AdminCourse                from "./admin_course.model.js";
 import AdminClassCourseMap        from "./admin_class_course_map.model.js";
 
-import AdminSubjectMaster         from "./admin_subject_master.model.js";
+import AdminSubject         from "./admin_subject_master.model.js";
 
 import GiniLog     from "./gini_log.model.js";
 import PracticeLog from "./practice_log.model.js";
@@ -140,11 +140,11 @@ AdminCourse.belongsToMany(AdminClass, {
 /* =====================================================
    COURSE ↔ SUBJECT MASTER
    ===================================================== */
-AdminCourse.hasMany(AdminSubjectMaster, {
+AdminCourse.hasMany(AdminSubject, {
   foreignKey: "course_id",
   as:         "subjects",
 });
-AdminSubjectMaster.belongsTo(AdminCourse, {
+AdminSubject.belongsTo(AdminCourse, {
   foreignKey: "course_id",
   as:         "course",
 });
@@ -219,13 +219,25 @@ TeacherClassSectionSubject.belongsTo(AdminSection, {
   foreignKey: "section_id",
   as:         "section",
 });
-AdminSubjectMaster.hasMany(TeacherClassSectionSubject, {
+AdminSubject.hasMany(TeacherClassSectionSubject, {
   foreignKey: "class_subject_id",
   as:         "teacherAssignments",
 });
-TeacherClassSectionSubject.belongsTo(AdminSubjectMaster, {
+TeacherClassSectionSubject.belongsTo(AdminSubject, {
   foreignKey: "class_subject_id",
   as:         "subject",
+});
+
+/* =====================================================
+   TEACHER PROFILE ↔ PRIMARY SUBJECT
+   ===================================================== */
+TeacherProfile.belongsTo(AdminSubject, {
+  foreignKey: "primary_subject_id",
+  as:         "primarySubject",
+});
+AdminSubject.hasMany(TeacherProfile, {
+  foreignKey: "primary_subject_id",
+  as:         "teachers",
 });
 
 
@@ -240,6 +252,12 @@ TeacherAnalytics.belongsTo(TeacherProfile, {
   foreignKey: "teacher_id",
   as:         "teacher",
 });
+
+/* =====================================================
+   SUBJECT ↔ CLASS  (AdminSubject has class_id FK)
+   ===================================================== */
+AdminSubject.belongsTo(AdminClass, { foreignKey: "class_id", as: "class" });
+AdminClass.hasMany(AdminSubject,   { foreignKey: "class_id", as: "subjects" });
 
 // USER ↔ USER SESSIONS
 User.hasMany(UserSession,  { foreignKey: "user_id", as: "sessions" });
@@ -344,7 +362,7 @@ export {
   AdminCourse,
   AdminClassCourseMap,
 
-  AdminSubjectMaster,
+  AdminSubject,
 
   GiniLog,
   PracticeLog,
