@@ -6,6 +6,7 @@ import {
 } from "./studentPerformance.model.js";
 
 export const getDashboardData = async (studentId) => {
+  console.log("Dashboard");
   const [summary, subjectMastery, progressChart, latestTests] =
     await Promise.all([
       getSummary(studentId),
@@ -13,7 +14,7 @@ export const getDashboardData = async (studentId) => {
       getMonthlyProgress(studentId),
       getLatestTests(studentId),
     ]);
-
+  console.log("Dashboard sql complete");
   return {
     success: true,
     data: {
