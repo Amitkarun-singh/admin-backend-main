@@ -70,7 +70,6 @@ const bulkCreateClasses = asyncHandler(async (req, res) => {
 
 // Get All Classes
 const getAllClasses = asyncHandler(async (req, res) => {
-  console.log("Starting the functions");
 
   const { school_id } = req.user;
 
@@ -84,7 +83,6 @@ const getAllClasses = asyncHandler(async (req, res) => {
   }
 
   const classCount = school.class_count;
-  console.log("class_count:", classCount);
 
   // 2. Fetch all classes
   const classes = await AdminClass.findAll({
@@ -100,7 +98,6 @@ const getAllClasses = asyncHandler(async (req, res) => {
     return classNumber <= classCount;
   });
 
-  console.log("Filtered classes:", filteredClasses);
 
   return res.status(200).json(
     new ApiResponse(200, filteredClasses, "Classes fetched")

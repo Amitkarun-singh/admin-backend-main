@@ -5,6 +5,7 @@ import User from "../models/user.model.js";
 import AdminRole from "../models/admin_role.model.js";
 import ParentProfile from "../models/parent_profile.model.js";
 import ParentStudentMap from "../models/parent_student_map.model.js";
+import StudentProfile from "../models/student_profile.model.js";
 
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -101,11 +102,31 @@ const getAllParents = asyncHandler(async (req, res) => {
 
   const parents = await ParentProfile.findAll({
     where: { school_id },
+    include: [
+      {
+        model: User,
+        as: "user",
+        attributes: ["user_id", "username", "full_name", "phone_number", "email", "status", "avatar"],
+      },
+      {
+        model: StudentProfile,
+        as: "students",
+        attributes: ["student_id", "preferred_language", "dob", "gender", "onboarding_date"],
+        through: { attributes: [] },   // hide ParentStudentMap join columns
+        include: [
+          {
+            model: User,
+            as: "user",
+            attributes: ["user_id", "username", "full_name", "phone_number", "email", "status", "avatar"],
+          },
+        ],
+      },
+    ],
   });
 
   return res
     .status(200)
-    .json(new ApiResponse(200, parents));
+    .json(new ApiResponse(200, parents, "Parents fetched"));
 });
 
 /* =====================================================
@@ -114,12 +135,34 @@ const getAllParents = asyncHandler(async (req, res) => {
 const getParentById = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const parent = await ParentProfile.findByPk(id);
+  const parent = await ParentProfile.findByPk(id, {
+    include: [
+      {
+        model: User,
+        as: "user",
+        attributes: ["user_id", "username", "full_name", "phone_number", "email", "status", "avatar"],
+      },
+      {
+        model: StudentProfile,
+        as: "students",
+        attributes: ["student_id", "preferred_language", "dob", "gender", "onboarding_date"],
+        through: { attributes: [] },   // hide ParentStudentMap join columns
+        include: [
+          {
+            model: User,
+            as: "user",
+            attributes: ["user_id", "username", "full_name", "phone_number", "email", "status", "avatar"],
+          },
+        ],
+      },
+    ],
+  });
+
   if (!parent) throw new ApiError(404, "Parent not found");
 
   return res
     .status(200)
-    .json(new ApiResponse(200, parent));
+    .json(new ApiResponse(200, parent, "Parent fetched"));
 });
 
 /* =====================================================
