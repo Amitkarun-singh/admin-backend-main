@@ -29,6 +29,7 @@ import AdminClassCourseMap        from "./admin_class_course_map.model.js";
 import AdminSubject         from "./admin_subject_master.model.js";
 
 import GiniLog     from "./gini_log.model.js";
+import TutorLog from "./tutor_log.model.js";
 import PracticeLog from "./practice_log.model.js";
 import UserSession from "./user_session.model.js";
 
@@ -271,6 +272,11 @@ GiniLog.belongsTo(User,  { foreignKey: "user_id", as: "user" });
 User.hasMany(PracticeLog,    { foreignKey: "user_id", as: "practiceLogs" });
 PracticeLog.belongsTo(User,  { foreignKey: "user_id", as: "user" });
 
+// USER ↔ TUTOR LOGS
+User.hasMany(TutorLog,   { foreignKey: "user_id", as: "tutorLogs" });
+TutorLog.belongsTo(User, { foreignKey: "user_id", as: "user" });
+ 
+
 /* =====================================================
    ASSESSMENT ENGINE ASSOCIATIONS  ← NEW
    ===================================================== */
@@ -367,6 +373,7 @@ export {
   GiniLog,
   PracticeLog,
   UserSession,
+  TutorLog,
 
   Assessment,
   AssessmentQuestion,

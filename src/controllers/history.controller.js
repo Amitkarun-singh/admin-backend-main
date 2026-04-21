@@ -2,20 +2,27 @@ import { Op } from "sequelize";
 import sequelize from "../config/db.js";
 
 import GiniLog          from "../models/gini_log.model.js";
+import TutorLog         from "../models/tutor_log.model.js";
 import PracticeLog      from "../models/practice_log.model.js";
 import AiUsageLog       from "../models/ai_usage_log.model.js";
 import UserSession      from "../models/user_session.model.js";
 import StudentAnalytics from "../models/student_analytics.model.js";
 import StudentProfile   from "../models/student_profile.model.js";
-import {getSummary} from "../ai-features/studentPerformance/studentPerformance.model.js";
 
 import { ApiError }     from "../utils/ApiError.js";
 import { ApiResponse }  from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
 /* ─────────────────────────────────────────────────────────────
+   TUTOR USER MATCH
+   user_details stores JWT payload JSON, e.g.:
+   {"user_id":32,"role":"STUDENT","school_id":22, ...}
+   We extract user_id directly — no extra column needed.
+───────────────────────────────────────────────────────────── */
+const TUTOR_UID = `CAST(JSON_UNQUOTE(JSON_EXTRACT(user_details, '$.user_id')) AS UNSIGNED)`;
+
+/* ─────────────────────────────────────────────────────────────
    HELPER: parse device string from User-Agent header
-   Returns "Desktop" | "Mobile" | "Tablet"
 ───────────────────────────────────────────────────────────── */
 function parseDevice(ua = "") {
   if (!ua) return "Desktop";
@@ -26,7 +33,7 @@ function parseDevice(ua = "") {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   HELPER: extract the FIRST user message as conversation title.
+   HELPER: extract the FIRST user message as conversation title
 ───────────────────────────────────────────────────────────── */
 function extractTitle(raw) {
   try {
@@ -73,17 +80,22 @@ function extractTitle(raw) {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   HELPER: parse full messages array for conversation restore
+   HELPER: extract title from a tutor_logs row
 ───────────────────────────────────────────────────────────── */
-function parseMessages(raw) {
+function extractTutorTitle(row) {
+  const fromReq = extractTitle(row.request_body);
+  if (fromReq) return fromReq;
+
   try {
-    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-    if (Array.isArray(parsed)) return parsed;
-    if (Array.isArray(parsed?.messages)) return parsed.messages;
-    return [];
-  } catch {
-    return [];
-  }
+    const ud = typeof row.user_details === "string"
+      ? JSON.parse(row.user_details)
+      : row.user_details;
+    if (ud?.query  && typeof ud.query  === "string") return ud.query.slice(0, 100);
+    if (ud?.topic  && typeof ud.topic  === "string") return ud.topic.slice(0, 100);
+    if (ud?.prompt && typeof ud.prompt === "string") return ud.prompt.slice(0, 100);
+  } catch { /* ignore */ }
+
+  return null;
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -102,8 +114,7 @@ function relativeTime(date) {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   HELPER: safely read created_at from a Sequelize instance.
-   Handles both .created_at and .createdAt depending on model config.
+   HELPER: safely read created_at from a Sequelize instance
 ───────────────────────────────────────────────────────────── */
 function getCreatedAt(instance) {
   if (!instance) return null;
@@ -112,7 +123,6 @@ function getCreatedAt(instance) {
 
 /* =====================================================
    1. RECORD SESSION ON LOGIN
-      Called from auth.controller.js login()
    ===================================================== */
 export const recordSession = async ({ user_id, ua, ip }) => {
   try {
@@ -129,7 +139,6 @@ export const recordSession = async ({ user_id, ua, ip }) => {
 
 /* =====================================================
    2. CLOSE SESSION ON LOGOUT
-      Called from auth.controller.js logout()
    ===================================================== */
 export const closeSession = async (user_id) => {
   try {
@@ -147,17 +156,14 @@ export const closeSession = async (user_id) => {
 };
 
 /* =====================================================
-   3. GET RECENT QUERIES  (AI Gini only)
+   3. GET RECENT QUERIES  (AI Gini + AI Tutor)
       GET /api/history/recent-queries
    ===================================================== */
 export const getRecentQueries = asyncHandler(async (req, res) => {
   const user_id = Number(req.user.user_id);
   const limit   = parseInt(req.query.limit) || 20;
 
-  console.log("🔍 getRecentQueries → user_id:", user_id, typeof user_id);
-
-  /* ── AI Gini ──
-     Group by conversation_id → one card per conversation. */
+  /* ── AI Gini ── group by conversation_id ── */
   const giniConvs = await GiniLog.findAll({
     where: { user_id },
     attributes: [
@@ -180,24 +186,20 @@ export const getRecentQueries = asyncHandler(async (req, res) => {
          ORDER  BY created_at ASC
          LIMIT  5`,
         {
-          replacements: { cid: conv.conversation_id, uid: Number(user_id) },
+          replacements: { cid: conv.conversation_id, uid: user_id },
           type: sequelize.QueryTypes.SELECT,
         }
       );
 
-      let title   = null;
-      let subject = null;
-      let cls     = null;
-
+      let title = null, subject = null, cls = null;
       for (const row of rows) {
         subject = subject || row.subject;
         cls     = cls     || row.class;
         if (!title && row.messages) {
           try {
             const msg = JSON.parse(row.messages);
-            if (msg?.role === "user" && msg?.content) {
+            if (msg?.role === "user" && msg?.content)
               title = String(msg.content).slice(0, 100);
-            }
           } catch { /* skip */ }
         }
         if (title) break;
@@ -217,8 +219,60 @@ export const getRecentQueries = asyncHandler(async (req, res) => {
     })
   );
 
-  // Only AI Gini — sort and strip raw date
-  const combined = giniQueries
+  /* ── AI Tutor ── JSON_EXTRACT user_id from user_details ── */
+  let tutorQueries = [];
+  try {
+    const tutorConvs = await sequelize.query(
+      `SELECT
+         conversation_id,
+         MAX(created_at) AS last_active,
+         COUNT(id)       AS turn_count
+       FROM   tutor_logs
+       WHERE  ${TUTOR_UID} = :uid
+       GROUP  BY conversation_id
+       ORDER  BY MAX(created_at) DESC
+       LIMIT  :lim`,
+      {
+        replacements: { uid: user_id, lim: limit },
+        type: sequelize.QueryTypes.SELECT,
+      }
+    );
+
+    tutorQueries = await Promise.all(
+      tutorConvs.map(async conv => {
+        const [firstRow] = await sequelize.query(
+          `SELECT request_body, user_details
+           FROM   tutor_logs
+           WHERE  conversation_id = :cid
+             AND  ${TUTOR_UID} = :uid
+           ORDER  BY created_at ASC
+           LIMIT  1`,
+          {
+            replacements: { cid: conv.conversation_id, uid: user_id },
+            type: sequelize.QueryTypes.SELECT,
+          }
+        );
+
+        const title = (firstRow ? extractTutorTitle(firstRow) : null)
+          || "AI Tutor conversation";
+
+        return {
+          source:          "AI Tutor",
+          redirect_to:     "/ai-tutor",
+          conversation_id: conv.conversation_id,
+          title,
+          turn_count:      parseInt(conv.turn_count),
+          time:            relativeTime(conv.last_active),
+          created_at:      conv.last_active,
+        };
+      })
+    );
+  } catch (err) {
+    console.error("getRecentQueries — tutor fetch failed:", err.message);
+  }
+
+  /* ── Merge, sort newest-first, slice ── */
+  const combined = [...giniQueries, ...tutorQueries]
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     .slice(0, limit)
     .map(({ created_at, ...rest }) => rest);
@@ -243,11 +297,36 @@ export const getFeaturesExplored = asyncHandler(async (req, res) => {
     attributes: ["created_at"],
   });
 
+  /* ── AI Tutor — JSON_EXTRACT from user_details ── */
+  let tutorCount    = 0;
+  let tutorLastDate = null;
+  try {
+    const [countRow] = await sequelize.query(
+      `SELECT COUNT(id) AS cnt
+       FROM   tutor_logs
+       WHERE  ${TUTOR_UID} = :uid`,
+      { replacements: { uid: user_id }, type: sequelize.QueryTypes.SELECT }
+    );
+    tutorCount = parseInt(countRow?.cnt) || 0;
+
+    const [lastRow] = await sequelize.query(
+      `SELECT created_at
+       FROM   tutor_logs
+       WHERE  ${TUTOR_UID} = :uid
+       ORDER  BY created_at DESC
+       LIMIT  1`,
+      { replacements: { uid: user_id }, type: sequelize.QueryTypes.SELECT }
+    );
+    tutorLastDate = lastRow?.created_at || null;
+  } catch (err) {
+    console.error("getFeaturesExplored — tutor fetch failed:", err.message);
+  }
+
   /* ── AI Practice ── */
   const practiceCount = await PracticeLog.count({ where: { user_id } });
   const practiceLast  = await PracticeLog.findOne({
-    where:  { user_id },
-    order:  [["created_at", "DESC"]],
+    where: { user_id },
+    order: [["created_at", "DESC"]],
   });
 
   /* ── AI Notes ── */
@@ -259,7 +338,6 @@ export const getFeaturesExplored = asyncHandler(async (req, res) => {
       { endpoint: null },
     ],
   };
-
   const aiNotesCount = await AiUsageLog.count({ where: aiNotesWhere });
   const aiNotesLast  = await AiUsageLog.findOne({
     where: aiNotesWhere,
@@ -280,6 +358,11 @@ export const getFeaturesExplored = asyncHandler(async (req, res) => {
       feature:   "AI Gini",
       uses:      giniCount,
       last_used: getCreatedAt(giniLast) ? relativeTime(getCreatedAt(giniLast)) : "Never",
+    },
+    {
+      feature:   "AI Tutor",
+      uses:      tutorCount,
+      last_used: tutorLastDate ? relativeTime(tutorLastDate) : "Never",
     },
     {
       feature:   "AI Notes",
@@ -421,8 +504,10 @@ export const getStats = asyncHandler(async (req, res) => {
 
 /* =====================================================
    8. GET FULL CONVERSATION
-      GET /api/history/conversation/:conversation_id?source=gini
-      GET /api/history/conversation/:conversation_id?source=practice
+      GET /api/history/conversation/:conversation_id
+         ?source=gini     (default)
+         ?source=tutor
+         ?source=practice
    ===================================================== */
 export const getConversation = asyncHandler(async (req, res) => {
   const user_id             = Number(req.user.user_id);
@@ -436,11 +521,10 @@ export const getConversation = asyncHandler(async (req, res) => {
     const allRows = await sequelize.query(
       `SELECT messages, response_body, subject, \`class\`, language, created_at
        FROM   chatbot_logs
-       WHERE  conversation_id = :cid
-         AND  user_id = :uid
+       WHERE  conversation_id = :cid AND user_id = :uid
        ORDER  BY created_at ASC`,
       {
-        replacements: { cid: conversation_id, uid: Number(user_id) },
+        replacements: { cid: conversation_id, uid: user_id },
         type: sequelize.QueryTypes.SELECT,
       }
     );
@@ -448,36 +532,24 @@ export const getConversation = asyncHandler(async (req, res) => {
     if (!allRows.length) throw new ApiError(404, "Conversation not found");
 
     const messages = [];
-
     for (const row of allRows) {
       try {
         const userMsg = JSON.parse(row.messages || "{}");
-        if (userMsg?.content !== undefined) {
+        if (userMsg?.content !== undefined)
           messages.push({ role: "user", content: userMsg.content });
-        }
       } catch { /* skip */ }
 
       if (row.response_body) {
         try {
-          const rb = JSON.parse(row.response_body);
-
+          const rb         = JSON.parse(row.response_body);
           const oaiContent = rb?.choices?.[0]?.message?.content;
-          if (oaiContent) {
-            messages.push({ role: "assistant", content: oaiContent });
-            continue;
-          }
+          if (oaiContent) { messages.push({ role: "assistant", content: oaiContent }); continue; }
 
-          const flat =
-            rb?.response ?? rb?.answer ?? rb?.content ??
-            rb?.text      ?? rb?.reply  ?? rb?.message;
-          if (flat && typeof flat === "string") {
-            messages.push({ role: "assistant", content: flat });
-            continue;
-          }
+          const flat = rb?.response ?? rb?.answer ?? rb?.content ?? rb?.text ?? rb?.reply ?? rb?.message;
+          if (flat && typeof flat === "string") { messages.push({ role: "assistant", content: flat }); continue; }
 
-          if (typeof rb === "string" && rb.trim()) {
+          if (typeof rb === "string" && rb.trim())
             messages.push({ role: "assistant", content: rb });
-          }
         } catch {
           const plain = String(row.response_body).trim();
           if (plain) messages.push({ role: "assistant", content: plain });
@@ -488,22 +560,93 @@ export const getConversation = asyncHandler(async (req, res) => {
     const firstRow  = allRows[0];
     const lastRow   = allRows[allRows.length - 1];
     const firstUser = messages.find(m => m.role === "user");
-    const title     = firstUser?.content?.slice(0, 100)
-                        || firstRow?.subject
-                        || "AI Gini conversation";
+    const title     = firstUser?.content?.slice(0, 100) || firstRow?.subject || "AI Gini conversation";
 
     return res.status(200).json(new ApiResponse(200, {
       conversation_id,
       source:      "AI Gini",
       redirect_to: "/ai-gini",
       title,
-      subject:     firstRow.subject  || null,
-      class:       firstRow.class    || null,
-      language:    firstRow.language || null,
+      subject:    firstRow.subject  || null,
+      class:      firstRow.class    || null,
+      language:   firstRow.language || null,
       messages,
-      turn_count:  messages.filter(m => m.role === "user").length,
-      started_at:  firstRow.created_at,
-      updated_at:  lastRow.created_at,
+      turn_count: messages.filter(m => m.role === "user").length,
+      started_at: firstRow.created_at,
+      updated_at: lastRow.created_at,
+    }, "Conversation fetched"));
+  }
+
+  /* ── AI Tutor — JSON_EXTRACT from user_details ── */
+  if (source === "tutor") {
+    const allRows = await sequelize.query(
+      `SELECT id, request_body, response_body, user_details, created_at
+       FROM   tutor_logs
+       WHERE  conversation_id = :cid
+         AND  ${TUTOR_UID} = :uid
+       ORDER  BY created_at ASC`,
+      {
+        replacements: { cid: conversation_id, uid: user_id },
+        type: sequelize.QueryTypes.SELECT,
+      }
+    );
+
+    if (!allRows.length) throw new ApiError(404, "Conversation not found");
+
+    const messages = [];
+    for (const row of allRows) {
+      /* ── user turn ── */
+      try {
+        const rb = typeof row.request_body === "string"
+          ? JSON.parse(row.request_body) : row.request_body;
+
+        if (rb) {
+          if (Array.isArray(rb)) {
+            const lastUser = [...rb].reverse().find(m => m?.role === "user");
+            if (lastUser?.content) messages.push({ role: "user", content: lastUser.content });
+          } else if (Array.isArray(rb.messages)) {
+            const lastUser = [...rb.messages].reverse().find(m => m?.role === "user");
+            if (lastUser?.content) messages.push({ role: "user", content: lastUser.content });
+          } else {
+            const text = rb.question ?? rb.prompt ?? rb.query ?? rb.message ?? rb.input ?? rb.text;
+            if (text && typeof text === "string") messages.push({ role: "user", content: text });
+          }
+        }
+      } catch { /* skip */ }
+
+      /* ── assistant turn ── */
+      if (row.response_body) {
+        try {
+          const res_body   = typeof row.response_body === "string"
+            ? JSON.parse(row.response_body) : row.response_body;
+          const oaiContent = res_body?.choices?.[0]?.message?.content;
+          if (oaiContent) { messages.push({ role: "assistant", content: oaiContent }); continue; }
+
+          const flat = res_body?.response ?? res_body?.answer ?? res_body?.content ?? res_body?.text ?? res_body?.reply ?? res_body?.message;
+          if (flat && typeof flat === "string") { messages.push({ role: "assistant", content: flat }); continue; }
+
+          if (typeof res_body === "string" && res_body.trim())
+            messages.push({ role: "assistant", content: res_body });
+        } catch {
+          const plain = String(row.response_body).trim();
+          if (plain) messages.push({ role: "assistant", content: plain });
+        }
+      }
+    }
+
+    const firstRow = allRows[0];
+    const lastRow  = allRows[allRows.length - 1];
+    const title    = extractTutorTitle(firstRow) || "AI Tutor conversation";
+
+    return res.status(200).json(new ApiResponse(200, {
+      conversation_id,
+      source:      "AI Tutor",
+      redirect_to: "/ai-tutor",
+      title,
+      messages,
+      turn_count: messages.filter(m => m.role === "user").length,
+      started_at: firstRow.created_at,
+      updated_at: lastRow.created_at,
     }, "Conversation fetched"));
   }
 
@@ -512,8 +655,7 @@ export const getConversation = asyncHandler(async (req, res) => {
     const rows = await PracticeLog.findAll({
       where:      { conversation_id, user_id },
       order:      [["created_at", "ASC"]],
-      attributes: ["id", "conversation_id", "request_body",
-                   "response_body", "device", "created_at"],
+      attributes: ["id", "conversation_id", "request_body", "response_body", "device", "created_at"],
     });
 
     if (!rows.length) throw new ApiError(404, "Conversation not found");
@@ -522,25 +664,17 @@ export const getConversation = asyncHandler(async (req, res) => {
     const title = extractTitle(last.request_body) || "Practice session";
 
     const messages = rows.flatMap(r => {
-      const req_body = typeof r.request_body  === "string"
-        ? JSON.parse(r.request_body  || "{}") : (r.request_body  || {});
-      const res_body = typeof r.response_body === "string"
-        ? JSON.parse(r.response_body || "{}") : (r.response_body || {});
-
+      const req_body = typeof r.request_body  === "string" ? JSON.parse(r.request_body  || "{}") : (r.request_body  || {});
+      const res_body = typeof r.response_body === "string" ? JSON.parse(r.response_body || "{}") : (r.response_body || {});
       const out = [];
 
-      if (Array.isArray(req_body)) {
-        out.push(...req_body);
-      } else if (Array.isArray(req_body.messages)) {
-        out.push(...req_body.messages);
-      } else if (req_body.question || req_body.prompt) {
+      if (Array.isArray(req_body))               out.push(...req_body);
+      else if (Array.isArray(req_body.messages)) out.push(...req_body.messages);
+      else if (req_body.question || req_body.prompt)
         out.push({ role: "user", content: req_body.question || req_body.prompt });
-      }
 
-      const answer = res_body.answer || res_body.response ||
-                     res_body.content || res_body.text;
+      const answer = res_body.answer || res_body.response || res_body.content || res_body.text;
       if (answer) out.push({ role: "assistant", content: answer });
-
       return out;
     });
 
@@ -550,13 +684,13 @@ export const getConversation = asyncHandler(async (req, res) => {
       redirect_to: "/ai-practice",
       title,
       messages,
-      turn_count:  messages.filter(m => m.role === "user").length,
-      started_at:  rows[0].created_at,
-      updated_at:  last.created_at,
+      turn_count: messages.filter(m => m.role === "user").length,
+      started_at: rows[0].created_at,
+      updated_at: last.created_at,
     }, "Conversation fetched"));
   }
 
-  throw new ApiError(400, `Unknown source "${source}". Use gini or practice.`);
+  throw new ApiError(400, `Unknown source "${source}". Use gini, tutor, or practice.`);
 });
 
 /* =====================================================
@@ -564,30 +698,23 @@ export const getConversation = asyncHandler(async (req, res) => {
       GET /api/history/latest-tests
    ===================================================== */
 export const getLatestTests = asyncHandler(async (req, res) => {
-  const user_id = Number(req.user.user_id);
-  
-
-  // Resolve student_id from user_id via StudentProfile
-
+  const user_id    = Number(req.user.user_id);
   const student_id = user_id;
 
   const results = await sequelize.query(
-    `SELECT 
-        pt.subject,
-        ROUND(AVG(pq.is_correct) * 100) AS score
-    FROM practice_tests pt
-    JOIN practice_questions pq 
-        ON pt.id = pq.test_id
-    WHERE pt.student_id = ${student_id}
-    GROUP BY pt.id
-    ORDER BY pt.created_at DESC
-  `,
+    `SELECT
+       pt.subject,
+       ROUND(AVG(pq.is_correct) * 100) AS score
+     FROM practice_tests pt
+     JOIN practice_questions pq ON pt.id = pq.test_id
+     WHERE pt.student_id = :student_id
+     GROUP BY pt.id
+     ORDER BY pt.created_at DESC`,
     {
       replacements: { student_id },
       type: sequelize.QueryTypes.SELECT,
     }
   );
-  
 
   return res.status(200).json(
     new ApiResponse(200, results, "Latest tests fetched")
