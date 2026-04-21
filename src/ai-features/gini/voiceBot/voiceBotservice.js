@@ -1,6 +1,8 @@
 import OpenAI from "openai";
 import { SarvamAIClient } from "sarvamai";
 import { Readable } from "stream";
+import { LLMFactory } from "../../pattern_imp/factory/LLMFactory.ts";
+import { STTFactory } from "../../pattern_imp/factory/STTFactory.ts";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -10,29 +12,65 @@ const sarvamClient = new SarvamAIClient({
   apiSubscriptionKey: process.env.SARVAM_API_KEY,
 });
 
-export const voiceBotService = async (message, audio) => {
+export const voiceBotService = async (message, audio, res) => {
   console.log("voiceBotService");
 
-  let STT = null;
+  let transcript = null;
   let messageWithPrompt;
-  if (audio) {
-    STT = await speechToText(audio);
-    const messageWithTranscript = mergeTranscriptWithMessage(message, STT);
-    messageWithPrompt = mergeSystemPromptWithMessage(messageWithTranscript);
-  } else {
-    messageWithPrompt = mergeSystemPromptWithMessage(message);
+
+  try {
+    // 1. Speech to text stage
+    if (audio) {
+      // STT = await speechToText(audio);
+      const stt = STTFactory.create("sarvam");
+      transcript = await stt.transcribe(audio);
+
+      res.write(
+        `data: ${JSON.stringify({
+          type: "stt",
+          transcript: transcript,
+        })}\n\n`,
+      );
+
+      const messageWithTranscript = mergeTranscriptWithMessage(
+        message,
+        transcript,
+      );
+      messageWithPrompt = mergeSystemPromptWithMessage(messageWithTranscript);
+    } else {
+      messageWithPrompt = mergeSystemPromptWithMessage(message);
+    }
+
+    // 2. LLM response
+    const LLM = LLMFactory.create("openai");
+    const response = await LLM.normalResponse(messageWithPrompt);
+
+    // 3. Text to speech
+    const responseAudio = await textToSpeech(response);
+
+    // 4. Final response
+    res.write(
+      `data: ${JSON.stringify({
+        type: "final",
+        role: "assistant",
+        content: response,
+        audio: responseAudio.audios[0],
+        userQuery: transcript !== null ? transcript : null,
+      })}\n\n`,
+    );
+
+    res.end();
+  } catch (error) {
+    console.error("error -> ", error);
+    res.write(
+      `data: ${JSON.stringify({
+        type: "error",
+        message: error.message,
+      })}\n\n`,
+    );
+
+    res.end();
   }
-
-  const response = await generateResponse(messageWithPrompt);
-
-  const responseAudio = await textToSpeech(response);
-
-  return {
-    role: "assistant",
-    content: response,
-    audio: responseAudio.audios[0],
-    userQuery: STT !== null ? STT?.transcript : null,
-  };
 };
 
 function getSystemPrompt() {
@@ -63,11 +101,9 @@ async function speechToText(audio) {
   });
 }
 
-function mergeTranscriptWithMessage(message, STT) {
+function mergeTranscriptWithMessage(message, transcript) {
   return message.map((msg) =>
-    msg.content === "[Voice message]"
-      ? { ...msg, content: STT?.transcript }
-      : msg,
+    msg.content === "[Voice message]" ? { ...msg, content: transcript } : msg,
   );
 }
 
@@ -95,3 +131,5 @@ async function textToSpeech(response) {
     dict_id: "p_c7b89ab3", // Pronunciation dictionary
   });
 }
+
+////////////////////////////////////////////////////

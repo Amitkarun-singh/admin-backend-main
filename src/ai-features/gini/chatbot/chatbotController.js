@@ -4,7 +4,7 @@ import {
   feedbackThumbDownService,
 } from "./chatbotService.js";
 import multer from "multer";
-import { errorMessage } from "../../../../error.js";
+import { LLMStreamAdapter } from "../../pattern/adapter/LLMStreamAdapter.ts";
 // Use memory storage for simplicity
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -60,9 +60,9 @@ export const chatbotController = [
       );
     } catch (error) {
       console.error("Gini chat bot controller ", error);
-      errorMessage.push({ error, msg: "Streaming Controller Error" });
-      res.write(`data: ${JSON.stringify({ error: "Streaming failed" })}\n\n`);
-      res.write("data: [DONE]\n\n");
+
+      res.write(LLMStreamAdapter.error());
+      res.write(LLMStreamAdapter.done());
       res.end();
     }
   },

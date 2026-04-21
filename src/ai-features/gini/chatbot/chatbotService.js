@@ -1,11 +1,12 @@
 import OpenAI from "openai";
 import pdf from "@cedrugs/pdf-parse"; // ESM-friendly PDF parser
 import Tesseract from "tesseract.js";
-import { errorMessage } from "../../../../error.js";
+
 import { ChatBotFeedbackSave } from "../../modal/chatbot.modal.js";
 import dotEnv from "dotenv";
 dotEnv.config();
 import { fromBuffer } from "pdf2pic";
+import { LLMFactory } from "../../pattern_imp/factory/LLMFactory.ts";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -27,49 +28,24 @@ export const streamChatbotResponse = async (
 ) => {
   console.log("Gini chat bot service ");
   let messageWithPrompt;
-  try {
-    if (file) {
-      const messageWithFile = await mergeMessagesWithFile(messages, file);
-      messageWithPrompt = mergeMessageWithPrompt(messageWithFile, {
-        language,
-        className,
-        chapter,
-      });
-    } else {
-      messageWithPrompt = mergeMessageWithPrompt(messages, {
-        language,
-        className,
-        chapter,
-      });
-    }
 
-    const stream = await openai.chat.completions.create({
-      // model: "tngtech/deepseek-r1t-chimera:free",
-      model: "gpt-4o-mini",
-      messages: messageWithPrompt,
-      stream: true,
-      max_tokens: 1200,
+  if (file) {
+    const messageWithFile = await mergeMessagesWithFile(messages, file);
+    messageWithPrompt = mergeMessageWithPrompt(messageWithFile, {
+      language,
+      className,
+      chapter,
     });
-
-    //Stream AI response to frontend
-    for await (const chunk of stream) {
-      const content = chunk.choices?.[0]?.delta?.content;
-      if (content) {
-        res.write(
-          `data: ${JSON.stringify({
-            choices: [{ delta: { content } }],
-          })}\n\n`,
-        );
-      }
-    }
-
-    res.write("data: [DONE]\n\n");
-    res.end();
-  } catch (error) {
-    console.error("Gini chat bot service  | Streaming Service Error:", error);
-    res.write("data: [DONE]\n\n");
-    res.end();
+  } else {
+    messageWithPrompt = mergeMessageWithPrompt(messages, {
+      language,
+      className,
+      chapter,
+    });
   }
+
+  const chatbot = LLMFactory.create("openai");
+  await chatbot.streamResponse(messageWithPrompt, res);
 };
 
 export const feedbackThumbUpService = async (feedback) => {

@@ -8,3 +8,6 @@ config.env
 
 /eng.traineddata
 .gitignore
+
+dist
+config.env
