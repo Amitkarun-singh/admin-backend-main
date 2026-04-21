@@ -6,7 +6,7 @@ import { ChatBotFeedbackSave } from "../../modal/chatbot.modal.js";
 import dotEnv from "dotenv";
 dotEnv.config();
 import { fromBuffer } from "pdf2pic";
-import { LLMFactory } from "../../pattern/factory/LLMFactory.ts";
+import { LLMFactory } from "../../pattern_imp/factory/LLMFactory.ts";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,

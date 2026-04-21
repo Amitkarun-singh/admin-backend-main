@@ -11,6 +11,13 @@ export class OpenAIProvider implements LLMStrategy {
       this._client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     }
   }
+  async normalResponse(messages: Message[]): Promise<string> {
+    const response = await this._client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: messages,
+    });
+    return response.choices[0].message.content;
+  }
 
   async streamResponse(messages: Message[], res: Response) {
     console.log("streamResponse");

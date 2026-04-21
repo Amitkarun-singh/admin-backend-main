@@ -1,13 +1,13 @@
-import { OpenAIProvider } from "../../pattern_imp/strategy/OpenAIProvider.ts";
+import { SarvamSSTProvider } from "../strategy/SarvamSTTProvide.ts";
 
 const providers = {
-  openai: OpenAIProvider,
+  sarvam: SarvamSSTProvider,
 };
 
 type ProviderName = keyof typeof providers;
 type ProviderInstance = InstanceType<(typeof providers)[ProviderName]>;
 
-export class LLMFactory {
+export class STTFactory {
   private static instances: Map<ProviderName, ProviderInstance> = new Map();
 
   private constructor() {}

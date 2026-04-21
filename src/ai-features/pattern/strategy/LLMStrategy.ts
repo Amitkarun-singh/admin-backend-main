@@ -5,6 +5,6 @@ export type Message = {
 import type { Request } from "express";
 export interface LLMStrategy {
   streamResponse(messages: Message[], res: Request): Promise<void>;
-  // normalResponse(messages: any[]): Promise<string>;
+  normalResponse(messages: Message[]): Promise<string>;
   // structuredResponse(messages: any[], schema: any): Promise<any>;
 }
