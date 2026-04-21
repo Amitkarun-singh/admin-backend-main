@@ -8,6 +8,9 @@ import TeacherProfile from "../models/teacher_profile.model.js";
 import TeacherClassSectionSubject from "../models/teacher_class_section_subject.model.js";
 import TeacherAnalytics from "../models/teacher_analytics.model.js";
 import AdminSchool from "../models/admin_school.model.js";
+import AdminClass from "../models/admin_class.model.js";
+import AdminSubject from "../models/admin_subject_master.model.js";
+import AdminSection from "../models/admin_section.model.js";
 
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -114,6 +117,12 @@ const bulkTeacherUpload = asyncHandler(async (req, res) => {
   const school_id = req.user.school_id;
   const file      = req.file;
 
+  const school = await AdminSchool.findOne({
+    where: { school_id },
+  });
+
+  if (!school) throw new ApiError(400, "School not found");
+
   if (!file) throw new ApiError(400, "Excel file required");
 
   const records = parseExcel(file.path);
@@ -152,11 +161,37 @@ const bulkTeacherUpload = asyncHandler(async (req, res) => {
         { transaction }
       );
 
+      let primarySubjectId = null;  // default null
+      
+      if (row.class_name && row.subject_name) {   
+        const classRecord = await AdminClass.findOne({
+          where: { class_name: row.class_name },
+          transaction,
+        });
+        
+
+        if (classRecord) {
+          const primarySubject = await AdminSubject.findOne({
+            where: {
+              class_id:     classRecord.class_id,
+              subject_name: row.subject_name,
+              board:        school.board,
+              language:     school.language_preference,
+            },
+            transaction,
+          });
+
+
+          primarySubjectId = primarySubject?.subject_id ?? null;  // null if not found
+        }
+      }
+      
+
       await TeacherProfile.create(
         {
           user_id:               user.user_id,
           school_id,
-          primary_subject_id:    row.primary_subject_id    || null,
+          primary_subject_id:    primarySubjectId,
           secondary_subject_ids: row.secondary_subject_ids || null,  // JSON field
           experience:            row.experience            || null,
           age:                   row.age                   || null,
@@ -207,12 +242,52 @@ const getAllTeachers = asyncHandler(async (req, res) => {
         as: "user",
         attributes: ["username", "full_name", "phone_number", "email", "status"],
       },
+      {
+        model: AdminSubject,
+        as: "primarySubject",
+        attributes: ["subject_id", "subject_name", "board", "language", "class_id"],
+        required: false,
+        include: [
+          {
+            model: AdminClass,
+            as: "class",
+            attributes: ["class_id", "class_name"],
+          },
+        ],
+      },
     ],
   });
 
+  // Resolve secondary subjects for each teacher
+  const teachersWithSecondary = await Promise.all(
+    teachers.map(async (teacher) => {
+      let secondarySubjects = [];
+
+      if (teacher.secondary_subject_ids?.length) {
+        const subjects = await AdminSubject.findAll({
+          where: { subject_id: teacher.secondary_subject_ids },
+          attributes: ["subject_id", "subject_name", "board", "language", "class_id"],
+          include: [
+            {
+              model: AdminClass,
+              as: "class",
+              attributes: ["class_id", "class_name"],
+            },
+          ],
+        });
+        secondarySubjects = subjects;
+      }
+
+      return {
+        ...teacher.toJSON(),
+        secondarySubjects,
+      };
+    })
+  );
+
   return res
     .status(200)
-    .json(new ApiResponse(200, teachers, "Teachers fetched"));
+    .json(new ApiResponse(200, teachersWithSecondary, "Teachers fetched"));
 });
 
 /* =====================================================
@@ -228,14 +303,48 @@ const getTeacherById = asyncHandler(async (req, res) => {
         as: "user",
         attributes: ["username", "full_name", "phone_number", "email", "status"],
       },
+      {
+        model: AdminSubject,
+        as: "primarySubject",
+        attributes: ["subject_id", "subject_name", "board", "language", "class_id"],
+        required: false,
+        include: [
+          {
+            model: AdminClass,
+            as: "class",
+            attributes: ["class_id", "class_name"],
+          },
+        ],
+      },
     ],
   });
 
   if (!teacher) throw new ApiError(404, "Teacher not found");
 
+  let secondarySubjects = [];
+  if (teacher.secondary_subject_ids?.length) {
+    const subjects = await AdminSubject.findAll({
+      where: { subject_id: teacher.secondary_subject_ids },
+      attributes: ["subject_id", "subject_name", "board", "language", "class_id"],
+      include: [
+        {
+          model: AdminClass,
+          as: "class",
+          attributes: ["class_id", "class_name"],
+        },
+      ],
+    });
+    secondarySubjects = subjects;
+  }
+
+  const response = {
+    ...teacher.toJSON(),
+    secondarySubjects,
+  };
+
   return res
     .status(200)
-    .json(new ApiResponse(200, teacher));
+    .json(new ApiResponse(200, response, "Teacher fetched"));
 });
 
 /* =====================================================
