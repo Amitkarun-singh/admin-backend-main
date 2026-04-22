@@ -1,29 +1,25 @@
-import OpenAI from "openai";
-import { SarvamAIClient } from "sarvamai";
-import { Readable } from "stream";
 import { LLMFactory } from "../../pattern_imp/factory/LLMFactory.ts";
 import { STTFactory } from "../../pattern_imp/factory/STTFactory.ts";
-
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-const sarvamClient = new SarvamAIClient({
-  apiSubscriptionKey: process.env.SARVAM_API_KEY,
-});
-
-export const voiceBotService = async (message, audio, res) => {
+import { TTSFactory } from "../../pattern_imp/factory/TTSFactory.ts";
+import type { Message } from "../../pattern/strategy/LLMStrategy.ts";
+import type { Response } from "express";
+import type { File } from "../../type/type.d.ts";
+export const voiceBotService = async (
+  message: Message[],
+  audio: File | undefined,
+  res: Response,
+): Promise<void> => {
   console.log("voiceBotService");
 
-  let transcript = null;
-  let messageWithPrompt;
+  let transcript: string | null = null;
+  let messageWithPrompt: Message[];
 
   try {
     // 1. Speech to text stage
     if (audio) {
       // STT = await speechToText(audio);
-      const stt = STTFactory.create("sarvam");
-      transcript = await stt.transcribe(audio);
+      const STT = STTFactory.create("sarvam");
+      transcript = await STT.transcribe(audio);
 
       res.write(
         `data: ${JSON.stringify({
@@ -46,7 +42,8 @@ export const voiceBotService = async (message, audio, res) => {
     const response = await LLM.normalResponse(messageWithPrompt);
 
     // 3. Text to speech
-    const responseAudio = await textToSpeech(response);
+    const TTS = TTSFactory.create("sarvam");
+    const responseAudio = await TTS.synthesize(response); //textToSpeech(response);
 
     // 4. Final response
     res.write(
@@ -54,13 +51,13 @@ export const voiceBotService = async (message, audio, res) => {
         type: "final",
         role: "assistant",
         content: response,
-        audio: responseAudio.audios[0],
+        audio: responseAudio,
         userQuery: transcript !== null ? transcript : null,
       })}\n\n`,
     );
 
     res.end();
-  } catch (error) {
+  } catch (error: any) {
     console.error("error -> ", error);
     res.write(
       `data: ${JSON.stringify({
@@ -73,7 +70,7 @@ export const voiceBotService = async (message, audio, res) => {
   }
 };
 
-function getSystemPrompt() {
+function getSystemPrompt(): string {
   return `You are a helpful voice assistant. Your responses will be converted to speech using a text-to-speech (TTS) system.
   
   Guidelines:
@@ -93,43 +90,15 @@ function getSystemPrompt() {
   Provide responses that sound smooth, friendly, and natural when spoken aloud.`;
 }
 
-async function speechToText(audio) {
-  return await sarvamClient.speechToText.transcribe({
-    file: Readable.from(audio.buffer),
-    model: "saaras:v3",
-    mode: "transcribe", // default mode
-  });
-}
-
-function mergeTranscriptWithMessage(message, transcript) {
+function mergeTranscriptWithMessage(
+  message: Message[],
+  transcript: string,
+): Message[] {
   return message.map((msg) =>
     msg.content === "[Voice message]" ? { ...msg, content: transcript } : msg,
   );
 }
 
-function mergeSystemPromptWithMessage(message) {
+function mergeSystemPromptWithMessage(message: Message[]): Message[] {
   return [{ role: "system", content: getSystemPrompt() }, ...message];
 }
-
-async function generateResponse(message) {
-  const response = await client.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: message,
-  });
-  return response.choices[0].message.content;
-}
-
-async function textToSpeech(response) {
-  return await sarvamClient.textToSpeech.convert({
-    text: response,
-    target_language_code: "hi-IN",
-    speaker: "arya",
-    pace: 1.1,
-    speech_sample_rate: 22050,
-    enable_preprocessing: true,
-    model: "bulbul:v2",
-    dict_id: "p_c7b89ab3", // Pronunciation dictionary
-  });
-}
-
-////////////////////////////////////////////////////

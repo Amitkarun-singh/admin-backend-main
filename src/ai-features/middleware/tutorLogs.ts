@@ -1,9 +1,10 @@
 import { v4 as uuidv4 } from "uuid";
 import pool from "../db/db.js";
-export const tutorLogs = (req, res, next) => {
+import type { Request, Response, NextFunction } from "express";
+export const tutorLogs = (req: Request, res: Response, next: NextFunction) => {
   console.log("logging");
   const originalJson = res.json;
-  let responseBody;
+  let responseBody: { success: string; message: string; errors: string[] };
 
   const insertQuery = `
   INSERT INTO tutor_logs 

@@ -1,33 +1,26 @@
-import OpenAI from "openai";
 import pdf from "@cedrugs/pdf-parse"; // ESM-friendly PDF parser
 import Tesseract from "tesseract.js";
-
 import { ChatBotFeedbackSave } from "../../modal/chatbot.modal.js";
-import dotEnv from "dotenv";
-dotEnv.config();
+
 import { fromBuffer } from "pdf2pic";
 import { LLMFactory } from "../../pattern_imp/factory/LLMFactory.ts";
+import type { Message } from "../../pattern/strategy/LLMStrategy.ts";
+import type { Response } from "express";
+import type { File } from "../../type/type.d.ts";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-/**
- * Stream AI response to client
- * @param {*} messages - Array of user messages
- * @param {*} res - Express response object (SSE)
- * @param {*} file - Optional uploaded file
- */
+type promptDetails = {
+  language: string;
+  className: string;
+  chapter: string;
+};
 export const streamChatbotResponse = async (
-  messages,
-  res,
-  file = null,
-  language = "",
-  className = "",
-  chapter = "",
+  messages: Message[],
+  res: Response,
+  file: File | undefined,
+  { language, className, chapter }: promptDetails,
 ) => {
   console.log("Gini chat bot service ");
-  let messageWithPrompt;
+  let messageWithPrompt: Message[];
 
   if (file) {
     const messageWithFile = await mergeMessagesWithFile(messages, file);
@@ -47,8 +40,10 @@ export const streamChatbotResponse = async (
   const chatbot = LLMFactory.create("openai");
   await chatbot.streamResponse(messageWithPrompt, res);
 };
-
-export const feedbackThumbUpService = async (feedback) => {
+type feedback = { userMessage: string; response: string; feedback: string };
+export const feedbackThumbUpService = async (
+  feedback: Omit<feedback, "feedback">,
+) => {
   try {
     await ChatBotFeedbackSave([
       feedback.userMessage,
@@ -62,9 +57,9 @@ export const feedbackThumbUpService = async (feedback) => {
     throw err;
   }
 };
-export const feedbackThumbDownService = async (feedback) => {
+export const feedbackThumbDownService = async (feedback: feedback) => {
   try {
-    await await ChatBotFeedbackSave([
+    await ChatBotFeedbackSave([
       feedback.userMessage,
       feedback.response,
       feedback.feedback,
@@ -75,7 +70,7 @@ export const feedbackThumbDownService = async (feedback) => {
   }
 };
 
-const extractFileText = async (file) => {
+const extractFileText = async (file: File) => {
   if (!file) return "";
 
   try {
@@ -98,31 +93,31 @@ const extractFileText = async (file) => {
       }
 
       // fallback OCR
-      try {
-        const convert = fromBuffer(file.buffer, {
-          density: 200,
-          format: "png",
-          width: 1200,
-          height: 1600,
-        });
+      // try {
+      //   const convert = fromBuffer(file.buffer, {
+      //     density: 200,
+      //     format: "png",
+      //     width: 1200,
+      //     height: 1600,
+      //   });
 
-        const pages = await convert.bulk(-1);
+      //   const pages = await convert.bulk(-1);
 
-        let fullText = "";
+      //   let fullText = "";
 
-        for (const page of pages) {
-          const {
-            data: { text },
-          } = await Tesseract.recognize(page.base64, "eng");
+      //   for (const page of pages) {
+      //     const {
+      //       data: { text },
+      //     } = await Tesseract.recognize(page, "eng");
 
-          fullText += text + "\n";
-        }
+      //     fullText += text + "\n";
+      //   }
 
-        return fullText.trim();
-      } catch (ocrError) {
-        console.error("OCR tools missing. Skipping OCR.");
-        return pdfData.text || "";
-      }
+      //   return fullText.trim();
+      // } catch (ocrError) {
+      //   console.error("OCR tools missing. Skipping OCR.");
+      //   return pdfData.text || "";
+      // }
     }
 
     return "Unable to read File";
@@ -132,7 +127,10 @@ const extractFileText = async (file) => {
   }
 };
 
-async function mergeMessagesWithFile(messages, file) {
+async function mergeMessagesWithFile(
+  messages: Message[],
+  file: File,
+): Promise<Message[]> {
   const fileContent = await extractFileText(file);
 
   if (!fileContent) return messages;
@@ -146,7 +144,10 @@ async function mergeMessagesWithFile(messages, file) {
   ];
 }
 
-function mergeMessageWithPrompt(messages, { language, className, chapter }) {
+function mergeMessageWithPrompt(
+  messages: Message[],
+  { language, className, chapter }: promptDetails,
+): Message[] {
   return [
     {
       role: "system",
@@ -156,7 +157,7 @@ function mergeMessageWithPrompt(messages, { language, className, chapter }) {
   ];
 }
 
-function getSystemPrompt({ language, className, chapter }) {
+function getSystemPrompt({ language, className, chapter }: promptDetails) {
   return `
 You are a friendly AI tutor helping a school student learn.
 

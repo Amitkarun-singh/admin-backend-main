@@ -2,15 +2,16 @@ import {
   streamChatbotResponse,
   feedbackThumbUpService,
   feedbackThumbDownService,
-} from "./chatbotService.js";
+} from "./chatbotService.ts";
 import multer from "multer";
 import { LLMStreamAdapter } from "../../pattern/adapter/LLMStreamAdapter.ts";
+import type { Request, Response } from "express";
 // Use memory storage for simplicity
 const upload = multer({ storage: multer.memoryStorage() });
 
 export const chatbotController = [
   upload.single("file"), // 'file' matches frontend FormData
-  async (req, res) => {
+  async (req: Request, res: Response) => {
     console.log("Gini chat bot controller");
     try {
       // Messages come as a JSON string in multipart/form-data
@@ -50,14 +51,11 @@ export const chatbotController = [
       res.setHeader("X-Accel-Buffering", "no"); // disable nginx buffering
       res.flushHeaders();
 
-      await streamChatbotResponse(
-        messages,
-        res,
-        uploadedFile,
+      await streamChatbotResponse(messages, res, uploadedFile, {
         language,
         className,
         chapter,
-      );
+      });
     } catch (error) {
       console.error("Gini chat bot controller ", error);
 
@@ -68,7 +66,10 @@ export const chatbotController = [
   },
 ];
 
-export const feedbackThumbUpController = async (req, res) => {
+export const feedbackThumbUpController = async (
+  req: Request,
+  res: Response,
+) => {
   // console.log(req.body);
   try {
     await feedbackThumbUpService(req.body);
@@ -82,7 +83,10 @@ export const feedbackThumbUpController = async (req, res) => {
     });
   }
 };
-export const feedbackThumbDownController = async (req, res) => {
+export const feedbackThumbDownController = async (
+  req: Request,
+  res: Response,
+) => {
   try {
     await feedbackThumbDownService(req.body);
     res.status(200).json({ isSuccessful: true });
