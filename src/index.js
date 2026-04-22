@@ -14,7 +14,7 @@ import courseRoutes from "./routes/course.routes.js";
 import teacherRoutes from "./routes/teacher.routes.js";
 import studentRoutes from "./routes/student.routes.js";
 import parentRoutes from "./routes/parent.routes.js";
-import { errorMessage } from "./error.js";
+
 import historyRoutes from "./routes/history.routes.js";
 
 // Imports for AI features
@@ -104,6 +104,5 @@ app.listen(process.env.PORT || 3000, () => {
     console.log("✅ Tables synced");
   } catch (error) {
     console.error("❌ DB connection failed:", error);
-    errorMessage.push({ error, msg: " DB connection failed" });
   }
 })();

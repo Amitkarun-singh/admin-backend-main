@@ -1,16 +1,16 @@
 import { Op } from "sequelize";
 import sequelize from "../config/db.js";
 
-import GiniLog          from "../models/gini_log.model.js";
-import TutorLog         from "../models/tutor_log.model.js";
-import PracticeLog      from "../models/practice_log.model.js";
-import AiUsageLog       from "../models/ai_usage_log.model.js";
-import UserSession      from "../models/user_session.model.js";
+import GiniLog from "../models/gini_log.model.js";
+import TutorLog from "../models/Tutor_log.model.js";
+import PracticeLog from "../models/practice_log.model.js";
+import AiUsageLog from "../models/ai_usage_log.model.js";
+import UserSession from "../models/user_session.model.js";
 import StudentAnalytics from "../models/student_analytics.model.js";
-import StudentProfile   from "../models/student_profile.model.js";
+import StudentProfile from "../models/student_profile.model.js";
 
-import { ApiError }     from "../utils/ApiError.js";
-import { ApiResponse }  from "../utils/ApiResponse.js";
+import { ApiError } from "../utils/ApiError.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
 /* ─────────────────────────────────────────────────────────────
@@ -27,8 +27,9 @@ const TUTOR_UID = `CAST(JSON_UNQUOTE(JSON_EXTRACT(user_details, '$.user_id')) AS
 function parseDevice(ua = "") {
   if (!ua) return "Desktop";
   const s = ua.toLowerCase();
-  if (s.includes("tablet") || s.includes("ipad"))                             return "Tablet";
-  if (s.includes("mobile") || s.includes("android") || s.includes("iphone")) return "Mobile";
+  if (s.includes("tablet") || s.includes("ipad")) return "Tablet";
+  if (s.includes("mobile") || s.includes("android") || s.includes("iphone"))
+    return "Mobile";
   return "Desktop";
 }
 
@@ -44,7 +45,7 @@ function extractTitle(raw) {
       const c = obj.content;
       if (typeof c === "string" && c.trim()) return c.trim().slice(0, 100);
       if (Array.isArray(c)) {
-        const part = c.find(p => p?.type === "text" && p?.text);
+        const part = c.find((p) => p?.type === "text" && p?.text);
         if (part?.text) return part.text.trim().slice(0, 100);
       }
     }
@@ -52,24 +53,29 @@ function extractTitle(raw) {
     const arr = Array.isArray(obj)
       ? obj
       : Array.isArray(obj.messages)
-      ? obj.messages
-      : null;
+        ? obj.messages
+        : null;
 
     if (arr) {
-      const firstUser = arr.find(m => m?.role === "user");
+      const firstUser = arr.find((m) => m?.role === "user");
       if (firstUser?.content) {
         const c = firstUser.content;
         if (typeof c === "string" && c.trim()) return c.trim().slice(0, 100);
         if (Array.isArray(c)) {
-          const part = c.find(p => p?.type === "text" && p?.text);
+          const part = c.find((p) => p?.type === "text" && p?.text);
           if (part?.text) return part.text.trim().slice(0, 100);
         }
       }
     }
 
     const flat =
-      obj.question ?? obj.prompt ?? obj.topic ??
-      obj.query    ?? obj.message ?? obj.input ?? obj.text;
+      obj.question ??
+      obj.prompt ??
+      obj.topic ??
+      obj.query ??
+      obj.message ??
+      obj.input ??
+      obj.text;
     if (flat && typeof flat === "string" && flat.trim())
       return flat.trim().slice(0, 100);
 
@@ -87,13 +93,19 @@ function extractTutorTitle(row) {
   if (fromReq) return fromReq;
 
   try {
-    const ud = typeof row.user_details === "string"
-      ? JSON.parse(row.user_details)
-      : row.user_details;
-    if (ud?.query  && typeof ud.query  === "string") return ud.query.slice(0, 100);
-    if (ud?.topic  && typeof ud.topic  === "string") return ud.topic.slice(0, 100);
-    if (ud?.prompt && typeof ud.prompt === "string") return ud.prompt.slice(0, 100);
-  } catch { /* ignore */ }
+    const ud =
+      typeof row.user_details === "string"
+        ? JSON.parse(row.user_details)
+        : row.user_details;
+    if (ud?.query && typeof ud.query === "string")
+      return ud.query.slice(0, 100);
+    if (ud?.topic && typeof ud.topic === "string")
+      return ud.topic.slice(0, 100);
+    if (ud?.prompt && typeof ud.prompt === "string")
+      return ud.prompt.slice(0, 100);
+  } catch {
+    /* ignore */
+  }
 
   return null;
 }
@@ -102,14 +114,14 @@ function extractTutorTitle(row) {
    HELPER: human-readable relative time
 ───────────────────────────────────────────────────────────── */
 function relativeTime(date) {
-  const diffMs  = Date.now() - new Date(date).getTime();
+  const diffMs = Date.now() - new Date(date).getTime();
   const diffMin = Math.floor(diffMs / 60000);
-  const diffH   = Math.floor(diffMin / 60);
-  const diffD   = Math.floor(diffH / 24);
+  const diffH = Math.floor(diffMin / 60);
+  const diffD = Math.floor(diffH / 24);
 
-  if (diffMin < 60)  return `${diffMin} min ago`;
-  if (diffH   < 24)  return `${diffH} hour${diffH > 1 ? "s" : ""} ago`;
-  if (diffD   === 1) return "Yesterday";
+  if (diffMin < 60) return `${diffMin} min ago`;
+  if (diffH < 24) return `${diffH} hour${diffH > 1 ? "s" : ""} ago`;
+  if (diffD === 1) return "Yesterday";
   return `${diffD} days ago`;
 }
 
@@ -128,8 +140,8 @@ export const recordSession = async ({ user_id, ua, ip }) => {
   try {
     await UserSession.create({
       user_id,
-      login_at:   new Date(),
-      device:     parseDevice(ua),
+      login_at: new Date(),
+      device: parseDevice(ua),
       ip_address: ip || null,
     });
   } catch (err) {
@@ -161,7 +173,7 @@ export const closeSession = async (user_id) => {
    ===================================================== */
 export const getRecentQueries = asyncHandler(async (req, res) => {
   const user_id = Number(req.user.user_id);
-  const limit   = parseInt(req.query.limit) || 20;
+  const limit = parseInt(req.query.limit) || 20;
 
   /* ── AI Gini ── group by conversation_id ── */
   const giniConvs = await GiniLog.findAll({
@@ -169,7 +181,7 @@ export const getRecentQueries = asyncHandler(async (req, res) => {
     attributes: [
       "conversation_id",
       [sequelize.fn("MAX", sequelize.col("created_at")), "last_active"],
-      [sequelize.fn("COUNT", sequelize.col("id")),       "turn_count"],
+      [sequelize.fn("COUNT", sequelize.col("id")), "turn_count"],
     ],
     group: ["conversation_id"],
     order: [[sequelize.fn("MAX", sequelize.col("created_at")), "DESC"]],
@@ -178,7 +190,7 @@ export const getRecentQueries = asyncHandler(async (req, res) => {
   });
 
   const giniQueries = await Promise.all(
-    giniConvs.map(async conv => {
+    giniConvs.map(async (conv) => {
       const rows = await sequelize.query(
         `SELECT messages, subject, \`class\`
          FROM   chatbot_logs
@@ -188,35 +200,39 @@ export const getRecentQueries = asyncHandler(async (req, res) => {
         {
           replacements: { cid: conv.conversation_id, uid: user_id },
           type: sequelize.QueryTypes.SELECT,
-        }
+        },
       );
 
-      let title = null, subject = null, cls = null;
+      let title = null,
+        subject = null,
+        cls = null;
       for (const row of rows) {
         subject = subject || row.subject;
-        cls     = cls     || row.class;
+        cls = cls || row.class;
         if (!title && row.messages) {
           try {
             const msg = JSON.parse(row.messages);
             if (msg?.role === "user" && msg?.content)
               title = String(msg.content).slice(0, 100);
-          } catch { /* skip */ }
+          } catch {
+            /* skip */
+          }
         }
         if (title) break;
       }
 
       return {
-        source:          "AI Gini",
-        redirect_to:     "/ai-gini",
+        source: "AI Gini",
+        redirect_to: "/ai-gini",
         conversation_id: conv.conversation_id,
-        title:           title || subject || "AI Gini conversation",
-        subject:         subject || null,
-        class:           cls     || null,
-        turn_count:      parseInt(conv.turn_count),
-        time:            relativeTime(conv.last_active),
-        created_at:      conv.last_active,
+        title: title || subject || "AI Gini conversation",
+        subject: subject || null,
+        class: cls || null,
+        turn_count: parseInt(conv.turn_count),
+        time: relativeTime(conv.last_active),
+        created_at: conv.last_active,
       };
-    })
+    }),
   );
 
   /* ── AI Tutor ── JSON_EXTRACT user_id from user_details ── */
@@ -235,11 +251,11 @@ export const getRecentQueries = asyncHandler(async (req, res) => {
       {
         replacements: { uid: user_id, lim: limit },
         type: sequelize.QueryTypes.SELECT,
-      }
+      },
     );
 
     tutorQueries = await Promise.all(
-      tutorConvs.map(async conv => {
+      tutorConvs.map(async (conv) => {
         const [firstRow] = await sequelize.query(
           `SELECT request_body, user_details
            FROM   tutor_logs
@@ -250,22 +266,23 @@ export const getRecentQueries = asyncHandler(async (req, res) => {
           {
             replacements: { cid: conv.conversation_id, uid: user_id },
             type: sequelize.QueryTypes.SELECT,
-          }
+          },
         );
 
-        const title = (firstRow ? extractTutorTitle(firstRow) : null)
-          || "AI Tutor conversation";
+        const title =
+          (firstRow ? extractTutorTitle(firstRow) : null) ||
+          "AI Tutor conversation";
 
         return {
-          source:          "AI Tutor",
-          redirect_to:     "/ai-tutor",
+          source: "AI Tutor",
+          redirect_to: "/ai-tutor",
           conversation_id: conv.conversation_id,
           title,
-          turn_count:      parseInt(conv.turn_count),
-          time:            relativeTime(conv.last_active),
-          created_at:      conv.last_active,
+          turn_count: parseInt(conv.turn_count),
+          time: relativeTime(conv.last_active),
+          created_at: conv.last_active,
         };
-      })
+      }),
     );
   } catch (err) {
     console.error("getRecentQueries — tutor fetch failed:", err.message);
@@ -277,9 +294,9 @@ export const getRecentQueries = asyncHandler(async (req, res) => {
     .slice(0, limit)
     .map(({ created_at, ...rest }) => rest);
 
-  return res.status(200).json(
-    new ApiResponse(200, combined, "Recent queries fetched")
-  );
+  return res
+    .status(200)
+    .json(new ApiResponse(200, combined, "Recent queries fetched"));
 });
 
 /* =====================================================
@@ -291,21 +308,21 @@ export const getFeaturesExplored = asyncHandler(async (req, res) => {
 
   /* ── Gini ── */
   const giniCount = await GiniLog.count({ where: { user_id } });
-  const giniLast  = await GiniLog.findOne({
-    where:      { user_id },
-    order:      [["created_at", "DESC"]],
+  const giniLast = await GiniLog.findOne({
+    where: { user_id },
+    order: [["created_at", "DESC"]],
     attributes: ["created_at"],
   });
 
   /* ── AI Tutor — JSON_EXTRACT from user_details ── */
-  let tutorCount    = 0;
+  let tutorCount = 0;
   let tutorLastDate = null;
   try {
     const [countRow] = await sequelize.query(
       `SELECT COUNT(id) AS cnt
        FROM   tutor_logs
        WHERE  ${TUTOR_UID} = :uid`,
-      { replacements: { uid: user_id }, type: sequelize.QueryTypes.SELECT }
+      { replacements: { uid: user_id }, type: sequelize.QueryTypes.SELECT },
     );
     tutorCount = parseInt(countRow?.cnt) || 0;
 
@@ -315,7 +332,7 @@ export const getFeaturesExplored = asyncHandler(async (req, res) => {
        WHERE  ${TUTOR_UID} = :uid
        ORDER  BY created_at DESC
        LIMIT  1`,
-      { replacements: { uid: user_id }, type: sequelize.QueryTypes.SELECT }
+      { replacements: { uid: user_id }, type: sequelize.QueryTypes.SELECT },
     );
     tutorLastDate = lastRow?.created_at || null;
   } catch (err) {
@@ -324,7 +341,7 @@ export const getFeaturesExplored = asyncHandler(async (req, res) => {
 
   /* ── AI Practice ── */
   const practiceCount = await PracticeLog.count({ where: { user_id } });
-  const practiceLast  = await PracticeLog.findOne({
+  const practiceLast = await PracticeLog.findOne({
     where: { user_id },
     order: [["created_at", "DESC"]],
   });
@@ -339,7 +356,7 @@ export const getFeaturesExplored = asyncHandler(async (req, res) => {
     ],
   };
   const aiNotesCount = await AiUsageLog.count({ where: aiNotesWhere });
-  const aiNotesLast  = await AiUsageLog.findOne({
+  const aiNotesLast = await AiUsageLog.findOne({
     where: aiNotesWhere,
     order: [["created_at", "DESC"]],
   });
@@ -348,42 +365,50 @@ export const getFeaturesExplored = asyncHandler(async (req, res) => {
   const summaryCount = await AiUsageLog.count({
     where: { user_id, feature: "summarizer" },
   });
-  const summaryLast  = await AiUsageLog.findOne({
-    where:  { user_id, feature: "summarizer" },
-    order:  [["created_at", "DESC"]],
+  const summaryLast = await AiUsageLog.findOne({
+    where: { user_id, feature: "summarizer" },
+    order: [["created_at", "DESC"]],
   });
 
   const features = [
     {
-      feature:   "AI Gini",
-      uses:      giniCount,
-      last_used: getCreatedAt(giniLast) ? relativeTime(getCreatedAt(giniLast)) : "Never",
+      feature: "AI Gini",
+      uses: giniCount,
+      last_used: getCreatedAt(giniLast)
+        ? relativeTime(getCreatedAt(giniLast))
+        : "Never",
     },
     {
-      feature:   "AI Tutor",
-      uses:      tutorCount,
+      feature: "AI Tutor",
+      uses: tutorCount,
       last_used: tutorLastDate ? relativeTime(tutorLastDate) : "Never",
     },
     {
-      feature:   "AI Notes",
-      uses:      aiNotesCount,
-      last_used: getCreatedAt(aiNotesLast) ? relativeTime(getCreatedAt(aiNotesLast)) : "Never",
+      feature: "AI Notes",
+      uses: aiNotesCount,
+      last_used: getCreatedAt(aiNotesLast)
+        ? relativeTime(getCreatedAt(aiNotesLast))
+        : "Never",
     },
     {
-      feature:   "AI Practice",
-      uses:      practiceCount,
-      last_used: getCreatedAt(practiceLast) ? relativeTime(getCreatedAt(practiceLast)) : "Never",
+      feature: "AI Practice",
+      uses: practiceCount,
+      last_used: getCreatedAt(practiceLast)
+        ? relativeTime(getCreatedAt(practiceLast))
+        : "Never",
     },
     {
-      feature:   "Doc Summariser",
-      uses:      summaryCount,
-      last_used: getCreatedAt(summaryLast) ? relativeTime(getCreatedAt(summaryLast)) : "Never",
+      feature: "Doc Summariser",
+      uses: summaryCount,
+      last_used: getCreatedAt(summaryLast)
+        ? relativeTime(getCreatedAt(summaryLast))
+        : "Never",
     },
   ];
 
-  return res.status(200).json(
-    new ApiResponse(200, features, "Features explored fetched")
-  );
+  return res
+    .status(200)
+    .json(new ApiResponse(200, features, "Features explored fetched"));
 });
 
 /* =====================================================
@@ -392,33 +417,47 @@ export const getFeaturesExplored = asyncHandler(async (req, res) => {
    ===================================================== */
 export const getLoginHistory = asyncHandler(async (req, res) => {
   const user_id = Number(req.user.user_id);
-  const limit   = parseInt(req.query.limit) || 10;
+  const limit = parseInt(req.query.limit) || 10;
 
   const sessions = await UserSession.findAll({
-    where:  { user_id },
-    order:  [["login_at", "DESC"]],
+    where: { user_id },
+    order: [["login_at", "DESC"]],
     limit,
-    attributes: ["session_id", "login_at", "logout_at", "device", "ip_address", "city", "country"],
+    attributes: [
+      "session_id",
+      "login_at",
+      "logout_at",
+      "device",
+      "ip_address",
+      "city",
+      "country",
+    ],
   });
 
-  const history = sessions.map(s => ({
+  const history = sessions.map((s) => ({
     session_id: s.session_id,
-    date:       new Date(s.login_at).toLocaleDateString("en-IN", {
-                  month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Kolkata"
-                }),
-    time:       new Date(s.login_at).toLocaleTimeString("en-IN", {
-                  hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata"
-                }),
-    device:     s.device || "Desktop",
-    location:   s.city && s.country
-                  ? `${s.city}, ${s.country}`
-                  : s.ip_address || "Unknown",
-    logout_at:  s.logout_at,
+    date: new Date(s.login_at).toLocaleDateString("en-IN", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "Asia/Kolkata",
+    }),
+    time: new Date(s.login_at).toLocaleTimeString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Asia/Kolkata",
+    }),
+    device: s.device || "Desktop",
+    location:
+      s.city && s.country
+        ? `${s.city}, ${s.country}`
+        : s.ip_address || "Unknown",
+    logout_at: s.logout_at,
   }));
 
-  return res.status(200).json(
-    new ApiResponse(200, history, "Login history fetched")
-  );
+  return res
+    .status(200)
+    .json(new ApiResponse(200, history, "Login history fetched"));
 });
 
 /* =====================================================
@@ -428,7 +467,7 @@ export const getLoginHistory = asyncHandler(async (req, res) => {
 export const getWeekActivity = asyncHandler(async (req, res) => {
   const user_id = Number(req.user.user_id);
 
-  const now       = new Date();
+  const now = new Date();
   const dayOfWeek = now.getDay();
   const weekStart = new Date(now);
   weekStart.setDate(now.getDate() - dayOfWeek);
@@ -448,7 +487,7 @@ export const getWeekActivity = asyncHandler(async (req, res) => {
   });
 
   const activeDays = new Set(
-    sessions.map(s => new Date(s.login_at).getDay())
+    sessions.map((s) => new Date(s.login_at).getDay()),
   );
 
   const days = ["S", "M", "T", "W", "T", "F", "S"].map((label, idx) => ({
@@ -457,10 +496,14 @@ export const getWeekActivity = asyncHandler(async (req, res) => {
   }));
 
   return res.status(200).json(
-    new ApiResponse(200, {
-      days,
-      total_active: activeDays.size,
-    }, "Week activity fetched")
+    new ApiResponse(
+      200,
+      {
+        days,
+        total_active: activeDays.size,
+      },
+      "Week activity fetched",
+    ),
   );
 });
 
@@ -475,7 +518,7 @@ export const getStats = asyncHandler(async (req, res) => {
     `SELECT COUNT(DISTINCT DATE(login_at)) AS cnt
      FROM user_sessions
      WHERE user_id = :user_id`,
-    { replacements: { user_id }, type: sequelize.QueryTypes.SELECT }
+    { replacements: { user_id }, type: sequelize.QueryTypes.SELECT },
   );
   const loginDays = parseInt(loginResult[0]?.cnt) || 0;
 
@@ -495,10 +538,14 @@ export const getStats = asyncHandler(async (req, res) => {
   }
 
   return res.status(200).json(
-    new ApiResponse(200, {
-      login_days:   loginDays,
-      test_overall: testOverall,
-    }, "Stats fetched")
+    new ApiResponse(
+      200,
+      {
+        login_days: loginDays,
+        test_overall: testOverall,
+      },
+      "Stats fetched",
+    ),
   );
 });
 
@@ -510,9 +557,9 @@ export const getStats = asyncHandler(async (req, res) => {
          ?source=practice
    ===================================================== */
 export const getConversation = asyncHandler(async (req, res) => {
-  const user_id             = Number(req.user.user_id);
+  const user_id = Number(req.user.user_id);
   const { conversation_id } = req.params;
-  const source              = (req.query.source || "gini").toLowerCase();
+  const source = (req.query.source || "gini").toLowerCase();
 
   if (!conversation_id) throw new ApiError(400, "conversation_id required");
 
@@ -526,7 +573,7 @@ export const getConversation = asyncHandler(async (req, res) => {
       {
         replacements: { cid: conversation_id, uid: user_id },
         type: sequelize.QueryTypes.SELECT,
-      }
+      },
     );
 
     if (!allRows.length) throw new ApiError(404, "Conversation not found");
@@ -537,16 +584,30 @@ export const getConversation = asyncHandler(async (req, res) => {
         const userMsg = JSON.parse(row.messages || "{}");
         if (userMsg?.content !== undefined)
           messages.push({ role: "user", content: userMsg.content });
-      } catch { /* skip */ }
+      } catch {
+        /* skip */
+      }
 
       if (row.response_body) {
         try {
-          const rb         = JSON.parse(row.response_body);
+          const rb = JSON.parse(row.response_body);
           const oaiContent = rb?.choices?.[0]?.message?.content;
-          if (oaiContent) { messages.push({ role: "assistant", content: oaiContent }); continue; }
+          if (oaiContent) {
+            messages.push({ role: "assistant", content: oaiContent });
+            continue;
+          }
 
-          const flat = rb?.response ?? rb?.answer ?? rb?.content ?? rb?.text ?? rb?.reply ?? rb?.message;
-          if (flat && typeof flat === "string") { messages.push({ role: "assistant", content: flat }); continue; }
+          const flat =
+            rb?.response ??
+            rb?.answer ??
+            rb?.content ??
+            rb?.text ??
+            rb?.reply ??
+            rb?.message;
+          if (flat && typeof flat === "string") {
+            messages.push({ role: "assistant", content: flat });
+            continue;
+          }
 
           if (typeof rb === "string" && rb.trim())
             messages.push({ role: "assistant", content: rb });
@@ -557,24 +618,33 @@ export const getConversation = asyncHandler(async (req, res) => {
       }
     }
 
-    const firstRow  = allRows[0];
-    const lastRow   = allRows[allRows.length - 1];
-    const firstUser = messages.find(m => m.role === "user");
-    const title     = firstUser?.content?.slice(0, 100) || firstRow?.subject || "AI Gini conversation";
+    const firstRow = allRows[0];
+    const lastRow = allRows[allRows.length - 1];
+    const firstUser = messages.find((m) => m.role === "user");
+    const title =
+      firstUser?.content?.slice(0, 100) ||
+      firstRow?.subject ||
+      "AI Gini conversation";
 
-    return res.status(200).json(new ApiResponse(200, {
-      conversation_id,
-      source:      "AI Gini",
-      redirect_to: "/ai-gini",
-      title,
-      subject:    firstRow.subject  || null,
-      class:      firstRow.class    || null,
-      language:   firstRow.language || null,
-      messages,
-      turn_count: messages.filter(m => m.role === "user").length,
-      started_at: firstRow.created_at,
-      updated_at: lastRow.created_at,
-    }, "Conversation fetched"));
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        {
+          conversation_id,
+          source: "AI Gini",
+          redirect_to: "/ai-gini",
+          title,
+          subject: firstRow.subject || null,
+          class: firstRow.class || null,
+          language: firstRow.language || null,
+          messages,
+          turn_count: messages.filter((m) => m.role === "user").length,
+          started_at: firstRow.created_at,
+          updated_at: lastRow.created_at,
+        },
+        "Conversation fetched",
+      ),
+    );
   }
 
   /* ── AI Tutor — JSON_EXTRACT from user_details ── */
@@ -588,7 +658,7 @@ export const getConversation = asyncHandler(async (req, res) => {
       {
         replacements: { cid: conversation_id, uid: user_id },
         type: sequelize.QueryTypes.SELECT,
-      }
+      },
     );
 
     if (!allRows.length) throw new ApiError(404, "Conversation not found");
@@ -597,33 +667,62 @@ export const getConversation = asyncHandler(async (req, res) => {
     for (const row of allRows) {
       /* ── user turn ── */
       try {
-        const rb = typeof row.request_body === "string"
-          ? JSON.parse(row.request_body) : row.request_body;
+        const rb =
+          typeof row.request_body === "string"
+            ? JSON.parse(row.request_body)
+            : row.request_body;
 
         if (rb) {
           if (Array.isArray(rb)) {
-            const lastUser = [...rb].reverse().find(m => m?.role === "user");
-            if (lastUser?.content) messages.push({ role: "user", content: lastUser.content });
+            const lastUser = [...rb].reverse().find((m) => m?.role === "user");
+            if (lastUser?.content)
+              messages.push({ role: "user", content: lastUser.content });
           } else if (Array.isArray(rb.messages)) {
-            const lastUser = [...rb.messages].reverse().find(m => m?.role === "user");
-            if (lastUser?.content) messages.push({ role: "user", content: lastUser.content });
+            const lastUser = [...rb.messages]
+              .reverse()
+              .find((m) => m?.role === "user");
+            if (lastUser?.content)
+              messages.push({ role: "user", content: lastUser.content });
           } else {
-            const text = rb.question ?? rb.prompt ?? rb.query ?? rb.message ?? rb.input ?? rb.text;
-            if (text && typeof text === "string") messages.push({ role: "user", content: text });
+            const text =
+              rb.question ??
+              rb.prompt ??
+              rb.query ??
+              rb.message ??
+              rb.input ??
+              rb.text;
+            if (text && typeof text === "string")
+              messages.push({ role: "user", content: text });
           }
         }
-      } catch { /* skip */ }
+      } catch {
+        /* skip */
+      }
 
       /* ── assistant turn ── */
       if (row.response_body) {
         try {
-          const res_body   = typeof row.response_body === "string"
-            ? JSON.parse(row.response_body) : row.response_body;
+          const res_body =
+            typeof row.response_body === "string"
+              ? JSON.parse(row.response_body)
+              : row.response_body;
           const oaiContent = res_body?.choices?.[0]?.message?.content;
-          if (oaiContent) { messages.push({ role: "assistant", content: oaiContent }); continue; }
+          if (oaiContent) {
+            messages.push({ role: "assistant", content: oaiContent });
+            continue;
+          }
 
-          const flat = res_body?.response ?? res_body?.answer ?? res_body?.content ?? res_body?.text ?? res_body?.reply ?? res_body?.message;
-          if (flat && typeof flat === "string") { messages.push({ role: "assistant", content: flat }); continue; }
+          const flat =
+            res_body?.response ??
+            res_body?.answer ??
+            res_body?.content ??
+            res_body?.text ??
+            res_body?.reply ??
+            res_body?.message;
+          if (flat && typeof flat === "string") {
+            messages.push({ role: "assistant", content: flat });
+            continue;
+          }
 
           if (typeof res_body === "string" && res_body.trim())
             messages.push({ role: "assistant", content: res_body });
@@ -635,62 +734,97 @@ export const getConversation = asyncHandler(async (req, res) => {
     }
 
     const firstRow = allRows[0];
-    const lastRow  = allRows[allRows.length - 1];
-    const title    = extractTutorTitle(firstRow) || "AI Tutor conversation";
+    const lastRow = allRows[allRows.length - 1];
+    const title = extractTutorTitle(firstRow) || "AI Tutor conversation";
 
-    return res.status(200).json(new ApiResponse(200, {
-      conversation_id,
-      source:      "AI Tutor",
-      redirect_to: "/ai-tutor",
-      title,
-      messages,
-      turn_count: messages.filter(m => m.role === "user").length,
-      started_at: firstRow.created_at,
-      updated_at: lastRow.created_at,
-    }, "Conversation fetched"));
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        {
+          conversation_id,
+          source: "AI Tutor",
+          redirect_to: "/ai-tutor",
+          title,
+          messages,
+          turn_count: messages.filter((m) => m.role === "user").length,
+          started_at: firstRow.created_at,
+          updated_at: lastRow.created_at,
+        },
+        "Conversation fetched",
+      ),
+    );
   }
 
   /* ── AI Practice ── */
   if (source === "practice") {
     const rows = await PracticeLog.findAll({
-      where:      { conversation_id, user_id },
-      order:      [["created_at", "ASC"]],
-      attributes: ["id", "conversation_id", "request_body", "response_body", "device", "created_at"],
+      where: { conversation_id, user_id },
+      order: [["created_at", "ASC"]],
+      attributes: [
+        "id",
+        "conversation_id",
+        "request_body",
+        "response_body",
+        "device",
+        "created_at",
+      ],
     });
 
     if (!rows.length) throw new ApiError(404, "Conversation not found");
 
-    const last  = rows[rows.length - 1];
+    const last = rows[rows.length - 1];
     const title = extractTitle(last.request_body) || "Practice session";
 
-    const messages = rows.flatMap(r => {
-      const req_body = typeof r.request_body  === "string" ? JSON.parse(r.request_body  || "{}") : (r.request_body  || {});
-      const res_body = typeof r.response_body === "string" ? JSON.parse(r.response_body || "{}") : (r.response_body || {});
+    const messages = rows.flatMap((r) => {
+      const req_body =
+        typeof r.request_body === "string"
+          ? JSON.parse(r.request_body || "{}")
+          : r.request_body || {};
+      const res_body =
+        typeof r.response_body === "string"
+          ? JSON.parse(r.response_body || "{}")
+          : r.response_body || {};
       const out = [];
 
-      if (Array.isArray(req_body))               out.push(...req_body);
+      if (Array.isArray(req_body)) out.push(...req_body);
       else if (Array.isArray(req_body.messages)) out.push(...req_body.messages);
       else if (req_body.question || req_body.prompt)
-        out.push({ role: "user", content: req_body.question || req_body.prompt });
+        out.push({
+          role: "user",
+          content: req_body.question || req_body.prompt,
+        });
 
-      const answer = res_body.answer || res_body.response || res_body.content || res_body.text;
+      const answer =
+        res_body.answer ||
+        res_body.response ||
+        res_body.content ||
+        res_body.text;
       if (answer) out.push({ role: "assistant", content: answer });
       return out;
     });
 
-    return res.status(200).json(new ApiResponse(200, {
-      conversation_id,
-      source:      "AI Practice",
-      redirect_to: "/ai-practice",
-      title,
-      messages,
-      turn_count: messages.filter(m => m.role === "user").length,
-      started_at: rows[0].created_at,
-      updated_at: last.created_at,
-    }, "Conversation fetched"));
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        {
+          conversation_id,
+          source: "AI Practice",
+          redirect_to: "/ai-practice",
+          title,
+          messages,
+          turn_count: messages.filter((m) => m.role === "user").length,
+          started_at: rows[0].created_at,
+          updated_at: last.created_at,
+        },
+        "Conversation fetched",
+      ),
+    );
   }
 
-  throw new ApiError(400, `Unknown source "${source}". Use gini, tutor, or practice.`);
+  throw new ApiError(
+    400,
+    `Unknown source "${source}". Use gini, tutor, or practice.`,
+  );
 });
 
 /* =====================================================
@@ -698,7 +832,7 @@ export const getConversation = asyncHandler(async (req, res) => {
       GET /api/history/latest-tests
    ===================================================== */
 export const getLatestTests = asyncHandler(async (req, res) => {
-  const user_id    = Number(req.user.user_id);
+  const user_id = Number(req.user.user_id);
   const student_id = user_id;
 
   const results = await sequelize.query(
@@ -713,10 +847,10 @@ export const getLatestTests = asyncHandler(async (req, res) => {
     {
       replacements: { student_id },
       type: sequelize.QueryTypes.SELECT,
-    }
+    },
   );
 
-  return res.status(200).json(
-    new ApiResponse(200, results, "Latest tests fetched")
-  );
+  return res
+    .status(200)
+    .json(new ApiResponse(200, results, "Latest tests fetched"));
 });

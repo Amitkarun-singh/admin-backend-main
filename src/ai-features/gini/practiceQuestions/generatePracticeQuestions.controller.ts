@@ -4,8 +4,13 @@ import {
   testResult,
 } from "./generatePracticeQuestions.js";
 import { insertTest, insertQuestions } from "../../modal/questions.modal.js";
+import type { Request, Response } from "express";
+import { number, string } from "zod";
 
-export const generatePracticeQuestionsController = async (req, res) => {
+export const generatePracticeQuestionsController = async (
+  req: Request,
+  res: Response,
+) => {
   try {
     const { subject, chapter, questionType, class_, language, questionsCount } =
       req.body;
@@ -17,19 +22,30 @@ export const generatePracticeQuestionsController = async (req, res) => {
       });
     }
 
-    const allQuestions = {};
+    type QuestionType = "MCQ" | "SA" | "LA";
+
+    interface Question {
+      id: string;
+      question: string; // Changed from 'text' to 'question' to match Zod
+      options?: string[];
+      answer: string;
+      answer_explanation?: string;
+      marks?: number;
+    }
+    type QuestionsMap = Record<QuestionType, Question[]>;
+    const allQuestions = {} as QuestionsMap;
 
     await Promise.all(
-      questionType.map(async (type) => {
+      questionType.map(async (type: QuestionType) => {
         const count = questionsCount[type.toLowerCase()] || 1;
-        allQuestions[type] = await generatePracticeQuestions(
+        allQuestions[type] = await generatePracticeQuestions({
           class_,
           language,
           subject,
           chapter,
-          type,
+          questionType: type,
           count,
-        );
+        });
       }),
     );
 
@@ -64,7 +80,7 @@ export const generatePracticeQuestionsController = async (req, res) => {
   }
 };
 
-export const submitAnswerController = async (req, res) => {
+export const submitAnswerController = async (req: Request, res: Response) => {
   try {
     const { questionId, testId, answer } = req.body;
     await submitAnswer(questionId, testId, answer);
@@ -78,8 +94,8 @@ export const submitAnswerController = async (req, res) => {
   }
 };
 
-export const testResultController = async (req, res) => {
-  const { testId } = req.params;
+export const testResultController = async (req: Request, res: Response) => {
+  const testId = Number(req.params.testId);
 
   try {
     const result = await testResult(testId);

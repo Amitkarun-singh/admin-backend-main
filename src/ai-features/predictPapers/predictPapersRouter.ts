@@ -5,7 +5,7 @@ import {
   downloadPaper,
   getSubjectsController,
   getClassesController,
-} from "./predictPapers.controller.js";
+} from "./predictPapers.controller.ts";
 
 const router = express.Router();
 

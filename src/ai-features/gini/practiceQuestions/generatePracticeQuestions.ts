@@ -1,5 +1,5 @@
 import { zodTextFormat } from "openai/helpers/zod";
-import { z } from "zod";
+import { number, z } from "zod";
 
 import {
   insertAnswer,
@@ -39,7 +39,7 @@ export const saAndLaSchema = z
   })
   .strict();
 
-let _openai = null;
+let _openai: OpenAI | null = null;
 
 export function getOpenAIClient() {
   if (!_openai) {
@@ -47,44 +47,55 @@ export function getOpenAIClient() {
   }
   return _openai;
 }
-
-export const generatePracticeQuestions = async (
+interface Question {
+  id: string;
+  question: string; // Changed from 'text' to 'question' to match Zod
+  options?: string[];
+  answer: string;
+  answer_explanation?: string;
+  marks?: number;
+}
+type QuestionType = "MCQ" | "SA" | "LA";
+interface PracticeRequest {
+  class_: string; // Using class_ to avoid the reserved 'class' keyword
+  language: string;
+  subject: string;
+  chapter: string;
+  questionType: QuestionType; // Array since you are mapping over it
+  count: number; // Optional if you have a default
+}
+export const generatePracticeQuestions = async ({
   class_,
   language,
   subject,
   chapter,
   questionType,
   count,
-) => {
-  try {
-    const openai = getOpenAIClient();
-    const response = await openai.responses.parse({
-      model: "gpt-4o-mini",
-      input: [
-        {
-          role: "user",
-          content: getprompt({
-            class_,
-            language,
-            subject,
-            chapter,
-            questionType,
-            count,
-          }),
-        },
-      ],
-      text: {
-        format: zodTextFormat(getSchema(questionType), "event"),
+}: PracticeRequest): Promise<Question[]> => {
+  const openai = getOpenAIClient();
+  const response = await openai.responses.parse({
+    model: "gpt-4o-mini",
+    input: [
+      {
+        role: "user",
+        content: getprompt({
+          class_,
+          language,
+          subject,
+          chapter,
+          questionType,
+          count,
+        }),
       },
-    });
+    ],
+    text: {
+      format: zodTextFormat(getSchema(questionType), "event"),
+    },
+  });
 
-    const content = response.output_parsed;
+  const content = response.output_parsed;
 
-    return content.questions;
-  } catch (error) {
-    console.error(`Error generating ${questionType} questions:`, error);
-    return `Failed to generate ${questionType} questions. Please try again.`;
-  }
+  return content?.questions || [];
 };
 
 function getprompt({
@@ -94,7 +105,7 @@ function getprompt({
   chapter,
   questionType,
   count,
-}) {
+}: PracticeRequest): string {
   return `
       You are an expert educator. Generate **${count} ${questionType} question${count > 1 ? "s" : ""}**
       for students studying in ${class_}, subject ${subject}, chapter "${chapter}".
@@ -109,7 +120,10 @@ function getprompt({
     `;
 }
 
-function getQuestionPrompt(questionType, count) {
+function getQuestionPrompt(
+  questionType: QuestionType,
+  count: number | undefined,
+) {
   switch (questionType) {
     case "MCQ":
       return `Provide ${count} multiple choice questions with 4 options each, indicate the correct answer, and assign 1 mark each.`;
@@ -122,15 +136,19 @@ function getQuestionPrompt(questionType, count) {
   }
 }
 
-export function getSchema(questionType) {
+export function getSchema(questionType: QuestionType) {
   return questionType === "MCQ" ? mcqSchema : saAndLaSchema;
 }
 
-export const submitAnswer = async (questionId, testId, answer) => {
+export const submitAnswer = async (
+  questionId: number,
+  testId: number,
+  answer: string,
+) => {
   await insertAnswer([questionId, testId, answer]);
 };
 
-export const testResult = (testId) => {
+export const testResult = (testId: number) => {
   const result = fetchTestResultById(testId);
   return result;
 };

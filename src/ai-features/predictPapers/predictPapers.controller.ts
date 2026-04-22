@@ -1,3 +1,4 @@
+import { string } from "zod";
 import {
   getPapers,
   getFilePreviewUrl,
@@ -6,9 +7,15 @@ import {
   getSubjects,
 } from "./predictPapers.service.js";
 
-export const fetchPaper = async (req, res) => {
+import type { Request, Response } from "express";
+
+export const fetchPaper = async (req: Request, res: Response) => {
   try {
-    const { board, className, subject } = req.query;
+    const { board, className, subject } = req.query as {
+      board: string;
+      className: string;
+      subject: string;
+    };
 
     if (!board || !className || !subject) {
       return res.status(400).json({
@@ -29,7 +36,7 @@ export const fetchPaper = async (req, res) => {
   }
 };
 
-export const previewPaper = async (req, res) => {
+export const previewPaper = async (req: Request, res: Response) => {
   const { filePath } = req.query;
 
   if (!filePath) {
@@ -37,7 +44,7 @@ export const previewPaper = async (req, res) => {
   }
 
   try {
-    const result = await getFilePreviewUrl(filePath);
+    const result = await getFilePreviewUrl(filePath as string);
     return res.status(200).json(result);
   } catch (err) {
     console.error("Preview URL generation failed:", err);
@@ -45,7 +52,7 @@ export const previewPaper = async (req, res) => {
   }
 };
 
-export const downloadPaper = async (req, res) => {
+export const downloadPaper = async (req: Request, res: Response) => {
   const { filePath, fileName } = req.query;
 
   if (!filePath) {
@@ -53,7 +60,10 @@ export const downloadPaper = async (req, res) => {
   }
 
   try {
-    const result = await getFileDownloadUrl(filePath, fileName);
+    const result = await getFileDownloadUrl(
+      filePath as string,
+      fileName as string,
+    );
     return res.status(200).json(result);
   } catch (err) {
     console.error("Download URL generation failed:", err);
@@ -61,8 +71,9 @@ export const downloadPaper = async (req, res) => {
   }
 };
 
-export const getSubjectsController = async (req, res) => {
-  const { board, className } = req.query;
+export const getSubjectsController = async (req: Request, res: Response) => {
+  const board = req.query.board as string;
+  const className = req.query.className as string;
 
   if (!board || !className) {
     return res
@@ -79,8 +90,8 @@ export const getSubjectsController = async (req, res) => {
   }
 };
 
-export const getClassesController = async (req, res) => {
-  const { board } = req.query;
+export const getClassesController = async (req: Request, res: Response) => {
+  const { board } = req.query as { board: string };
 
   if (!board) {
     return res
