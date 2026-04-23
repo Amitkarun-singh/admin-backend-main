@@ -8,8 +8,8 @@ export const tutorLogs = (req: Request, res: Response, next: NextFunction) => {
 
   const insertQuery = `
   INSERT INTO tutor_logs 
-  (conversation_id, method, url, status_code, device, request_body, response_body, created_at , user_details) 
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?,?)
+  (conversation_id, method, url, status_code, device, request_body, response_body, created_at , user_details,session_id, user_id) 
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?,?,?,?)
 `;
 
   res.json = function (body) {
@@ -32,6 +32,8 @@ export const tutorLogs = (req: Request, res: Response, next: NextFunction) => {
       JSON.stringify(responseBody),
       now,
       JSON.stringify(req.user),
+      req.body.sessionId,
+      req.user.user_id,
     ];
 
     await pool.query(insertQuery, value);

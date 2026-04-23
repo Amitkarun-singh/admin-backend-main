@@ -58,7 +58,6 @@ export const voiceBotService = async (
 
     res.end();
   } catch (error: any) {
-    console.error("error -> ", error);
     res.write(
       `data: ${JSON.stringify({
         type: "error",

@@ -32,7 +32,7 @@ router.post("/ai/gini", chatbotLogs, chatbotController);
 const upload = multer({ storage: multer.memoryStorage() });
 router.post(
   "/voice-bot",
-
+  authMiddleware,
   upload.single("user_audio"),
   tutorLogs,
   voiceBotController,
