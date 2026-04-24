@@ -16,6 +16,7 @@ import studentRoutes from "./routes/student.routes.js";
 import parentRoutes from "./routes/parent.routes.js";
 
 import historyRoutes from "./routes/history.routes.js";
+import { globalErrorHandler } from "./error/globalErrorHandler.ts";
 
 // Imports for AI features
 import giniRouter from "./ai-features/gini/giniRouter.js";
@@ -77,18 +78,8 @@ app.get("/health", (_, res) => {
 });
 
 /* ---------------- GLOBAL ERROR HANDLER ---------------- */
-app.use((err, req, res, next) => {
-  console.error(err);
 
-  const statusCode =
-    err.statuscode && Number.isInteger(err.statuscode) ? err.statuscode : 500;
-
-  res.status(statusCode).json({
-    success: false,
-    message: err.message || "Internal Server Error",
-    errors: err.errors || [],
-  });
-});
+app.use(globalErrorHandler);
 
 /* ---------------- START SERVER + DB ---------------- */
 

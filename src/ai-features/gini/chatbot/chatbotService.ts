@@ -19,7 +19,6 @@ export const streamChatbotResponse = async (
   file: File | undefined,
   { language, className, chapter }: promptDetails,
 ) => {
-  console.log("Gini chat bot service ");
   let messageWithPrompt: Message[];
 
   if (file) {
@@ -40,6 +39,7 @@ export const streamChatbotResponse = async (
   const chatbot = LLMFactory.create("openai");
   await chatbot.streamResponse(messageWithPrompt, res);
 };
+
 type feedback = { userMessage: string; response: string; feedback: string };
 export const feedbackThumbUpService = async (
   feedback: Omit<feedback, "feedback">,

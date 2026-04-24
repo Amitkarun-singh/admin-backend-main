@@ -17,7 +17,7 @@ import { rateLimit } from "../middleware/rateLimite.js";
 import { voiceBotController } from "./voiceBot/voiceBotController.ts";
 import { chatbotLogs } from "../middleware/chatbotLogs.js";
 import { tutorLogs } from "../middleware/tutorLogs.ts";
-
+const upload = multer({ storage: multer.memoryStorage() });
 const router = express.Router();
 
 router.post(
@@ -28,8 +28,8 @@ router.post(
   generatePracticeQuestionsController,
 );
 
-router.post("/ai/gini", chatbotLogs, chatbotController);
-const upload = multer({ storage: multer.memoryStorage() });
+router.post("/ai/gini", upload.single("file"), chatbotLogs, chatbotController);
+
 router.post(
   "/voice-bot",
   authMiddleware,

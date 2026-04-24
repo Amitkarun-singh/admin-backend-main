@@ -1,18 +1,11 @@
+import { StreamAdapter } from "./StreamAdapter.ts";
 import type { Response } from "express";
-export abstract class LLMStreamAdapter {
+export abstract class LLMStreamAdapter<T> extends StreamAdapter {
+  protected stream: T;
+
+  protected constructor(stream: T) {
+    super();
+    this.stream = stream;
+  }
   abstract pipeTo(res: Response): Promise<void>;
-  format(content: string) {
-    return `data: ${JSON.stringify({
-      choices: [{ delta: { content } }],
-      type: "msg",
-    })}\n\n`;
-  }
-
-  static done() {
-    return "data: [DONE]\n\n";
-  }
-
-  static error() {
-    return `data: ${JSON.stringify({ error: "Streaming failed", type: "error" })}\n\n`;
-  }
 }
