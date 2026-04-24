@@ -15,14 +15,13 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 
 /* ─────────────────────────────────────────────────────────────
    TUTOR USER MATCH
-   user_details stores JWT payload JSON, e.g.:
+   user_details stores JWT payload:
    {"user_id":32,"role":"STUDENT","school_id":22, ...}
-   We extract user_id directly — no extra column needed.
 ───────────────────────────────────────────────────────────── */
 const TUTOR_UID = `CAST(JSON_UNQUOTE(JSON_EXTRACT(user_details, '$.user_id')) AS UNSIGNED)`;
 
 /* ─────────────────────────────────────────────────────────────
-   HELPER: parse device string from User-Agent header
+   HELPER: parse device string
 ───────────────────────────────────────────────────────────── */
 function parseDevice(ua = "") {
   if (!ua) return "Desktop";
@@ -33,7 +32,7 @@ function parseDevice(ua = "") {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   HELPER: extract the FIRST user message as conversation title
+   HELPER: extract conversation title from any message format
 ───────────────────────────────────────────────────────────── */
 function extractTitle(raw) {
   try {
@@ -80,26 +79,87 @@ function extractTitle(raw) {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   HELPER: extract title from a tutor_logs row
+   HELPER: extract title specifically from a tutor_logs row.
+
+   Your actual tutor_logs structure:
+     request_body = { "message": "[{\"role\":\"user\",\"content\":\"hi\"}, ...]" }
+     response_body = NULL  (AI response not stored here)
+
+   So the conversation history lives in request_body.message
+   as a JSON-encoded string of the messages array.
 ───────────────────────────────────────────────────────────── */
 function extractTutorTitle(row) {
-  const fromReq = extractTitle(row.request_body);
-  if (fromReq) return fromReq;
-
   try {
-    const ud = typeof row.user_details === "string"
-      ? JSON.parse(row.user_details)
-      : row.user_details;
-    if (ud?.query  && typeof ud.query  === "string") return ud.query.slice(0, 100);
-    if (ud?.topic  && typeof ud.topic  === "string") return ud.topic.slice(0, 100);
-    if (ud?.prompt && typeof ud.prompt === "string") return ud.prompt.slice(0, 100);
-  } catch { /* ignore */ }
+    const rb = typeof row.request_body === "string"
+      ? JSON.parse(row.request_body)
+      : row.request_body;
+
+    if (!rb) return null;
+
+    // Your format: { message: "[{role, content}, ...]" }
+    if (rb.message && typeof rb.message === "string") {
+      const msgs = JSON.parse(rb.message);
+      if (Array.isArray(msgs)) {
+        const firstUser = msgs.find(m => m?.role === "user");
+        if (firstUser?.content && typeof firstUser.content === "string")
+          return firstUser.content.trim().slice(0, 100);
+      }
+    }
+
+    // Fallback: try other known fields
+    const flat =
+      rb.question ?? rb.prompt ?? rb.query ??
+      rb.topic    ?? rb.input  ?? rb.text;
+    if (flat && typeof flat === "string") return flat.trim().slice(0, 100);
+
+  } catch { /* ignore parse errors */ }
 
   return null;
 }
 
 /* ─────────────────────────────────────────────────────────────
-   HELPER: human-readable relative time
+   HELPER: parse ALL messages from a single tutor_logs row.
+
+   Each row's request_body.message contains the FULL conversation
+   history up to that point (cumulative). To avoid duplicates we
+   only read the LAST row of a conversation (which has the full history)
+   for the full conversation view, but for recent queries we just
+   need the first user message as the title.
+───────────────────────────────────────────────────────────── */
+function parseTutorMessages(row) {
+  const messages = [];
+  try {
+    const rb = typeof row.request_body === "string"
+      ? JSON.parse(row.request_body)
+      : row.request_body;
+
+    if (!rb) return messages;
+
+    // Primary format: { message: "[{role, content}, ...]" }
+    if (rb.message && typeof rb.message === "string") {
+      const msgs = JSON.parse(rb.message);
+      if (Array.isArray(msgs)) {
+        for (const m of msgs) {
+          if (m?.role && m?.content !== undefined) {
+            messages.push({ role: m.role, content: m.content });
+          }
+        }
+        return messages; // return early — this is the full history
+      }
+    }
+
+    // Fallback: flat request formats
+    const text = rb.question ?? rb.prompt ?? rb.query ?? rb.input ?? rb.text;
+    if (text && typeof text === "string")
+      messages.push({ role: "user", content: text });
+
+  } catch { /* ignore */ }
+
+  return messages;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   HELPER: relative time
 ───────────────────────────────────────────────────────────── */
 function relativeTime(date) {
   const diffMs  = Date.now() - new Date(date).getTime();
@@ -158,12 +218,16 @@ export const closeSession = async (user_id) => {
 /* =====================================================
    3. GET RECENT QUERIES  (AI Gini + AI Tutor)
       GET /api/history/recent-queries
+
+      Tutor: one card per unique conversation_id.
+      Title comes from the FIRST row's request_body.message[0].
+      Turn count = number of rows for that conversation_id.
    ===================================================== */
 export const getRecentQueries = asyncHandler(async (req, res) => {
   const user_id = Number(req.user.user_id);
   const limit   = parseInt(req.query.limit) || 20;
 
-  /* ── AI Gini ── group by conversation_id ── */
+  /* ── AI Gini ── */
   const giniConvs = await GiniLog.findAll({
     where: { user_id },
     attributes: [
@@ -219,7 +283,10 @@ export const getRecentQueries = asyncHandler(async (req, res) => {
     })
   );
 
-  /* ── AI Tutor ── JSON_EXTRACT user_id from user_details ── */
+  /* ── AI Tutor ──
+     Group by conversation_id → one card per conversation.
+     Fetch the FIRST row of each conversation to extract the title.
+     turn_count = number of DB rows (each row = one user turn).          */
   let tutorQueries = [];
   try {
     const tutorConvs = await sequelize.query(
@@ -240,8 +307,9 @@ export const getRecentQueries = asyncHandler(async (req, res) => {
 
     tutorQueries = await Promise.all(
       tutorConvs.map(async conv => {
+        // Get the earliest row — has the first user message
         const [firstRow] = await sequelize.query(
-          `SELECT request_body, user_details
+          `SELECT request_body
            FROM   tutor_logs
            WHERE  conversation_id = :cid
              AND  ${TUTOR_UID} = :uid
@@ -253,8 +321,9 @@ export const getRecentQueries = asyncHandler(async (req, res) => {
           }
         );
 
-        const title = (firstRow ? extractTutorTitle(firstRow) : null)
-          || "AI Tutor conversation";
+        const title = firstRow
+          ? (extractTutorTitle(firstRow) || "AI Tutor conversation")
+          : "AI Tutor conversation";
 
         return {
           source:          "AI Tutor",
@@ -271,7 +340,7 @@ export const getRecentQueries = asyncHandler(async (req, res) => {
     console.error("getRecentQueries — tutor fetch failed:", err.message);
   }
 
-  /* ── Merge, sort newest-first, slice ── */
+  /* ── Merge, sort newest-first, strip raw date ── */
   const combined = [...giniQueries, ...tutorQueries]
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     .slice(0, limit)
@@ -297,24 +366,19 @@ export const getFeaturesExplored = asyncHandler(async (req, res) => {
     attributes: ["created_at"],
   });
 
-  /* ── AI Tutor — JSON_EXTRACT from user_details ── */
-  let tutorCount    = 0;
-  let tutorLastDate = null;
+  /* ── AI Tutor ── */
+  let tutorCount = 0, tutorLastDate = null;
   try {
     const [countRow] = await sequelize.query(
-      `SELECT COUNT(id) AS cnt
-       FROM   tutor_logs
-       WHERE  ${TUTOR_UID} = :uid`,
+      `SELECT COUNT(id) AS cnt FROM tutor_logs WHERE ${TUTOR_UID} = :uid`,
       { replacements: { uid: user_id }, type: sequelize.QueryTypes.SELECT }
     );
     tutorCount = parseInt(countRow?.cnt) || 0;
 
     const [lastRow] = await sequelize.query(
-      `SELECT created_at
-       FROM   tutor_logs
+      `SELECT created_at FROM tutor_logs
        WHERE  ${TUTOR_UID} = :uid
-       ORDER  BY created_at DESC
-       LIMIT  1`,
+       ORDER  BY created_at DESC LIMIT 1`,
       { replacements: { uid: user_id }, type: sequelize.QueryTypes.SELECT }
     );
     tutorLastDate = lastRow?.created_at || null;
@@ -325,8 +389,7 @@ export const getFeaturesExplored = asyncHandler(async (req, res) => {
   /* ── AI Practice ── */
   const practiceCount = await PracticeLog.count({ where: { user_id } });
   const practiceLast  = await PracticeLog.findOne({
-    where: { user_id },
-    order: [["created_at", "DESC"]],
+    where: { user_id }, order: [["created_at", "DESC"]],
   });
 
   /* ── AI Notes ── */
@@ -340,8 +403,7 @@ export const getFeaturesExplored = asyncHandler(async (req, res) => {
   };
   const aiNotesCount = await AiUsageLog.count({ where: aiNotesWhere });
   const aiNotesLast  = await AiUsageLog.findOne({
-    where: aiNotesWhere,
-    order: [["created_at", "DESC"]],
+    where: aiNotesWhere, order: [["created_at", "DESC"]],
   });
 
   /* ── Doc Summariser ── */
@@ -349,8 +411,7 @@ export const getFeaturesExplored = asyncHandler(async (req, res) => {
     where: { user_id, feature: "summarizer" },
   });
   const summaryLast  = await AiUsageLog.findOne({
-    where:  { user_id, feature: "summarizer" },
-    order:  [["created_at", "DESC"]],
+    where: { user_id, feature: "summarizer" }, order: [["created_at", "DESC"]],
   });
 
   const features = [
@@ -447,9 +508,7 @@ export const getWeekActivity = asyncHandler(async (req, res) => {
     raw: true,
   });
 
-  const activeDays = new Set(
-    sessions.map(s => new Date(s.login_at).getDay())
-  );
+  const activeDays = new Set(sessions.map(s => new Date(s.login_at).getDay()));
 
   const days = ["S", "M", "T", "W", "T", "F", "S"].map((label, idx) => ({
     label,
@@ -457,10 +516,7 @@ export const getWeekActivity = asyncHandler(async (req, res) => {
   }));
 
   return res.status(200).json(
-    new ApiResponse(200, {
-      days,
-      total_active: activeDays.size,
-    }, "Week activity fetched")
+    new ApiResponse(200, { days, total_active: activeDays.size }, "Week activity fetched")
   );
 });
 
@@ -473,8 +529,7 @@ export const getStats = asyncHandler(async (req, res) => {
 
   const loginResult = await sequelize.query(
     `SELECT COUNT(DISTINCT DATE(login_at)) AS cnt
-     FROM user_sessions
-     WHERE user_id = :user_id`,
+     FROM user_sessions WHERE user_id = :user_id`,
     { replacements: { user_id }, type: sequelize.QueryTypes.SELECT }
   );
   const loginDays = parseInt(loginResult[0]?.cnt) || 0;
@@ -487,28 +542,34 @@ export const getStats = asyncHandler(async (req, res) => {
         where: { student_id: student.student_id },
       });
       testOverall = analytics?.ai_practice_score
-        ? parseFloat(analytics.ai_practice_score)
-        : 0;
+        ? parseFloat(analytics.ai_practice_score) : 0;
     }
-  } catch {
-    // non-student user — score stays 0
-  }
+  } catch { /* non-student */ }
 
   return res.status(200).json(
-    new ApiResponse(200, {
-      login_days:   loginDays,
-      test_overall: testOverall,
-    }, "Stats fetched")
+    new ApiResponse(200, { login_days: loginDays, test_overall: testOverall }, "Stats fetched")
   );
 });
 
 /* =====================================================
    8. GET FULL CONVERSATION
       GET /api/history/conversation/:conversation_id
-         ?source=gini     (default)
+         ?source=gini
          ?source=tutor
          ?source=practice
-   ===================================================== */
+
+   TUTOR LOGIC:
+   ─────────────────────────────────────────────────────
+   Each row in tutor_logs = one user turn.
+   request_body.message = JSON string of the FULL messages
+   array up to that point (cumulative, like ChatGPT context).
+
+   Strategy: take only the LAST row of the conversation —
+   it has the most complete message history. Parse its
+   request_body.message to get all user + assistant turns.
+
+   This avoids duplicating messages that appear in every row.
+   ───────────────────────────────────────────────────── */
 export const getConversation = asyncHandler(async (req, res) => {
   const user_id             = Number(req.user.user_id);
   const { conversation_id } = req.params;
@@ -577,10 +638,11 @@ export const getConversation = asyncHandler(async (req, res) => {
     }, "Conversation fetched"));
   }
 
-  /* ── AI Tutor — JSON_EXTRACT from user_details ── */
+  /* ── AI Tutor ── */
   if (source === "tutor") {
+    // Get all rows so we know start/end times and turn count
     const allRows = await sequelize.query(
-      `SELECT id, request_body, response_body, user_details, created_at
+      `SELECT id, request_body, response_body, created_at
        FROM   tutor_logs
        WHERE  conversation_id = :cid
          AND  ${TUTOR_UID} = :uid
@@ -593,50 +655,53 @@ export const getConversation = asyncHandler(async (req, res) => {
 
     if (!allRows.length) throw new ApiError(404, "Conversation not found");
 
-    const messages = [];
-    for (const row of allRows) {
-      /* ── user turn ── */
-      try {
-        const rb = typeof row.request_body === "string"
-          ? JSON.parse(row.request_body) : row.request_body;
+    const firstRow = allRows[0];
+    const lastRow  = allRows[allRows.length - 1];
 
-        if (rb) {
-          if (Array.isArray(rb)) {
-            const lastUser = [...rb].reverse().find(m => m?.role === "user");
-            if (lastUser?.content) messages.push({ role: "user", content: lastUser.content });
-          } else if (Array.isArray(rb.messages)) {
-            const lastUser = [...rb.messages].reverse().find(m => m?.role === "user");
-            if (lastUser?.content) messages.push({ role: "user", content: lastUser.content });
-          } else {
-            const text = rb.question ?? rb.prompt ?? rb.query ?? rb.message ?? rb.input ?? rb.text;
-            if (text && typeof text === "string") messages.push({ role: "user", content: text });
-          }
-        }
-      } catch { /* skip */ }
+    /* ── Parse messages from the LAST row ──
+       The last row contains the most complete cumulative history.
+       request_body.message is a JSON string of [{role, content}, ...].
+       This gives us all user + assistant turns in order.           */
+    let messages = parseTutorMessages(lastRow);
 
-      /* ── assistant turn ── */
-      if (row.response_body) {
+    /* ── Fallback: if last row parsing fails, rebuild from all rows ──
+       Each row = one user turn. We take only the NEW user message
+       from each row (the last user message in the messages array)
+       since earlier messages repeat across rows.                     */
+    if (!messages.length) {
+      for (const row of allRows) {
         try {
-          const res_body   = typeof row.response_body === "string"
-            ? JSON.parse(row.response_body) : row.response_body;
-          const oaiContent = res_body?.choices?.[0]?.message?.content;
-          if (oaiContent) { messages.push({ role: "assistant", content: oaiContent }); continue; }
+          const rb = typeof row.request_body === "string"
+            ? JSON.parse(row.request_body) : row.request_body;
 
-          const flat = res_body?.response ?? res_body?.answer ?? res_body?.content ?? res_body?.text ?? res_body?.reply ?? res_body?.message;
-          if (flat && typeof flat === "string") { messages.push({ role: "assistant", content: flat }); continue; }
+          if (rb?.message && typeof rb.message === "string") {
+            const msgs = JSON.parse(rb.message);
+            if (Array.isArray(msgs)) {
+              // Find the last user message — this is the new message for this turn
+              const lastUser = [...msgs].reverse().find(m => m?.role === "user");
+              if (lastUser?.content)
+                messages.push({ role: "user", content: lastUser.content });
 
-          if (typeof res_body === "string" && res_body.trim())
-            messages.push({ role: "assistant", content: res_body });
-        } catch {
-          const plain = String(row.response_body).trim();
-          if (plain) messages.push({ role: "assistant", content: plain });
-        }
+              // Also grab the assistant response from response_body if available
+              if (row.response_body) {
+                try {
+                  const res_body = typeof row.response_body === "string"
+                    ? JSON.parse(row.response_body) : row.response_body;
+                  const assistantText =
+                    res_body?.choices?.[0]?.message?.content ??
+                    res_body?.response ?? res_body?.answer ??
+                    res_body?.content  ?? res_body?.text;
+                  if (assistantText && typeof assistantText === "string")
+                    messages.push({ role: "assistant", content: assistantText });
+                } catch { /* no response */ }
+              }
+            }
+          }
+        } catch { /* skip malformed row */ }
       }
     }
 
-    const firstRow = allRows[0];
-    const lastRow  = allRows[allRows.length - 1];
-    const title    = extractTutorTitle(firstRow) || "AI Tutor conversation";
+    const title = extractTutorTitle(firstRow) || "AI Tutor conversation";
 
     return res.status(200).json(new ApiResponse(200, {
       conversation_id,
@@ -644,9 +709,9 @@ export const getConversation = asyncHandler(async (req, res) => {
       redirect_to: "/ai-tutor",
       title,
       messages,
-      turn_count: messages.filter(m => m.role === "user").length,
-      started_at: firstRow.created_at,
-      updated_at: lastRow.created_at,
+      turn_count:  messages.filter(m => m.role === "user").length,
+      started_at:  firstRow.created_at,
+      updated_at:  lastRow.created_at,
     }, "Conversation fetched"));
   }
 
@@ -694,7 +759,7 @@ export const getConversation = asyncHandler(async (req, res) => {
 });
 
 /* =====================================================
-   9. GET LATEST TESTS  (Exam History)
+   9. GET LATEST TESTS
       GET /api/history/latest-tests
    ===================================================== */
 export const getLatestTests = asyncHandler(async (req, res) => {
