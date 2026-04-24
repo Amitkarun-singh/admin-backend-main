@@ -1,13 +1,13 @@
-import { SarvamSSTProvider } from "../strategy/SarvamSTTProvide.ts";
+import { SarvamTTSProvide } from "../strategy/SarvamTTSProvide.ts";
 
 const providers = {
-  sarvam: SarvamSSTProvider,
+  sarvam: SarvamTTSProvide,
 };
 
 type ProviderName = keyof typeof providers;
 type ProviderInstance = InstanceType<(typeof providers)[ProviderName]>;
 
-export class STTFactory {
+export class TTSFactory {
   private static instances: Map<ProviderName, ProviderInstance> = new Map();
 
   private constructor() {}
@@ -18,7 +18,7 @@ export class STTFactory {
     }
 
     const Provider = providers[name];
-    if (!Provider) throw new Error(`Unknown STT provider: "${name}"`);
+    if (!Provider) throw new Error(`Unknown TTS provider: "${name}"`);
 
     const instance = new Provider();
     this.instances.set(name, instance);

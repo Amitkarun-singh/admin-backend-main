@@ -1,9 +1,10 @@
 import type { Response } from "express";
 export abstract class LLMStreamAdapter {
   abstract pipeTo(res: Response): Promise<void>;
-  format(content) {
+  format(content: string) {
     return `data: ${JSON.stringify({
       choices: [{ delta: { content } }],
+      type: "msg",
     })}\n\n`;
   }
 
@@ -12,6 +13,6 @@ export abstract class LLMStreamAdapter {
   }
 
   static error() {
-    return `data: ${JSON.stringify({ error: "Streaming failed" })}\n\n`;
+    return `data: ${JSON.stringify({ error: "Streaming failed", type: "error" })}\n\n`;
   }
 }

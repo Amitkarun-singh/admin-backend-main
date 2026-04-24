@@ -4,16 +4,24 @@ import {
   GetObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import strict from "node:assert/strict";
+
+const { AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY } = process.env;
+
+if (!AWS_REGION || !AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY) {
+  throw new Error("Missing AWS configuration in environment variables");
+}
 
 const s3Client = new S3Client({
-  region: process.env.AWS_REGION,
+  region: AWS_REGION,
   credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    accessKeyId: AWS_ACCESS_KEY_ID,
+    secretAccessKey: AWS_SECRET_ACCESS_KEY,
   },
 });
 const bucketName = process.env.AWS_S3_BUCKET;
-export const getPapers = async ({ board, className, subject }) => {
+type PapersArg = { board: string; className: string; subject: string };
+export const getPapers = async ({ board, className, subject }: PapersArg) => {
   const command = new ListObjectsV2Command({
     Bucket: bucketName,
     Prefix: `predict/${board}/class-${className}/${subject}`,
@@ -22,7 +30,7 @@ export const getPapers = async ({ board, className, subject }) => {
   // console.log(response[1].Key);
 
   const files = (response.Contents || [])
-    .filter((item) => item.Size > 0)
+    .filter((item) => item.Size! > 0)
     .map((item) => ({
       board,
 
@@ -39,7 +47,7 @@ export const getPapers = async ({ board, className, subject }) => {
  * @param {string} filePath - The S3 object key (e.g. "papers/CBSE/2025/class-10/math/430-1-1_Mathematics Basic.pdf")
  * @param {number} expiresIn - URL expiry in seconds (default: 1 hour)
  */
-export const getFilePreviewUrl = async (filePath, expiresIn = 3600) => {
+export const getFilePreviewUrl = async (filePath: string, expiresIn = 3600) => {
   const command = new GetObjectCommand({
     Bucket: bucketName,
     Key: filePath,
@@ -62,8 +70,8 @@ export const getFilePreviewUrl = async (filePath, expiresIn = 3600) => {
  * @param {number} expiresIn - URL expiry in seconds (default: 1 hour)
  */
 export const getFileDownloadUrl = async (
-  filePath,
-  fileName,
+  filePath: string,
+  fileName: string,
   expiresIn = 3600,
 ) => {
   const command = new GetObjectCommand({
@@ -87,7 +95,8 @@ export const getFileDownloadUrl = async (
  * Get all available subjects for a given board, year, and class
  * e.g. papers/CBSE/2025/class-10/ → ["math", "science", "english"]
  */
-export const getSubjects = async ({ board, className }) => {
+type getSubjectsArg = { board: string; className: string };
+export const getSubjects = async ({ board, className }: getSubjectsArg) => {
   const command = new ListObjectsV2Command({
     Bucket: bucketName,
     Prefix: `predict/${board}/class-${className}/`,
@@ -97,14 +106,14 @@ export const getSubjects = async ({ board, className }) => {
   const response = await s3Client.send(command);
 
   const subjects = (response.CommonPrefixes || []).map((prefix) => {
-    const parts = prefix.Prefix.split("/");
+    const parts = prefix?.Prefix?.split("/") || "";
     return parts[parts.length - 2];
   });
 
   return { board, className, subjects };
 };
 
-export const getClasses = async ({ board }) => {
+export const getClasses = async ({ board }: { board: string }) => {
   const command = new ListObjectsV2Command({
     Bucket: bucketName,
     Prefix: `predict/${board}/`,
@@ -114,7 +123,7 @@ export const getClasses = async ({ board }) => {
   const response = await s3Client.send(command);
 
   const subjects = (response.CommonPrefixes || []).map((prefix) => {
-    const parts = prefix.Prefix.split("/");
+    const parts = prefix?.Prefix?.split("/") || "";
     return parts[parts.length - 2];
   });
 

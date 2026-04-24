@@ -11,10 +11,10 @@ import {
   chatbotController,
   feedbackThumbUpController,
   feedbackThumbDownController,
-} from "./chatbot/chatbotController.js";
+} from "./chatbot/chatbotController.ts";
 import { practiceQuestionsLog } from "../middleware/practiceQuestionsLog.js";
 import { rateLimit } from "../middleware/rateLimite.js";
-import { voiceBotController } from "./voiceBot/voiceBotController.js";
+import { voiceBotController } from "./voiceBot/voiceBotController.ts";
 import { chatbotLogs } from "../middleware/chatbotLogs.js";
 import { tutorLogs } from "../middleware/tutorLogs.ts";
 
@@ -32,7 +32,7 @@ router.post("/ai/gini", chatbotLogs, chatbotController);
 const upload = multer({ storage: multer.memoryStorage() });
 router.post(
   "/voice-bot",
-
+  authMiddleware,
   upload.single("user_audio"),
   tutorLogs,
   voiceBotController,

@@ -16,11 +16,10 @@ export class OpenAIProvider implements LLMStrategy {
       model: "gpt-4o-mini",
       messages: messages,
     });
-    return response.choices[0].message.content;
+    return response.choices[0].message.content as string;
   }
 
   async streamResponse(messages: Message[], res: Response) {
-    console.log("streamResponse");
     const stream = await this._client.chat.completions.create({
       model: "gpt-4o-mini",
       messages,

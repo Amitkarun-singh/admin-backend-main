@@ -1,14 +1,15 @@
 import { v4 as uuidv4 } from "uuid";
 import pool from "../db/db.js";
-export const tutorLogs = (req, res, next) => {
+import type { Request, Response, NextFunction } from "express";
+export const tutorLogs = (req: Request, res: Response, next: NextFunction) => {
   console.log("logging");
   const originalJson = res.json;
-  let responseBody;
+  let responseBody: { success: string; message: string; errors: string[] };
 
   const insertQuery = `
   INSERT INTO tutor_logs 
-  (conversation_id, method, url, status_code, device, request_body, response_body, created_at , user_details) 
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?,?)
+  (conversation_id, method, url, status_code, device, request_body, response_body, created_at , user_details,session_id, user_id) 
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?,?,?,?)
 `;
 
   res.json = function (body) {
@@ -31,6 +32,8 @@ export const tutorLogs = (req, res, next) => {
       JSON.stringify(responseBody),
       now,
       JSON.stringify(req.user),
+      req.body.sessionId,
+      req.user.user_id,
     ];
 
     await pool.query(insertQuery, value);

@@ -1,6 +1,7 @@
 import { SarvamAIClient } from "sarvamai";
 import { Readable } from "stream";
 import { STTStrategy } from "../../pattern/strategy/STTStrategy.ts";
+import type { File } from "../../type/type.d.ts";
 
 export class SarvamSSTProvider implements STTStrategy {
   declare _client;
@@ -9,7 +10,7 @@ export class SarvamSSTProvider implements STTStrategy {
       apiSubscriptionKey: process.env.SARVAM_API_KEY,
     });
   }
-  async transcribe(audio): Promise<string> {
+  async transcribe(audio: File): Promise<string> {
     const STT = await this._client.speechToText.transcribe({
       file: Readable.from(audio.buffer),
       model: "saaras:v3",

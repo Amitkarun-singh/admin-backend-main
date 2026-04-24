@@ -1,5 +1,7 @@
-import { voiceBotService } from "./voiceBotservice.js";
-export const voiceBotController = async (req, res) => {
+import { voiceBotService } from "./voiceBotservice.ts";
+import type { Request, Response } from "express";
+
+export const voiceBotController = async (req: Request, res: Response) => {
   const { message } = req.body;
   const file = req.file;
 
@@ -8,6 +10,8 @@ export const voiceBotController = async (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
+
   const response = await voiceBotService(msgArr, file, res);
+
   // res.status(200).json({ response });
 };

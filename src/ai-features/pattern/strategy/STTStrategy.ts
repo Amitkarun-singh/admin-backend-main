@@ -1,3 +1,4 @@
+import type { File } from "../../type/type.d.ts";
 export interface STTStrategy {
-  transcribe(audio: Buffer | string): Promise<string>;
+  transcribe(audio: File): Promise<string>;
 }
