@@ -3,7 +3,7 @@ import sequelize from "../config/db.js";
 import fs from "fs";
 
 import User from "../models/user.model.js";
-import AdminRole from "../models/admin_role.model.js";          // ← was missing, caused runtime crash
+import AdminRole from "../models/admin_role.model.js";
 import TeacherProfile from "../models/teacher_profile.model.js";
 import TeacherClassSectionSubject from "../models/teacher_class_section_subject.model.js";
 import TeacherAnalytics from "../models/teacher_analytics.model.js";
@@ -24,25 +24,12 @@ const createTeacher = asyncHandler(async (req, res) => {
   const school_id = req.user.school_id;
   const school = await AdminSchool.findByPk(school_id);
   if (!school) throw new ApiError(404, "School not found");
-  const {
-    // User fields
-    username,
-    password,
-    phone_number,
-    email,
-    full_name,
 
-    // Teacher profile fields
-    primary_subject_id,
-    secondary_subject_ids,
-    experience,
-    age,
-    onboarding_date,
-    school_tenure,
-    device_type,
-    device_access,
-    ppt_generation_enabled,
-    cost_limit,
+  const {
+    username, password, phone_number, email, full_name,
+    primary_subject_id, secondary_subject_ids,
+    experience, age, onboarding_date, school_tenure,
+    device_type, device_access, ppt_generation_enabled, cost_limit,
   } = req.body;
 
   if (!username || !password)
@@ -51,11 +38,7 @@ const createTeacher = asyncHandler(async (req, res) => {
   const transaction = await sequelize.transaction();
 
   try {
-    const role = await AdminRole.findOne({
-      where: { role_name: "TEACHER" },
-      transaction,
-    });
-
+    const role = await AdminRole.findOne({ where: { role_name: "TEACHER" }, transaction });
     if (!role) throw new ApiError(400, "Teacher role not found");
 
     const hashed = await bcrypt.hash(password, 10);
@@ -63,47 +46,41 @@ const createTeacher = asyncHandler(async (req, res) => {
     const user = await User.create(
       {
         username,
-        full_name:    full_name    || null,
-        password:     hashed,
-        phone_number: phone_number || null,
-        email:        email        || null,
-        role_id:      role.role_id,
+        full_name:                  full_name    || null,
+        password:                   hashed,
+        phone_number:               phone_number || null,
+        email:                      email        || null,
+        role_id:                    role.role_id,
         school_id,
-        status:       "Active",     // capital A per ENUM("Active","Suspended","Blocked")
+        status:                     "Active",
+        is_password_reset_required: true,   // ✅ admin-created → must reset on first login
       },
       { transaction }
     );
 
     const teacher = await TeacherProfile.create(
       {
-        user_id:               user.user_id,
+        user_id:                user.user_id,
         school_id,
-        primary_subject_id:    primary_subject_id    || null,
-        secondary_subject_ids: secondary_subject_ids || null,  // JSON field
-        experience:            experience            || null,
-        age:                   age                   || null,
-        onboarding_date:       onboarding_date       || null,
-        school_tenure:         school_tenure         || null,
-        device_type:           device_type           || null,
-        device_access:         device_access         || null,  // JSON field
+        primary_subject_id:     primary_subject_id    || null,
+        secondary_subject_ids:  secondary_subject_ids || null,
+        experience:             experience            || null,
+        age:                    age                   || null,
+        onboarding_date:        onboarding_date       || null,
+        school_tenure:          school_tenure         || null,
+        device_type:            device_type           || null,
+        device_access:          device_access         || null,
         ppt_generation_enabled: ppt_generation_enabled ?? false,
-        cost_limit:            cost_limit            || null,
-        // No status field on TeacherProfile model
+        cost_limit:             cost_limit            || null,
       },
       { transaction }
     );
 
-    await AdminSchool.increment("teacher_count", {
-      by: 1,
-      where: { school_id },
-      transaction,
-    });
+    await AdminSchool.increment("teacher_count", { by: 1, where: { school_id }, transaction });
 
     await transaction.commit();
 
-    return res
-      .status(201)
-      .json(new ApiResponse(201, teacher, "Teacher created successfully"));
+    return res.status(201).json(new ApiResponse(201, teacher, "Teacher created successfully"));
   } catch (error) {
     await transaction.rollback();
     throw error;
@@ -117,13 +94,9 @@ const bulkTeacherUpload = asyncHandler(async (req, res) => {
   const school_id = req.user.school_id;
   const file      = req.file;
 
-  const school = await AdminSchool.findOne({
-    where: { school_id },
-  });
-
+  const school = await AdminSchool.findOne({ where: { school_id } });
   if (!school) throw new ApiError(400, "School not found");
-
-  if (!file) throw new ApiError(400, "Excel file required");
+  if (!file)   throw new ApiError(400, "Excel file required");
 
   const records = parseExcel(file.path);
   if (!records.length) throw new ApiError(400, "Excel file is empty");
@@ -131,45 +104,36 @@ const bulkTeacherUpload = asyncHandler(async (req, res) => {
   const transaction = await sequelize.transaction();
 
   try {
-    const role = await AdminRole.findOne({
-      where: { role_name: "TEACHER" },
-      transaction,
-    });
-
+    const role = await AdminRole.findOne({ where: { role_name: "TEACHER" }, transaction });
     if (!role) throw new ApiError(400, "Teacher role not found");
 
     let createdCount = 0;
 
     for (const [index, row] of records.entries()) {
-      if (!row.username || !row.password) {
+      if (!row.username || !row.password)
         throw new ApiError(400, `Row ${index + 2}: Missing username or password`);
-      }
 
       const hashed = await bcrypt.hash(String(row.password), 10);
 
       const user = await User.create(
         {
-          username:     row.username,
-          full_name:    row.full_name    || null,
-          password:     hashed,
-          phone_number: row.phone_number || null,
-          email:        row.email        || null,
-          role_id:      role.role_id,
+          username:                   row.username,
+          full_name:                  row.full_name    || null,
+          password:                   hashed,
+          phone_number:               row.phone_number || null,
+          email:                      row.email        || null,
+          role_id:                    role.role_id,
           school_id,
-          status:       "Active",         // capital A per ENUM("Active","Suspended","Blocked")
+          status:                     "Active",
+          is_password_reset_required: true,   // ✅
         },
         { transaction }
       );
 
-      let primarySubjectId = null;  // default null
-      
-      if (row.class_name && row.subject_name) {   
-        const classRecord = await AdminClass.findOne({
-          where: { class_name: row.class_name },
-          transaction,
-        });
-        
+      let primarySubjectId = null;
 
+      if (row.class_name && row.subject_name) {
+        const classRecord = await AdminClass.findOne({ where: { class_name: row.class_name }, transaction });
         if (classRecord) {
           const primarySubject = await AdminSubject.findOne({
             where: {
@@ -180,28 +144,24 @@ const bulkTeacherUpload = asyncHandler(async (req, res) => {
             },
             transaction,
           });
-
-
-          primarySubjectId = primarySubject?.subject_id ?? null;  // null if not found
+          primarySubjectId = primarySubject?.subject_id ?? null;
         }
       }
-      
 
       await TeacherProfile.create(
         {
-          user_id:               user.user_id,
+          user_id:                user.user_id,
           school_id,
-          primary_subject_id:    primarySubjectId,
-          secondary_subject_ids: row.secondary_subject_ids || null,  // JSON field
-          experience:            row.experience            || null,
-          age:                   row.age                   || null,
-          onboarding_date:       row.onboarding_date       || null,
-          school_tenure:         row.school_tenure         || null,
-          device_type:           row.device_type           || null,
-          device_access:         row.device_access         || null,  // JSON field
+          primary_subject_id:     primarySubjectId,
+          secondary_subject_ids:  row.secondary_subject_ids || null,
+          experience:             row.experience            || null,
+          age:                    row.age                   || null,
+          onboarding_date:        row.onboarding_date       || null,
+          school_tenure:          row.school_tenure         || null,
+          device_type:            row.device_type           || null,
+          device_access:          row.device_access         || null,
           ppt_generation_enabled: row.ppt_generation_enabled ?? false,
-          cost_limit:            row.cost_limit            || null,
-          // No status field on TeacherProfile model
+          cost_limit:             row.cost_limit            || null,
         },
         { transaction }
       );
@@ -209,21 +169,14 @@ const bulkTeacherUpload = asyncHandler(async (req, res) => {
       createdCount++;
     }
 
-    await AdminSchool.increment("teacher_count", {
-      by: createdCount,
-      where: { school_id },
-      transaction,
-    });
-
+    await AdminSchool.increment("teacher_count", { by: createdCount, where: { school_id }, transaction });
     await transaction.commit();
     fs.unlinkSync(file.path);
 
-    return res
-      .status(201)
-      .json(new ApiResponse(201, { created: createdCount }, "Teachers uploaded successfully"));
+    return res.status(201).json(new ApiResponse(201, { created: createdCount }, "Teachers uploaded successfully"));
   } catch (error) {
     await transaction.rollback();
-    if (fs.existsSync(file.path)) fs.unlinkSync(file.path);  // ← guard prevents double-throw
+    if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
     throw error;
   }
 });
@@ -247,47 +200,26 @@ const getAllTeachers = asyncHandler(async (req, res) => {
         as: "primarySubject",
         attributes: ["subject_id", "subject_name", "board", "language", "class_id"],
         required: false,
-        include: [
-          {
-            model: AdminClass,
-            as: "class",
-            attributes: ["class_id", "class_name"],
-          },
-        ],
+        include: [{ model: AdminClass, as: "class", attributes: ["class_id", "class_name"] }],
       },
     ],
   });
 
-  // Resolve secondary subjects for each teacher
   const teachersWithSecondary = await Promise.all(
     teachers.map(async (teacher) => {
       let secondarySubjects = [];
-
       if (teacher.secondary_subject_ids?.length) {
-        const subjects = await AdminSubject.findAll({
+        secondarySubjects = await AdminSubject.findAll({
           where: { subject_id: teacher.secondary_subject_ids },
           attributes: ["subject_id", "subject_name", "board", "language", "class_id"],
-          include: [
-            {
-              model: AdminClass,
-              as: "class",
-              attributes: ["class_id", "class_name"],
-            },
-          ],
+          include: [{ model: AdminClass, as: "class", attributes: ["class_id", "class_name"] }],
         });
-        secondarySubjects = subjects;
       }
-
-      return {
-        ...teacher.toJSON(),
-        secondarySubjects,
-      };
+      return { ...teacher.toJSON(), secondarySubjects };
     })
   );
 
-  return res
-    .status(200)
-    .json(new ApiResponse(200, teachersWithSecondary, "Teachers fetched"));
+  return res.status(200).json(new ApiResponse(200, teachersWithSecondary, "Teachers fetched"));
 });
 
 /* =====================================================
@@ -308,13 +240,7 @@ const getTeacherById = asyncHandler(async (req, res) => {
         as: "primarySubject",
         attributes: ["subject_id", "subject_name", "board", "language", "class_id"],
         required: false,
-        include: [
-          {
-            model: AdminClass,
-            as: "class",
-            attributes: ["class_id", "class_name"],
-          },
-        ],
+        include: [{ model: AdminClass, as: "class", attributes: ["class_id", "class_name"] }],
       },
     ],
   });
@@ -323,28 +249,14 @@ const getTeacherById = asyncHandler(async (req, res) => {
 
   let secondarySubjects = [];
   if (teacher.secondary_subject_ids?.length) {
-    const subjects = await AdminSubject.findAll({
+    secondarySubjects = await AdminSubject.findAll({
       where: { subject_id: teacher.secondary_subject_ids },
       attributes: ["subject_id", "subject_name", "board", "language", "class_id"],
-      include: [
-        {
-          model: AdminClass,
-          as: "class",
-          attributes: ["class_id", "class_name"],
-        },
-      ],
+      include: [{ model: AdminClass, as: "class", attributes: ["class_id", "class_name"] }],
     });
-    secondarySubjects = subjects;
   }
 
-  const response = {
-    ...teacher.toJSON(),
-    secondarySubjects,
-  };
-
-  return res
-    .status(200)
-    .json(new ApiResponse(200, response, "Teacher fetched"));
+  return res.status(200).json(new ApiResponse(200, { ...teacher.toJSON(), secondarySubjects }, "Teacher fetched"));
 });
 
 /* =====================================================
@@ -356,14 +268,11 @@ const updateTeacher = asyncHandler(async (req, res) => {
   const teacher = await TeacherProfile.findByPk(id);
   if (!teacher) throw new ApiError(404, "Teacher not found");
 
-  // Strip immutable foreign keys — these must never be reassigned after creation
   const { user_id, school_id, ...allowedUpdates } = req.body;
 
   await teacher.update(allowedUpdates);
 
-  return res
-    .status(200)
-    .json(new ApiResponse(200, teacher, "Teacher updated successfully"));
+  return res.status(200).json(new ApiResponse(200, teacher, "Teacher updated successfully"));
 });
 
 /* =====================================================
@@ -380,25 +289,16 @@ const deleteTeacher = asyncHandler(async (req, res) => {
 
     const { school_id, user_id } = teacher;
 
-    // Remove all dependent records first
     await TeacherClassSectionSubject.destroy({ where: { teacher_id: id }, transaction });
     await TeacherAnalytics.destroy(          { where: { teacher_id: id }, transaction });
-
     await teacher.destroy({ transaction });
-
     await User.destroy({ where: { user_id }, transaction });
 
-    await AdminSchool.increment("teacher_count", {
-      by: -1,
-      where: { school_id },
-      transaction,
-    });
+    await AdminSchool.increment("teacher_count", { by: -1, where: { school_id }, transaction });
 
     await transaction.commit();
 
-    return res
-      .status(200)
-      .json(new ApiResponse(200, null, "Teacher deleted successfully"));
+    return res.status(200).json(new ApiResponse(200, null, "Teacher deleted successfully"));
   } catch (error) {
     await transaction.rollback();
     throw error;

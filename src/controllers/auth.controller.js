@@ -31,27 +31,31 @@ import {
   verifyOtpToken
 } from "../utils/otp.util.js";
 
-// Send OTP to phone number for login
+// ─────────────────────────────────────────────
+// SEND OTP
+// ─────────────────────────────────────────────
 const sendLoginOtp = asyncHandler(async (req, res) => {
-    const { phone_number } = req.body;
+  const { phone_number } = req.body;
 
-    if (!phone_number)
-      throw new ApiError(400, "Phone number required");
+  if (!phone_number)
+    throw new ApiError(400, "Phone number required");
 
-    const user = await User.findOne({ where: { phone_number } });
-    if (!user) throw new ApiError(404, "User not found");
+  const user = await User.findOne({ where: { phone_number } });
+  if (!user) throw new ApiError(404, "User not found");
 
-    const otp = generateOTP();
-    const otpToken = createOtpToken(phone_number, otp);
+  const otp = generateOTP();
+  const otpToken = createOtpToken(phone_number, otp);
 
-    console.log("OTP (DEV ONLY):", otp);
+  console.log("OTP (DEV ONLY):", otp);
 
-    return res.status(200).json(
-      new ApiResponse(200, { otpToken }, "OTP sent successfully")
-    );
+  return res.status(200).json(
+    new ApiResponse(200, { otpToken }, "OTP sent successfully")
+  );
 });
 
-// Login controller supporting both password and OTP login
+// ─────────────────────────────────────────────
+// LOGIN  (password OR OTP)
+// ─────────────────────────────────────────────
 const login = asyncHandler(async (req, res) => {
   const {
     username,
@@ -64,7 +68,7 @@ const login = asyncHandler(async (req, res) => {
 
   let user;
 
-  /* PASSWORD LOGIN */
+  /* ── PASSWORD LOGIN ── */
   if ((username || email) && password) {
     user = await User.findOne({
       where: username ? { username } : { email }
@@ -76,7 +80,7 @@ const login = asyncHandler(async (req, res) => {
     if (!valid) throw new ApiError(401, "Invalid credentials");
   }
 
-  /* OTP LOGIN */
+  /* ── OTP LOGIN ── */
   else if (phone_number && otp && otpToken) {
     verifyOtpToken(phone_number, otp, otpToken);
 
@@ -89,10 +93,29 @@ const login = asyncHandler(async (req, res) => {
   }
 
   if (user.status.toLowerCase() !== "active") {
-  throw new ApiError(403, "User inactive");
-}
+    throw new ApiError(403, "User inactive");
+  }
 
-  /* LOAD ROLE + PERMISSIONS */
+  /* ── FIRST-TIME LOGIN → force password reset ── */
+  if (user.is_password_reset_required) {
+    // Issue a short-lived token whose sole purpose is to call /reset-first-time-password
+    // It carries purpose:"password_reset" so the reset endpoint can verify intent
+    const tempToken = jwt.sign(
+      { user_id: user.user_id, purpose: "password_reset" },
+      process.env.ACCESS_TOKEN_SECRET,
+      { expiresIn: "15m" }
+    );
+
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        { requiresPasswordReset: true, tempToken },
+        "Password reset required before accessing the application"
+      )
+    );
+  }
+
+  /* ── LOAD ROLE + PERMISSIONS ── */
   const userWithRole = await User.findOne({
     where: { user_id: user.user_id },
     attributes: { exclude: ["password"] },
@@ -113,10 +136,9 @@ const login = asyncHandler(async (req, res) => {
 
   if (!userWithRole) throw new ApiError(404, "User not found");
 
-  const permissions =
-    userWithRole.role.permissions.map(p => p.permission_key);
+  const permissions = userWithRole.role.permissions.map(p => p.permission_key);
 
-  /* TOKEN PAYLOAD */
+  /* ── TOKEN PAYLOAD ── */
   const payload = {
     user_id: user.user_id,
     role: userWithRole.role.role_name,
@@ -124,34 +146,154 @@ const login = asyncHandler(async (req, res) => {
     school_id: user.school_id
   };
 
-  const accessToken = generateAccessToken(payload);
+  const accessToken  = generateAccessToken(payload);
   const refreshToken = generateRefreshToken(payload);
 
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure:   process.env.NODE_ENV === "production",
     sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000
+    maxAge:   7 * 24 * 60 * 60 * 1000
   });
 
   await recordSession({
-      user_id: user.user_id,
-      ua:      req.headers["user-agent"],
-      ip:      req.ip || req.headers["x-forwarded-for"],
+    user_id: user.user_id,
+    ua:      req.headers["user-agent"],
+    ip:      req.ip || req.headers["x-forwarded-for"],
   });
 
   return res.status(200).json(
-    new ApiResponse(200, 
-      { 
-        accessToken, 
-        role: payload.role, 
-        permissions, 
-        school_id: user.school_id, 
-        profile: userWithRole 
-      }, "Login successful")
+    new ApiResponse(
+      200,
+      {
+        accessToken,
+        role:        payload.role,
+        permissions,
+        school_id:   user.school_id,
+        profile:     userWithRole
+      },
+      "Login successful"
+    )
   );
 });
 
+// ─────────────────────────────────────────────
+// RESET FIRST-TIME PASSWORD
+// POST /auth/reset-first-time-password
+// Header: Authorization: Bearer <tempToken>
+// Body:   { newPassword, confirmPassword }
+// ─────────────────────────────────────────────
+const resetFirstTimePassword = asyncHandler(async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const tempToken  = authHeader?.startsWith("Bearer ")
+    ? authHeader.split(" ")[1]
+    : null;
+
+  if (!tempToken) throw new ApiError(401, "Temp token required");
+
+  const { newPassword, confirmPassword } = req.body;
+
+  if (!newPassword || !confirmPassword)
+    throw new ApiError(400, "newPassword and confirmPassword are required");
+
+  if (newPassword !== confirmPassword)
+    throw new ApiError(400, "Passwords do not match");
+
+  if (newPassword.length < 8)
+    throw new ApiError(400, "Password must be at least 8 characters");
+
+  /* ── Verify the temp token ── */
+  let decoded;
+  try {
+    decoded = jwt.verify(tempToken, process.env.ACCESS_TOKEN_SECRET);
+  } catch {
+    throw new ApiError(401, "Temp token is invalid or has expired. Please log in again.");
+  }
+
+  // Extra safety: ensure this token was issued specifically for password reset
+  if (decoded.purpose !== "password_reset") {
+    throw new ApiError(403, "Invalid token purpose");
+  }
+
+  /* ── Find user ── */
+  const user = await User.findByPk(decoded.user_id);
+  if (!user) throw new ApiError(404, "User not found");
+
+  // Guard: if flag was already cleared, don't allow re-use of old temp tokens
+  if (!user.is_password_reset_required) {
+    throw new ApiError(400, "Password has already been reset. Please log in normally.");
+  }
+
+  /* ── Hash & save new password, clear the flag ── */
+  const hashed = await bcrypt.hash(newPassword, 10);
+
+  await user.update({
+    password:                   hashed,
+    is_password_reset_required: false   // ✅ flag cleared — user won't be intercepted again
+  });
+
+  /* ── Load role + permissions to issue real tokens immediately ── */
+  const userWithRole = await User.findOne({
+    where:      { user_id: user.user_id },
+    attributes: { exclude: ["password"] },
+    include: [
+      {
+        model: AdminRole,
+        as:    "role",
+        include: [
+          {
+            model:      AdminPermission,
+            as:         "permissions",
+            attributes: ["permission_key"]
+          }
+        ]
+      }
+    ]
+  });
+
+  const permissions = userWithRole.role.permissions.map(p => p.permission_key);
+
+  const payload = {
+    user_id:   user.user_id,
+    role:      userWithRole.role.role_name,
+    permissions,
+    school_id: user.school_id
+  };
+
+  const accessToken  = generateAccessToken(payload);
+  const refreshToken = generateRefreshToken(payload);
+
+  res.cookie("refreshToken", refreshToken, {
+    httpOnly: true,
+    secure:   process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge:   7 * 24 * 60 * 60 * 1000
+  });
+
+  await recordSession({
+    user_id: user.user_id,
+    ua:      req.headers["user-agent"],
+    ip:      req.ip || req.headers["x-forwarded-for"],
+  });
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        accessToken,
+        role:       payload.role,
+        permissions,
+        school_id:  user.school_id,
+        profile:    userWithRole
+      },
+      "Password reset successful. You are now logged in."
+    )
+  );
+});
+
+// ─────────────────────────────────────────────
+// REFRESH ACCESS TOKEN
+// ─────────────────────────────────────────────
 const refreshAccessToken = asyncHandler(async (req, res) => {
   const incomingRefreshToken = req.cookies.refreshToken;
   console.log("Cookies:", req.cookies);
@@ -160,317 +302,195 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Refresh token missing");
   }
 
-  console.log("Incoming token:", incomingRefreshToken);
-
   try {
-    console.log("Hello ", incomingRefreshToken);
-    
-    // 1. Verify refresh token
     const decoded = jwt.verify(
       incomingRefreshToken,
       process.env.REFRESH_TOKEN_SECRET
     );
 
-    console.log("Decoded token:", decoded.user_id);
-    
-    // 2. Find user
     const user = await User.findOne({
       where: { user_id: decoded.user_id }
     });
 
-    if (!user) {
-      throw new ApiError(401, "Invalid refresh token");
-    }
+    if (!user) throw new ApiError(401, "Invalid refresh token");
 
-    // 3. (IMPORTANT) Check token matches DB (if you store it)
-    // if (user.refresh_token !== incomingRefreshToken) {
-    //   throw new ApiError(401, "Refresh token expired or reused");
-    // }
-
-    // 4. Create payload (same as login)
     const payload = {
-      user_id: user.user_id,
-      role: decoded.role,
+      user_id:   user.user_id,
+      role:      decoded.role,
       permissions: decoded.permissions,
       school_id: decoded.school_id
     };
 
-    // 5. Generate new tokens (ROTATION 🔥)
-    const newAccessToken = generateAccessToken(payload);
+    const newAccessToken  = generateAccessToken(payload);
     const newRefreshToken = generateRefreshToken(payload);
 
-    // 6. Save new refresh token in DB (rotation)
     await User.update(
       { refresh_token: newRefreshToken },
       { where: { user_id: user.user_id } }
     );
 
-    // 7. Set new refresh token cookie
     res.cookie("refreshToken", newRefreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure:   process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000
+      maxAge:   7 * 24 * 60 * 60 * 1000
     });
 
-    // 8. Send new access token
     return res.status(200).json(
-      new ApiResponse(
-        200,
-        { accessToken: newAccessToken },
-        "Access token refreshed"
-      )
+      new ApiResponse(200, { accessToken: newAccessToken }, "Access token refreshed")
     );
-
   } catch (error) {
     throw new ApiError(401, "Invalid or expired refresh token");
   }
 });
 
+// ─────────────────────────────────────────────
 // LOGOUT
+// ─────────────────────────────────────────────
 const logout = asyncHandler(async (req, res) => {
   await closeSession(req.user.user_id);
 
   res.clearCookie("refreshToken", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure:   process.env.NODE_ENV === "production",
     sameSite: "strict"
   });
 
-  return res
-    .status(200)
-    .json(new ApiResponse(200, {}, "Logout successful"));
+  return res.status(200).json(new ApiResponse(200, {}, "Logout successful"));
 });
 
-// Get profile of logged in user
+// ─────────────────────────────────────────────
+// GET LOGGED-IN USER PROFILE
+// ─────────────────────────────────────────────
 const getLoggedInUserProfile = asyncHandler(async (req, res) => {
   const { user_id, role, school_id } = req.user;
 
   let profileData = null;
-  let school = null;
+  let school      = null;
 
-  // Admin and Subadmin
   if (["ADMIN", "SUBADMIN"].includes(role)) {
-
     const user = await User.findOne({
-      where: { user_id },
+      where:      { user_id },
       attributes: { exclude: ["password"] }
     });
 
     if (!user) throw new ApiError(404, "User not found");
 
     if (school_id) {
-      school = await AdminSchool.findOne({
-        where: { school_id }
-      });
+      school = await AdminSchool.findOne({ where: { school_id } });
     }
 
     if (user.avatar !== null) {
       const avatarUrl = await getSignedPdfUrl(user?.avatar);
-      console.log(avatarUrl)
-
-      profileData = {
-        role: role,
-        user,
-        school,
-        avatarUrl
-      };
+      profileData = { role, user, school, avatarUrl };
     } else {
-      profileData = {
-        role: role,
-        user,
-        school
-      };
+      profileData = { role, user, school };
     }
   }
 
-  // Teacher
   else if (role === "TEACHER") {
+    const teacher = await TeacherProfile.findOne({ where: { user_id } });
+    if (!teacher) throw new ApiError(404, "Teacher profile not found");
 
-    const teacher = await TeacherProfile.findOne({
-      where: { user_id }
-    });
-
-    if (!teacher)
-      throw new ApiError(404, "Teacher profile not found");
-
-    school = await AdminSchool.findOne({
-      where: { school_id: teacher.school_id }
-    });
-
-    profileData = {
-      role: role,
-      teacher,
-      school
-    };
+    school = await AdminSchool.findOne({ where: { school_id: teacher.school_id } });
+    profileData = { role, teacher, school };
   }
 
-  // STUDENT
   else if (role === "STUDENT") {
-
-    const student = await StudentProfile.findOne({
-      where: { user_id }
-    });
-
-    if (!student)
-      throw new ApiError(404, "Student profile not found");
-
+    const student = await StudentProfile.findOne({ where: { user_id } });
+    if (!student) throw new ApiError(404, "Student profile not found");
 
     const user = await User.findOne({
-      where: { user_id },
+      where:      { user_id },
       attributes: ["full_name", "email", "phone_number", "role_id", "avatar"]
     });
 
+    const roleData = await AdminRole.findOne({ where: { role_id: user.role_id } });
 
-    const roleData = await AdminRole.findOne({
-      where: { role_id: user.role_id }
-    });
-
-
-    school = await AdminSchool.findOne({
-      where: { school_id: student.school_id }
-    });
-
+    school = await AdminSchool.findOne({ where: { school_id: student.school_id } });
 
     const classSection = await StudentClassSection.findOne({
       where: { student_id: student.student_id }
     });
 
-    if (!classSection)
-      throw new ApiError(404, "Student class mapping not found");
+    if (!classSection) throw new ApiError(404, "Student class mapping not found");
 
-
-    const classData = await AdminClass.findOne({
-      where: { class_id: classSection.class_id }
-    });
-
-
-    const sectionData = await AdminSection.findOne({
-      where: { section_id: classSection.section_id }
-    });
+    const classData   = await AdminClass.findOne({ where: { class_id: classSection.class_id } });
+    const sectionData = await AdminSection.findOne({ where: { section_id: classSection.section_id } });
 
     const avatarUrl = await getSignedPdfUrl(user?.avatar);
 
     profileData = {
-      school_name: school?.school_name,
-      board: school?.board,
-
-      address: `${school?.city}, ${school?.state}, ${school?.country}, ${school?.pincode}`,
-
-      class: classData?.class_name,
-      div: sectionData?.section_name,
-
-      roll_number: classSection?.roll_number,
-
+      school_name:  school?.school_name,
+      board:        school?.board,
+      address:      `${school?.city}, ${school?.state}, ${school?.country}, ${school?.pincode}`,
+      class:        classData?.class_name,
+      div:          sectionData?.section_name,
+      roll_number:  classSection?.roll_number,
       Student_name: user?.full_name,
-      number: user?.phone_number,
-      email: user?.email,
-
-      gender: student?.gender,
-      dob: student?.dob,
-      language: student?.preferred_language,
+      number:       user?.phone_number,
+      email:        user?.email,
+      gender:       student?.gender,
+      dob:          student?.dob,
+      language:     student?.preferred_language,
       joining_date: student?.onboarding_date,
-
-      role: roleData?.role_name,
-      avatar: avatarUrl
+      role:         roleData?.role_name,
+      avatar:       avatarUrl
     };
   }
 
-  // Parent
   else if (role === "PARENT") {
+    const parent = await ParentProfile.findOne({ where: { user_id } });
+    if (!parent) throw new ApiError(404, "Parent profile not found");
 
-    const parent = await ParentProfile.findOne({
-      where: { user_id }
-    });
-
-    if (!parent)
-      throw new ApiError(404, "Parent profile not found");
-
-
-    const mappings = await ParentStudentMap.findAll({
-      where: { parent_id: parent.parent_id }
-    });
-
-    if (!mappings.length)
-      throw new ApiError(404, "Student mapping not found");
-
+    const mappings = await ParentStudentMap.findAll({ where: { parent_id: parent.parent_id } });
+    if (!mappings.length) throw new ApiError(404, "Student mapping not found");
 
     const studentIds = mappings.map(m => m.student_id);
+    const students   = await StudentProfile.findAll({ where: { student_id: studentIds } });
+    if (!students.length) throw new ApiError(404, "Linked students not found");
 
-
-    const students = await StudentProfile.findAll({
-      where: { student_id: studentIds }
-    });
-
-    if (!students.length)
-      throw new ApiError(404, "Linked students not found");
-
-
-    school = await AdminSchool.findOne({
-      where: { school_id: students[0].school_id }
-    });
-
-
-    profileData = {
-      parent,
-      students,
-      school
-    };
+    school = await AdminSchool.findOne({ where: { school_id: students[0].school_id } });
+    profileData = { parent, students, school };
   }
 
   else {
     throw new ApiError(400, "Unsupported role");
   }
 
-
   return res.status(200).json(
-    new ApiResponse(
-      200,
-      profileData,
-      "Profile fetched successfully"
-    )
+    new ApiResponse(200, profileData, "Profile fetched successfully")
   );
 });
 
+// ─────────────────────────────────────────────
+// UPDATE AVATAR
+// ─────────────────────────────────────────────
 const updateAvatar = asyncHandler(async (req, res) => {
   const { user_id } = req.user;
 
-  // 1. Check file
-  if (!req.file) {
-    throw new ApiError(400, "Avatar file is required");
-  }
+  if (!req.file) throw new ApiError(400, "Avatar file is required");
 
-  // 2. Validate file type (IMPORTANT 🔥)
   const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
   if (!allowedTypes.includes(req.file.mimetype)) {
     throw new ApiError(400, "Only JPG, PNG, WEBP allowed");
   }
 
-  // 3. Upload to S3
   const { key } = await uploadAvatarToS3(req.file, user_id);
-  
 
-  // 4. Save key in DB
-  await User.update(
-    { avatar: key },
-    { where: { user_id } }
-  );
+  await User.update({ avatar: key }, { where: { user_id } });
 
   fs.unlinkSync(req.file.path);
+
   return res.status(200).json(
-    new ApiResponse(
-      200,
-      {
-        avatar: key,
-      },
-      "Avatar updated successfully"
-    )
+    new ApiResponse(200, { avatar: key }, "Avatar updated successfully")
   );
 });
 
 export {
   sendLoginOtp,
   login,
+  resetFirstTimePassword,
   refreshAccessToken,
   logout,
   getLoggedInUserProfile,
