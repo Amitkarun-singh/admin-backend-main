@@ -1,31 +1,42 @@
 import express from "express";
 import {
-    getLanguages,
-    getClasses,
-    getSubjects,
-    getChapters,
-    getAiNotes,
-    generateAiNotes, // 👈 add this
+  getLanguages,
+  getClasses,
+  getSubjects,
+  getChapters,
+  getAiNotes,
+  generateAiNotes,
 } from "../controllers/ainote.controller.js";
-import { upload } from "../middlewares/multer.middleware.js";
-import { aiLogger } from "../middlewares/aiLogger.middleware.js";
-import { authMiddleware } from "../middlewares/auth.middleware.js";
+import { upload }          from "../middlewares/multer.middleware.js";
+import { aiLogger }        from "../middlewares/aiLogger.middleware.js";
+import { authMiddleware }  from "../middlewares/auth.middleware.js";
+import { requireFeature }  from "../middlewares/feature.middleware.js";
 
 const router = express.Router();
 
-// Dropdown APIs
-router.get("/languages", authMiddleware, aiLogger("ai_notes", "generate_notes"), getLanguages);
-router.get("/classes", authMiddleware, aiLogger("ai_notes", "generate_notes"), getClasses);
-router.get("/subjects", authMiddleware, aiLogger("ai_notes", "generate_notes"), getSubjects);
-router.get("/chapters",authMiddleware, aiLogger("ai_notes", "generate_notes"), getChapters);
+// Feature ID 15 = AI_NOTES
+// Applied after auth so req.user is available inside requireFeature
+router.use(authMiddleware);
+router.use(requireFeature(15));
 
-// Generate AI notes (Gemini)
-router.post("/generate", authMiddleware, aiLogger("ai_notes", "generate_notes"), upload.fields([
+// Dropdown APIs (still gated — no point calling them if feature is off)
+router.get("/languages", aiLogger("ai_notes", "generate_notes"), getLanguages);
+router.get("/classes",   aiLogger("ai_notes", "generate_notes"), getClasses);
+router.get("/subjects",  aiLogger("ai_notes", "generate_notes"), getSubjects);
+router.get("/chapters",  aiLogger("ai_notes", "generate_notes"), getChapters);
+
+// Generate AI notes
+router.post(
+  "/generate",
+  aiLogger("ai_notes", "generate_notes"),
+  upload.fields([
     { name: "notes", maxCount: 20 },
     { name: "books", maxCount: 20 },
-]), generateAiNotes); // 👈 new route
+  ]),
+  generateAiNotes
+);
 
-// Final notes fetch (optional old system)
-router.get("/", authMiddleware, aiLogger("ai_notes", "generate_notes"), getAiNotes);
+// Final notes fetch
+router.get("/", aiLogger("ai_notes", "generate_notes"), getAiNotes);
 
 export default router;
