@@ -28,6 +28,7 @@ import summarizeRoute from "./routes/summarize.routes.js";
 import ainoteRoute from "./routes/ainote.routes.js";
 import assessmentRoutes from "./routes/assessment.routes.js";
 import appFeedbackRouter from "./ai-features/app_feedback/appFeedbackRoute.js";
+import featureRoutes from "./routes/feature.routes.js";
 // import dotenv from "dotenv";
 // dotenv.config();
 const app = express();
@@ -63,6 +64,7 @@ app.use("/api/assessments", assessmentRoutes);
 
 // History and Analytics Routes
 app.use("/api/history", historyRoutes);
+app.use("/api/features", featureRoutes);
 
 // Static serving for AI server's papers
 app.use("/api/ai/papers", express.static("papers"));

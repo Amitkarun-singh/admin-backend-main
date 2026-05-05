@@ -36,7 +36,11 @@ import UserSession from "./user_session.model.js";
 import Assessment from "./assessment.model.js";
 import AssessmentQuestion from "./assessment_question.model.js";
 import AssessmentAssignment from "./assessment_assignment.model.js";
-import { StudentAttempt, StudentAnswer } from "./student_attempt.model.js";
+import { StudentAttempt, StudentAnswer } from "./student_attempt.model.js"; 
+
+import Feature         from "./feature.model.js";
+import SchoolFeature   from "./school_feature.model.js";
+import FeatureOverride from "./feature_overrides.model.js";
 
 /* =====================================================
    USER ↔ ROLE  (RBAC)
@@ -326,6 +330,20 @@ StudentAttempt.belongsTo(StudentProfile, {
   as: "student",
 });
 
+// --- ASSOCIATIONS (add after existing associations) ---
+
+AdminSchool.hasMany(SchoolFeature,   { foreignKey: "school_id",  as: "schoolFeatures" });
+SchoolFeature.belongsTo(AdminSchool, { foreignKey: "school_id",  as: "school" });
+ 
+Feature.hasMany(SchoolFeature,       { foreignKey: "feature_id", as: "schoolGrants" });
+SchoolFeature.belongsTo(Feature,     { foreignKey: "feature_id", as: "feature" });
+ 
+// Feature.hasMany(FeatureOverride,     { foreignKey: "feature_id", as: "overrides" });
+// FeatureOverride.belongsTo(Feature,   { foreignKey: "feature_id", as: "feature" });
+ 
+// AdminSchool.hasMany(FeatureOverride,    { foreignKey: "school_id", as: "featureOverrides" });
+// FeatureOverride.belongsTo(AdminSchool,  { foreignKey: "school_id", as: "school" });
+
 /* =====================================================
    EXPORT ALL MODELS
    ===================================================== */
@@ -357,4 +375,8 @@ export {
   AssessmentAssignment,
   StudentAttempt,
   StudentAnswer,
+
+  Feature,
+  SchoolFeature,
+  FeatureOverride,
 };
