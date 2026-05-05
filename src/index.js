@@ -17,6 +17,7 @@ import parentRoutes from "./routes/parent.routes.js";
 
 import historyRoutes from "./routes/history.routes.js";
 import { globalErrorHandler } from "./error/globalErrorHandler.ts";
+import { traceMiddleware } from "./ai-features/middleware/traceMiddleware.ts";
 
 // Imports for AI features
 import giniRouter from "./ai-features/gini/giniRouter.js";
@@ -30,6 +31,7 @@ import appFeedbackRouter from "./ai-features/app_feedback/appFeedbackRoute.js";
 // import dotenv from "dotenv";
 // dotenv.config();
 const app = express();
+app.use(traceMiddleware);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));

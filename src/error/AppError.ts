@@ -9,17 +9,14 @@ export class AppError extends Error {
   type;
   extra;
   isOperational;
-  isStream;
-  constructor(
-    { statusCode, type, message, extra = {} }: constructorArg,
-    isStream = false,
-  ) {
+
+  constructor({ statusCode, type, message, extra = {} }: constructorArg) {
     super(message);
 
     this.statusCode = statusCode;
     this.type = type;
     this.extra = extra;
-    this.isStream = isStream;
+
     this.isOperational = true;
 
     Error.captureStackTrace(this, this.constructor);

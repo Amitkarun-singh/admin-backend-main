@@ -77,16 +77,16 @@ export class InternalServerError extends AppError {
   }
 }
 
-// export class InternalServerErrorStream extends AppError {
-//   constructor(traceId?: string) {
-//     super(
-//       {
-//         statusCode: 500,
-//         type: "INTERNAL_ERROR",
-//         message: "An unexpected error occurred",
-//         extra: { traceId },
-//       },
-//       true,
-//     );
-//   }
-// }
+export class FileExtractionError extends AppError {
+  constructor(fileType?: string, originalError?: unknown) {
+    super({
+      statusCode: 422,
+      type: "FILE_EXTRACTION_FAILED",
+      message: `Failed to extract content from ${fileType || "file"}`,
+      extra: {
+        fileType,
+        cause: originalError,
+      },
+    });
+  }
+}

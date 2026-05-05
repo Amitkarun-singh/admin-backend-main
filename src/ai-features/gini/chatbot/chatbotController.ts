@@ -66,31 +66,15 @@ export const feedbackThumbUpController = async (
   res: Response,
 ) => {
   // console.log(req.body);
-  try {
-    await feedbackThumbUpService(req.body);
-    res.status(200).json({ isSuccessful: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      isSuccessful: false,
-      statusMessage: "something went wrong",
-      err,
-    });
-  }
+
+  await feedbackThumbUpService(req.body);
+  res.status(200).json({ isSuccessful: true });
 };
+
 export const feedbackThumbDownController = async (
   req: Request,
   res: Response,
 ) => {
-  try {
-    await feedbackThumbDownService(req.body);
-    res.status(200).json({ isSuccessful: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      isSuccessful: false,
-      statusMessage: "something went wrong",
-      err,
-    });
-  }
+  await feedbackThumbDownService(req.body);
+  res.status(200).json({ isSuccessful: true });
 };
