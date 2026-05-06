@@ -32,13 +32,18 @@ const TUTOR_USER_MATCH = `(user_id = :uid OR ${TUTOR_UID} = :uid)`;
      OLD → {"message":"[{\"role\":\"user\",\"content\":\"...\"},...]","sessionId":"..."}
 
    response_body formats:
-     A → {"message":{"type":"final","role":"assistant","content":"..."}}
+     A → {"message":{"type":"final","role":"assistant","content":"...","userQuery":"..."}}
      B → {"message":"plain string reply"}
      C → {"type":"final","role":"assistant","content":"..."}
 
+   Voice message flow:
+     When request_body content is "[Voice message]", the real user question
+     is stored in response_body.message.userQuery (transcribed by the AI).
+     We always prefer userQuery over the voice placeholder.
+
    To reconstruct a conversation:
      Fetch ALL rows for session_id ORDER BY created_at ASC, id ASC.
-     For each row emit: user msg (request_body) + assistant reply (response_body).
+     For each row emit: user msg (request_body / userQuery) + assistant reply (response_body).
 ───────────────────────────────────────────────────────────── */
 
 /* ─────────────────────────────────────────────────────────────
@@ -62,10 +67,42 @@ function isVoiceMessage(content) {
 }
 
 /* ─────────────────────────────────────────────────────────────
+   HELPER: extract userQuery from response_body.
+   The AI stores the transcribed voice question here.
+
+   Handles:
+     Format A: {"message":{"type":"final","userQuery":"..."}}
+     Format C: {"type":"final","userQuery":"..."}
+───────────────────────────────────────────────────────────── */
+function extractUserQueryFromResponseBody(rawResponseBody) {
+  try {
+    const rb = typeof rawResponseBody === "string"
+      ? JSON.parse(rawResponseBody)
+      : rawResponseBody;
+
+    if (!rb) return null;
+
+    // Format A: {"message":{"type":"final","role":"assistant","content":"...","userQuery":"..."}}
+    if (rb.message && typeof rb.message === "object" && rb.message.userQuery) {
+      return String(rb.message.userQuery).trim() || null;
+    }
+
+    // Format C: {"type":"final","userQuery":"..."}
+    if (rb.userQuery) {
+      return String(rb.userQuery).trim() || null;
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+/* ─────────────────────────────────────────────────────────────
    HELPER: extract user message text from a tutor_logs request_body.
    Handles both the NEW single-object format and the OLD cumulative-array format.
+
+   When the content is a voice placeholder, falls back to userQuery
+   extracted from response_body (the AI-transcribed real question).
 ───────────────────────────────────────────────────────────── */
-function parseTutorUserContent(rawRequestBody) {
+function parseTutorUserContent(rawRequestBody, rawResponseBody = null) {
   try {
     const rb = typeof rawRequestBody === "string"
       ? JSON.parse(rawRequestBody)
@@ -75,7 +112,15 @@ function parseTutorUserContent(rawRequestBody) {
 
     // ── NEW FORMAT: {"role":"user","content":"..."} ──
     if (rb.role === "user" && rb.content !== undefined) {
-      return String(rb.content).trim() || null;
+      const content = String(rb.content).trim();
+
+      // Voice placeholder → try to get the real question from response_body.userQuery
+      if (isVoiceMessage(content) && rawResponseBody) {
+        const userQuery = extractUserQueryFromResponseBody(rawResponseBody);
+        if (userQuery) return userQuery;
+      }
+
+      return content || null;
     }
 
     // ── OLD FORMAT: {"message":"[{role,content},...]","sessionId":"..."} ──
@@ -84,7 +129,15 @@ function parseTutorUserContent(rawRequestBody) {
         const msgs = JSON.parse(rb.message);
         if (Array.isArray(msgs)) {
           const firstUser = msgs.find(m => m?.role === "user");
-          return firstUser?.content ? String(firstUser.content).trim() : null;
+          const content   = firstUser?.content ? String(firstUser.content).trim() : null;
+
+          // Voice placeholder → try userQuery fallback
+          if (content && isVoiceMessage(content) && rawResponseBody) {
+            const userQuery = extractUserQueryFromResponseBody(rawResponseBody);
+            if (userQuery) return userQuery;
+          }
+
+          return content;
         }
       } catch { /* not a JSON array */ }
     }
@@ -131,11 +184,13 @@ function parseTutorAssistantContent(rawResponseBody) {
    HELPER: build a full [{role,content}] messages array from
    all rows of a session (pass rows ordered by created_at ASC).
    Each row contributes one user turn + one assistant turn.
+   Passes response_body to parseTutorUserContent so voice
+   messages resolve to the real userQuery.
 ───────────────────────────────────────────────────────────── */
 function buildTutorMessages(rows) {
   const messages = [];
   for (const row of rows) {
-    const userContent = parseTutorUserContent(row.request_body);
+    const userContent = parseTutorUserContent(row.request_body, row.response_body);
     if (userContent !== null) {
       messages.push({ role: "user", content: userContent });
     }
@@ -149,16 +204,17 @@ function buildTutorMessages(rows) {
 
 /* ─────────────────────────────────────────────────────────────
    HELPER: get best title from a set of session rows (ASC order).
-   Returns first real non-voice user message.
-   Falls back to first voice message if no real text found.
+   Returns first real non-voice user message (or resolved userQuery).
+   Falls back to first voice message if nothing real is found.
 ───────────────────────────────────────────────────────────── */
 function extractTutorTitleFromRows(rows) {
   let voiceFallback = null;
   for (const row of rows) {
-    const content = parseTutorUserContent(row.request_body);
+    // Pass response_body so voice rows resolve via userQuery
+    const content = parseTutorUserContent(row.request_body, row.response_body);
     if (!content) continue;
-    if (!isVoiceMessage(content)) return content.slice(0, 100);   // best case
-    if (!voiceFallback) voiceFallback = content.slice(0, 100);
+    if (!isVoiceMessage(content)) return content.slice(0, 100);   // best case: real text
+    if (!voiceFallback) voiceFallback = content.slice(0, 100);   // keep as fallback
   }
   return voiceFallback || null;
 }
@@ -255,7 +311,7 @@ export const closeSession = async (user_id) => {
       TUTOR → NEW SCHEMA: one row = one turn
               group by session_id → one card per conversation
               turn_count = COUNT(rows) in session
-              title      = first non-voice user message (rows ASC)
+              title      = first real user message / userQuery (rows ASC)
    ===================================================== */
 export const getRecentQueries = asyncHandler(async (req, res) => {
   const user_id = Number(req.user.user_id);
@@ -323,7 +379,8 @@ export const getRecentQueries = asyncHandler(async (req, res) => {
 
   /* ── AI Tutor ── NEW SCHEMA ──
      One row per turn. Group by session_id.
-     Fetch the first 10 rows ASC per session just for title extraction.
+     Fetch the first 10 rows ASC per session for title extraction.
+     Also fetch response_body so voice rows resolve via userQuery.
      turn_count = total rows in session (each row = one user turn).
   ── */
   let tutorQueries = [];
@@ -354,9 +411,10 @@ export const getRecentQueries = asyncHandler(async (req, res) => {
         tutorSessions.map(async session => {
           console.log(`\n[TUTOR] Processing session_id: ${session.session_id}`);
 
-          // Fetch first 10 rows ASC — enough to find a real text message for the title
+          // Fetch first 10 rows ASC — need both request_body AND response_body
+          // so voice messages can fall back to userQuery in response_body
           const titleRows = await sequelize.query(
-            `SELECT request_body
+            `SELECT request_body, response_body
              FROM   tutor_logs
              WHERE  session_id = :sid AND ${TUTOR_USER_MATCH}
              ORDER  BY created_at ASC, id ASC
@@ -485,7 +543,6 @@ export const getFeaturesExplored = asyncHandler(async (req, res) => {
 /* =====================================================
    5. GET LOGIN HISTORY
       GET /api/history/login-history
-      (unchanged)
    ===================================================== */
 export const getLoginHistory = asyncHandler(async (req, res) => {
   const user_id = Number(req.user.user_id);
@@ -511,7 +568,6 @@ export const getLoginHistory = asyncHandler(async (req, res) => {
 /* =====================================================
    6. GET WEEK ACTIVITY
       GET /api/history/week-activity
-      (unchanged)
    ===================================================== */
 export const getWeekActivity = asyncHandler(async (req, res) => {
   const user_id = Number(req.user.user_id);
@@ -544,7 +600,6 @@ export const getWeekActivity = asyncHandler(async (req, res) => {
 /* =====================================================
    7. GET STATS
       GET /api/history/stats
-      (unchanged)
    ===================================================== */
 export const getStats = asyncHandler(async (req, res) => {
   const user_id = Number(req.user.user_id);
@@ -579,7 +634,7 @@ export const getStats = asyncHandler(async (req, res) => {
    TUTOR — NEW SCHEMA:
      Each row = one turn (user msg + assistant reply).
      Fetch ALL rows for session_id ORDER BY created_at ASC, id ASC.
-     For each row: push user message then assistant reply into messages[].
+     For voice rows, the real user question comes from response_body.userQuery.
    ===================================================== */
 export const getConversation = asyncHandler(async (req, res) => {
   const user_id             = Number(req.user.user_id);
@@ -652,7 +707,7 @@ export const getConversation = asyncHandler(async (req, res) => {
   /* ── AI Tutor ── NEW SCHEMA ──
      conversation_id param = session_id.
      Fetch ALL rows for this session ordered ASC.
-     Each row = one turn → push user msg then assistant reply.
+     Each row = one turn → push user msg (with userQuery fallback) then assistant reply.
   ── */
   if (source === "tutor") {
     const allRows = await sequelize.query(
@@ -670,10 +725,11 @@ export const getConversation = asyncHandler(async (req, res) => {
 
     if (!allRows.length) throw new ApiError(404, "Conversation not found");
 
-    // Build the full interleaved message list from all rows
+    // Build the full interleaved message list from all rows.
+    // Voice messages are resolved to userQuery from response_body automatically.
     const messages = buildTutorMessages(allRows);
 
-    // Title: first non-voice user message, fallback to voice
+    // Title: first non-voice user message or resolved userQuery, fallback to voice
     const title = extractTutorTitleFromRows(allRows) || "AI Tutor conversation";
 
     const responseData = {
@@ -739,7 +795,6 @@ export const getConversation = asyncHandler(async (req, res) => {
 /* =====================================================
    9. GET LATEST TESTS
       GET /api/history/latest-tests
-      (unchanged)
    ===================================================== */
 export const getLatestTests = asyncHandler(async (req, res) => {
   const user_id    = Number(req.user.user_id);
