@@ -9,28 +9,23 @@ type OpenAIChunk = {
     };
   }[];
 };
-export class OpenAIStreamAdapter extends LLMStreamAdapter {
-  declare stream;
-
+export class OpenAIStreamAdapter extends LLMStreamAdapter<
+  AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>
+> {
   constructor(
     stream: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>,
   ) {
-    super();
-    this.stream = stream;
+    super(stream);
   }
 
   async pipeTo(res: Response) {
-    try {
-      for await (const chunk of this.stream) {
-        const content = chunk.choices?.[0]?.delta?.content;
-        if (!content) continue;
+    for await (const chunk of this.stream) {
+      const content = chunk.choices?.[0]?.delta?.content;
+      if (!content) continue;
 
-        res.write(this.format(content));
-      }
-      res.write(LLMStreamAdapter.done());
-      res.end();
-    } catch (e) {
-      res.write(LLMStreamAdapter.error());
+      res.write(this.message(content));
     }
+    res.write(this.done());
+    res.end();
   }
 }

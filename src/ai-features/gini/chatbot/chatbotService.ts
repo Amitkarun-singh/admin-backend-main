@@ -2,11 +2,11 @@ import pdf from "@cedrugs/pdf-parse"; // ESM-friendly PDF parser
 import Tesseract from "tesseract.js";
 import { ChatBotFeedbackSave } from "../../modal/chatbot.modal.js";
 
-import { fromBuffer } from "pdf2pic";
 import { LLMFactory } from "../../pattern_imp/factory/LLMFactory.ts";
 import type { Message } from "../../pattern/strategy/LLMStrategy.ts";
 import type { Response } from "express";
 import type { File } from "../../type/type.d.ts";
+import { FileExtractionError } from "../../../error/subError.ts";
 
 type promptDetails = {
   language: string;
@@ -19,7 +19,6 @@ export const streamChatbotResponse = async (
   file: File | undefined,
   { language, className, chapter }: promptDetails,
 ) => {
-  console.log("Gini chat bot service ");
   let messageWithPrompt: Message[];
 
   if (file) {
@@ -40,38 +39,28 @@ export const streamChatbotResponse = async (
   const chatbot = LLMFactory.create("openai");
   await chatbot.streamResponse(messageWithPrompt, res);
 };
+
 type feedback = { userMessage: string; response: string; feedback: string };
 export const feedbackThumbUpService = async (
   feedback: Omit<feedback, "feedback">,
 ) => {
-  try {
-    await ChatBotFeedbackSave([
-      feedback.userMessage,
-      feedback.response,
-      "LIKE",
-    ]);
+  await ChatBotFeedbackSave([feedback.userMessage, feedback.response, "LIKE"]);
 
-    return true;
-  } catch (err) {
-    console.error(err);
-    throw err;
-  }
+  return true;
 };
 export const feedbackThumbDownService = async (feedback: feedback) => {
-  try {
-    await ChatBotFeedbackSave([
-      feedback.userMessage,
-      feedback.response,
-      feedback.feedback,
-    ]);
-    return true;
-  } catch (err) {
-    throw err;
-  }
+  await ChatBotFeedbackSave([
+    feedback.userMessage,
+    feedback.response,
+    feedback.feedback,
+  ]);
+  return true;
 };
 
-const extractFileText = async (file: File) => {
-  if (!file) return "";
+const extractFileText = async (file: File): Promise<string> => {
+  if (!file) {
+    throw new FileExtractionError(undefined, "File is missing");
+  }
 
   try {
     const mime = file.mimetype;
@@ -81,6 +70,7 @@ const extractFileText = async (file: File) => {
       const {
         data: { text },
       } = await Tesseract.recognize(file.buffer, "eng");
+
       return text.trim();
     }
 
@@ -92,38 +82,14 @@ const extractFileText = async (file: File) => {
         return pdfData.text.trim();
       }
 
-      // fallback OCR
-      // try {
-      //   const convert = fromBuffer(file.buffer, {
-      //     density: 200,
-      //     format: "png",
-      //     width: 1200,
-      //     height: 1600,
-      //   });
-
-      //   const pages = await convert.bulk(-1);
-
-      //   let fullText = "";
-
-      //   for (const page of pages) {
-      //     const {
-      //       data: { text },
-      //     } = await Tesseract.recognize(page, "eng");
-
-      //     fullText += text + "\n";
-      //   }
-
-      //   return fullText.trim();
-      // } catch (ocrError) {
-      //   console.error("OCR tools missing. Skipping OCR.");
-      //   return pdfData.text || "";
-      // }
+      // If PDF has no usable text → treat as failure
+      throw new FileExtractionError(mime, "Empty or insufficient PDF text");
     }
 
-    return "Unable to read File";
-  } catch (error) {
-    console.error("File extraction error:", error);
-    return "";
+    // Unsupported type
+    throw new FileExtractionError(mime, "Unsupported file type");
+  } catch (error: any) {
+    throw new FileExtractionError(file.mimetype, error.message);
   }
 };
 

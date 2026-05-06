@@ -6,6 +6,7 @@ declare global {
     interface Request {
       file?: Express.Multer.File;
       user: UserTokenPayload;
+      traceId: string;
     }
   }
 }

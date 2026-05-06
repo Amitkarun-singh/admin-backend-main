@@ -17,6 +17,8 @@ import parentRoutes from "./routes/parent.routes.js";
 import registerRoutes from "./routes/register.routes.js";
 
 import historyRoutes from "./routes/history.routes.js";
+import { globalErrorHandler } from "./error/globalErrorHandler.ts";
+import { traceMiddleware } from "./ai-features/middleware/traceMiddleware.ts";
 
 // Imports for AI features
 import giniRouter from "./ai-features/gini/giniRouter.js";
@@ -31,6 +33,7 @@ import featureRoutes from "./routes/feature.routes.js";
 // import dotenv from "dotenv";
 // dotenv.config();
 const app = express();
+app.use(traceMiddleware);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));
@@ -81,18 +84,8 @@ app.get("/health", (_, res) => {
 });
 
 /* ---------------- GLOBAL ERROR HANDLER ---------------- */
-app.use((err, req, res, next) => {
-  console.error(err);
 
-  const statusCode =
-    err.statuscode && Number.isInteger(err.statuscode) ? err.statuscode : 500;
-
-  res.status(statusCode).json({
-    success: false,
-    message: err.message || "Internal Server Error",
-    errors: err.errors || [],
-  });
-});
+app.use(globalErrorHandler);
 
 /* ---------------- START SERVER + DB ---------------- */
 
