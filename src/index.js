@@ -14,6 +14,7 @@ import courseRoutes from "./routes/course.routes.js";
 import teacherRoutes from "./routes/teacher.routes.js";
 import studentRoutes from "./routes/student.routes.js";
 import parentRoutes from "./routes/parent.routes.js";
+import registerRoutes from "./routes/register.routes.js";
 
 import historyRoutes from "./routes/history.routes.js";
 import { globalErrorHandler } from "./error/globalErrorHandler.ts";
@@ -56,6 +57,7 @@ app.use("/api", courseRoutes);
 app.use("/api/teachers", teacherRoutes);
 app.use("/api/students", studentRoutes);
 app.use("/api/parents", parentRoutes);
+app.use("/api/auth/register", registerRoutes);
 
 // AI Feature Routes
 app.use("/api", summarizeRoute);

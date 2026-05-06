@@ -32,7 +32,7 @@ import {
 } from "../utils/otp.util.js";
 
 // ─────────────────────────────────────────────
-// SEND OTP
+// SEND OTP  (used by login)
 // ─────────────────────────────────────────────
 const sendLoginOtp = asyncHandler(async (req, res) => {
   const { phone_number } = req.body;
@@ -43,7 +43,7 @@ const sendLoginOtp = asyncHandler(async (req, res) => {
   const user = await User.findOne({ where: { phone_number } });
   if (!user) throw new ApiError(404, "User not found");
 
-  const otp = generateOTP();
+  const otp      = generateOTP();
   const otpToken = createOtpToken(phone_number, otp);
 
   console.log("OTP (DEV ONLY):", otp);
@@ -57,14 +57,7 @@ const sendLoginOtp = asyncHandler(async (req, res) => {
 // LOGIN  (password OR OTP)
 // ─────────────────────────────────────────────
 const login = asyncHandler(async (req, res) => {
-  const {
-    username,
-    email,
-    password,
-    phone_number,
-    otp,
-    otpToken
-  } = req.body;
+  const { username, email, password, phone_number, otp, otpToken } = req.body;
 
   let user;
 
@@ -98,8 +91,6 @@ const login = asyncHandler(async (req, res) => {
 
   /* ── FIRST-TIME LOGIN → force password reset ── */
   if (user.is_password_reset_required) {
-    // Issue a short-lived token whose sole purpose is to call /reset-first-time-password
-    // It carries purpose:"password_reset" so the reset endpoint can verify intent
     const tempToken = jwt.sign(
       { user_id: user.user_id, purpose: "password_reset" },
       process.env.ACCESS_TOKEN_SECRET,
@@ -117,16 +108,16 @@ const login = asyncHandler(async (req, res) => {
 
   /* ── LOAD ROLE + PERMISSIONS ── */
   const userWithRole = await User.findOne({
-    where: { user_id: user.user_id },
+    where:      { user_id: user.user_id },
     attributes: { exclude: ["password"] },
     include: [
       {
         model: AdminRole,
-        as: "role",
+        as:    "role",
         include: [
           {
-            model: AdminPermission,
-            as: "permissions",
+            model:      AdminPermission,
+            as:         "permissions",
             attributes: ["permission_key"]
           }
         ]
@@ -138,10 +129,9 @@ const login = asyncHandler(async (req, res) => {
 
   const permissions = userWithRole.role.permissions.map(p => p.permission_key);
 
-  /* ── TOKEN PAYLOAD ── */
   const payload = {
-    user_id: user.user_id,
-    role: userWithRole.role.role_name,
+    user_id:   user.user_id,
+    role:      userWithRole.role.role_name,
     permissions,
     school_id: user.school_id
   };
@@ -167,10 +157,10 @@ const login = asyncHandler(async (req, res) => {
       200,
       {
         accessToken,
-        role:        payload.role,
+        role:       payload.role,
         permissions,
-        school_id:   user.school_id,
-        profile:     userWithRole
+        school_id:  user.school_id,
+        profile:    userWithRole
       },
       "Login successful"
     )
@@ -202,7 +192,6 @@ const resetFirstTimePassword = asyncHandler(async (req, res) => {
   if (newPassword.length < 8)
     throw new ApiError(400, "Password must be at least 8 characters");
 
-  /* ── Verify the temp token ── */
   let decoded;
   try {
     decoded = jwt.verify(tempToken, process.env.ACCESS_TOKEN_SECRET);
@@ -210,29 +199,24 @@ const resetFirstTimePassword = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Temp token is invalid or has expired. Please log in again.");
   }
 
-  // Extra safety: ensure this token was issued specifically for password reset
   if (decoded.purpose !== "password_reset") {
     throw new ApiError(403, "Invalid token purpose");
   }
 
-  /* ── Find user ── */
   const user = await User.findByPk(decoded.user_id);
   if (!user) throw new ApiError(404, "User not found");
 
-  // Guard: if flag was already cleared, don't allow re-use of old temp tokens
   if (!user.is_password_reset_required) {
     throw new ApiError(400, "Password has already been reset. Please log in normally.");
   }
 
-  /* ── Hash & save new password, clear the flag ── */
   const hashed = await bcrypt.hash(newPassword, 10);
 
   await user.update({
     password:                   hashed,
-    is_password_reset_required: false   // ✅ flag cleared — user won't be intercepted again
+    is_password_reset_required: false
   });
 
-  /* ── Load role + permissions to issue real tokens immediately ── */
   const userWithRole = await User.findOne({
     where:      { user_id: user.user_id },
     attributes: { exclude: ["password"] },
@@ -292,33 +276,155 @@ const resetFirstTimePassword = asyncHandler(async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
+// FORGOT PASSWORD — STEP 1
+// Send OTP to the registered phone number
+// POST /auth/forgot-password/send-otp
+// Body: { phone_number }
+// ─────────────────────────────────────────────
+const forgotPasswordSendOtp = asyncHandler(async (req, res) => {
+  const { phone_number } = req.body;
+
+  if (!phone_number)
+    throw new ApiError(400, "Phone number is required");
+
+  // Verify the number belongs to a real, active user
+  const user = await User.findOne({ where: { phone_number } });
+  if (!user)
+    throw new ApiError(404, "No account found with this phone number");
+
+  if (user.status.toLowerCase() !== "active")
+    throw new ApiError(403, "Account is inactive. Contact your administrator.");
+
+  const otp      = generateOTP();
+  const otpToken = createOtpToken(phone_number, otp);
+
+  console.log("Forgot-password OTP (DEV ONLY):", otp);
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      { otpToken },
+      "OTP sent successfully. Please verify to reset your password."
+    )
+  );
+});
+
+// ─────────────────────────────────────────────
+// FORGOT PASSWORD — STEP 2
+// Verify OTP → receive a short-lived resetToken
+// POST /auth/forgot-password/verify-otp
+// Body: { phone_number, otp, otpToken }
+// ─────────────────────────────────────────────
+const forgotPasswordVerifyOtp = asyncHandler(async (req, res) => {
+  const { phone_number, otp, otpToken } = req.body;
+
+  if (!phone_number || !otp || !otpToken)
+    throw new ApiError(400, "phone_number, otp, and otpToken are required");
+
+  // Throws ApiError if OTP is wrong or expired
+  verifyOtpToken(phone_number, otp, otpToken);
+
+  const user = await User.findOne({ where: { phone_number } });
+  if (!user) throw new ApiError(404, "User not found");
+
+  // Issue a short-lived token dedicated to the password-reset step only
+  // purpose:"forgot_password" distinguishes it from the first-login reset token
+  const resetToken = jwt.sign(
+    { user_id: user.user_id, purpose: "forgot_password" },
+    process.env.ACCESS_TOKEN_SECRET,
+    { expiresIn: "10m" }
+  );
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      { resetToken },
+      "OTP verified. You may now reset your password."
+    )
+  );
+});
+
+// ─────────────────────────────────────────────
+// FORGOT PASSWORD — STEP 3
+// Set the new password using the resetToken
+// POST /auth/forgot-password/reset
+// Header: Authorization: Bearer <resetToken>
+// Body:   { newPassword, confirmPassword }
+// ─────────────────────────────────────────────
+const forgotPasswordReset = asyncHandler(async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const resetToken = authHeader?.startsWith("Bearer ")
+    ? authHeader.split(" ")[1]
+    : null;
+
+  if (!resetToken) throw new ApiError(401, "Reset token required");
+
+  const { newPassword, confirmPassword } = req.body;
+
+  if (!newPassword || !confirmPassword)
+    throw new ApiError(400, "newPassword and confirmPassword are required");
+
+  if (newPassword !== confirmPassword)
+    throw new ApiError(400, "Passwords do not match");
+
+  if (newPassword.length < 8)
+    throw new ApiError(400, "Password must be at least 8 characters");
+
+  // Verify the reset token
+  let decoded;
+  try {
+    decoded = jwt.verify(resetToken, process.env.ACCESS_TOKEN_SECRET);
+  } catch {
+    throw new ApiError(401, "Reset token is invalid or has expired. Please start over.");
+  }
+
+  // Must be a forgot-password token — not a first-login token
+  if (decoded.purpose !== "forgot_password") {
+    throw new ApiError(403, "Invalid token purpose");
+  }
+
+  const user = await User.findByPk(decoded.user_id);
+  if (!user) throw new ApiError(404, "User not found");
+
+  const hashed = await bcrypt.hash(newPassword, 10);
+
+  // Save new password and clear first-login flag (in case they had never logged in)
+  await user.update({
+    password:                   hashed,
+    is_password_reset_required: false
+  });
+
+  // No tokens issued — user is redirected to login after a successful reset
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {},
+      "Password reset successful. Please log in with your new password."
+    )
+  );
+});
+
+// ─────────────────────────────────────────────
 // REFRESH ACCESS TOKEN
 // ─────────────────────────────────────────────
 const refreshAccessToken = asyncHandler(async (req, res) => {
   const incomingRefreshToken = req.cookies.refreshToken;
   console.log("Cookies:", req.cookies);
 
-  if (!incomingRefreshToken) {
+  if (!incomingRefreshToken)
     throw new ApiError(401, "Refresh token missing");
-  }
 
   try {
-    const decoded = jwt.verify(
-      incomingRefreshToken,
-      process.env.REFRESH_TOKEN_SECRET
-    );
+    const decoded = jwt.verify(incomingRefreshToken, process.env.REFRESH_TOKEN_SECRET);
 
-    const user = await User.findOne({
-      where: { user_id: decoded.user_id }
-    });
-
+    const user = await User.findOne({ where: { user_id: decoded.user_id } });
     if (!user) throw new ApiError(401, "Invalid refresh token");
 
     const payload = {
-      user_id:   user.user_id,
-      role:      decoded.role,
+      user_id:     user.user_id,
+      role:        decoded.role,
       permissions: decoded.permissions,
-      school_id: decoded.school_id
+      school_id:   decoded.school_id
     };
 
     const newAccessToken  = generateAccessToken(payload);
@@ -392,8 +498,18 @@ const getLoggedInUserProfile = asyncHandler(async (req, res) => {
     const teacher = await TeacherProfile.findOne({ where: { user_id } });
     if (!teacher) throw new ApiError(404, "Teacher profile not found");
 
-    school = await AdminSchool.findOne({ where: { school_id: teacher.school_id } });
-    profileData = { role, teacher, school };
+    // school is null for standalone teachers — no crash
+    if (teacher.school_id) {
+      school = await AdminSchool.findOne({ where: { school_id: teacher.school_id } });
+    }
+
+    profileData = {
+      role,
+      teacher,
+      school,
+      is_standalone:    !teacher.school_id,
+      profile_complete: !!teacher.primary_subject_id,
+    };
   }
 
   else if (role === "STUDENT") {
@@ -405,28 +521,37 @@ const getLoggedInUserProfile = asyncHandler(async (req, res) => {
       attributes: ["full_name", "email", "phone_number", "role_id", "avatar"]
     });
 
-    const roleData = await AdminRole.findOne({ where: { role_id: user.role_id } });
+    const roleData  = await AdminRole.findOne({ where: { role_id: user.role_id } });
+    const avatarUrl = user?.avatar ? await getSignedPdfUrl(user?.avatar) : null;
 
-    school = await AdminSchool.findOne({ where: { school_id: student.school_id } });
+    // school is null for standalone students — no crash
+    if (student.school_id) {
+      school = await AdminSchool.findOne({ where: { school_id: student.school_id } });
+    }
 
-    const classSection = await StudentClassSection.findOne({
+    // class/section is null for standalone students — no crash
+    let classData    = null;
+    let sectionData  = null;
+    let classSection = null;
+
+    classSection = await StudentClassSection.findOne({
       where: { student_id: student.student_id }
     });
 
-    if (!classSection) throw new ApiError(404, "Student class mapping not found");
-
-    const classData   = await AdminClass.findOne({ where: { class_id: classSection.class_id } });
-    const sectionData = await AdminSection.findOne({ where: { section_id: classSection.section_id } });
-
-    const avatarUrl = await getSignedPdfUrl(user?.avatar);
+    if (classSection) {
+      classData   = await AdminClass.findOne({ where: { class_id: classSection.class_id } });
+      sectionData = await AdminSection.findOne({ where: { section_id: classSection.section_id } });
+    }
 
     profileData = {
-      school_name:  school?.school_name,
-      board:        school?.board,
-      address:      `${school?.city}, ${school?.state}, ${school?.country}, ${school?.pincode}`,
-      class:        classData?.class_name,
-      div:          sectionData?.section_name,
-      roll_number:  classSection?.roll_number,
+      school_name:  school?.school_name   ?? null,
+      board:        school?.board         ?? null,
+      address:      school
+        ? `${school.city}, ${school.state}, ${school.country}, ${school.pincode}`
+        : null,
+      class:        classData?.class_name     ?? null,
+      div:          sectionData?.section_name ?? null,
+      roll_number:  classSection?.roll_number ?? null,
       Student_name: user?.full_name,
       number:       user?.phone_number,
       email:        user?.email,
@@ -435,7 +560,11 @@ const getLoggedInUserProfile = asyncHandler(async (req, res) => {
       language:     student?.preferred_language,
       joining_date: student?.onboarding_date,
       role:         roleData?.role_name,
-      avatar:       avatarUrl
+      avatar:       avatarUrl,
+
+      // frontend uses these to decide whether to show school/class fields
+      is_standalone:    !student.school_id,
+      profile_complete: !!student.preferred_language,
     };
   }
 
@@ -472,9 +601,8 @@ const updateAvatar = asyncHandler(async (req, res) => {
   if (!req.file) throw new ApiError(400, "Avatar file is required");
 
   const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-  if (!allowedTypes.includes(req.file.mimetype)) {
+  if (!allowedTypes.includes(req.file.mimetype))
     throw new ApiError(400, "Only JPG, PNG, WEBP allowed");
-  }
 
   const { key } = await uploadAvatarToS3(req.file, user_id);
 
@@ -491,6 +619,9 @@ export {
   sendLoginOtp,
   login,
   resetFirstTimePassword,
+  forgotPasswordSendOtp,
+  forgotPasswordVerifyOtp,
+  forgotPasswordReset,
   refreshAccessToken,
   logout,
   getLoggedInUserProfile,

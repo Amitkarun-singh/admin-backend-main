@@ -45,6 +45,10 @@ const TutorLog = sequelize.define(
       type:      DataTypes.TEXT("long"),
       allowNull: true,
     },
+    session_id: {
+      type:      DataTypes.STRING(255),
+      allowNull: true,
+    },
     created_at: {
       type:         DataTypes.DATE,
       allowNull:    true,
