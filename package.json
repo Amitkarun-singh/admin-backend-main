@@ -21,6 +21,7 @@
     "@google/genai": "^1.41.0",
     "@openrouter/sdk": "^0.8.0",
     "@types/jsonwebtoken": "^9.0.10",
+    "axios": "^1.16.0",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
