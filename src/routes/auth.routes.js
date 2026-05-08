@@ -3,6 +3,9 @@ import {
   login,
   sendLoginOtp,
   resetFirstTimePassword,
+  forgotPasswordSendOtp,
+  forgotPasswordVerifyOtp,
+  forgotPasswordReset,
   getLoggedInUserProfile,
   logout,
   refreshAccessToken,
@@ -13,17 +16,26 @@ import { upload } from "../middlewares/multer.middleware.js";
 
 const router = express.Router();
 
-// ── Public ──────────────────────────────────────────────────
+// ── Public ───────────────────────────────────────────────────────────────
 router.post("/login",          login);
 router.post("/login/send-otp", sendLoginOtp);
 router.post("/refresh-token",  refreshAccessToken);
 
-// ── First-time password reset ────────────────────────────────
-// No authMiddleware here — uses the short-lived tempToken in the
-// Authorization header (issued by /login when is_password_reset_required = true)
+// ── First-time password reset (uses tempToken, no authMiddleware) ─────────
 router.post("/reset-first-time-password", resetFirstTimePassword);
 
-// ── Protected ────────────────────────────────────────────────
+// ── Forgot password (3-step flow, all public) ────────────────────────────
+//
+//  Step 1 — enter phone number → receive otpToken
+router.post("/forgot-password/send-otp",   forgotPasswordSendOtp);
+//
+//  Step 2 — submit phone_number + otp + otpToken → receive resetToken
+router.post("/forgot-password/verify-otp", forgotPasswordVerifyOtp);
+//
+//  Step 3 — submit resetToken (Authorization header) + new password
+router.post("/forgot-password/reset",      forgotPasswordReset);
+
+// ── Protected ─────────────────────────────────────────────────────────────
 router.post("/update-avatar", upload.single("file"), authMiddleware, updateAvatar);
 router.get( "/profile",       authMiddleware, getLoggedInUserProfile);
 router.post("/logout",        authMiddleware, logout);
