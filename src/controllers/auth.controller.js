@@ -20,6 +20,31 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadAvatarToS3 } from "../utils/s3Upload.js";
 import { getSignedPdfUrl } from "../utils/signedUrl.js";
 
+import admin from "firebase-admin";
+import serviceAccount from "../../schools2ai-firebase-adminsdk.json" with { type: "json" };
+import { getAuth } from "firebase-admin/auth";
+
+// Initialize Firebase Admin SDK
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+}
+
+async function verifyIdToken(idToken) {
+  try {
+    const decodedToken = await getAuth().verifyIdToken(idToken);
+
+    console.log(decodedToken.uid);
+
+    return decodedToken;
+  } catch (error) {
+    console.error("Invalid token:", error);
+    throw error;
+  }
+}
+
+
 import {
   generateAccessToken,
   generateRefreshToken
@@ -57,7 +82,7 @@ const sendLoginOtp = asyncHandler(async (req, res) => {
 // LOGIN  (password OR OTP)
 // ─────────────────────────────────────────────
 const login = asyncHandler(async (req, res) => {
-  const { username, email, password, phone_number, otp, otpToken } = req.body;
+  const { username, email, password, phone_number, idToken } = req.body;
 
   let user;
 
@@ -74,10 +99,11 @@ const login = asyncHandler(async (req, res) => {
   }
 
   /* ── OTP LOGIN ── */
-  else if (phone_number && otp && otpToken) {
-    verifyOtpToken(phone_number, otp, otpToken);
-
-    user = await User.findOne({ where: { phone_number } });
+  else if (phone_number && idToken) {
+    const decodedToken = await verifyIdToken(idToken);
+    if (!decodedToken) throw new ApiError(401, "Invalid credentials");
+    const contact_number = phone_number.slice(-10);
+    user = await User.findOne({ where: { phone_number: contact_number } });
     if (!user) throw new ApiError(404, "User not found");
   }
 

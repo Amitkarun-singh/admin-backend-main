@@ -317,8 +317,7 @@ export const getRecentQueries = asyncHandler(async (req, res) => {
   const user_id = Number(req.user.user_id);
   const limit   = parseInt(req.query.limit) || 20;
 
-  console.log(`\n========== [getRecentQueries] START ==========`);
-  console.log(`[getRecentQueries] user_id: ${user_id}, limit: ${limit}`);
+ 
 
   /* ── AI Gini ── (unchanged) ── */
   const giniConvs = await GiniLog.findAll({
