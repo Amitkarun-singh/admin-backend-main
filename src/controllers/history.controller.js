@@ -178,9 +178,6 @@ export const getRecentQueries = asyncHandler(async (req, res) => {
   const user_id = Number(req.user.user_id);
   const limit   = parseInt(req.query.limit) || 20;
 
-  console.log(`\n========== [getRecentQueries] START ==========`);
-  console.log(`[getRecentQueries] user_id: ${user_id}, limit: ${limit}`);
-
   /* ── AI Gini ── group by conversation_id ── */
   const giniConvs = await GiniLog.findAll({
     where: { user_id },
@@ -194,8 +191,6 @@ export const getRecentQueries = asyncHandler(async (req, res) => {
     limit,
     raw: true,
   });
-
-  console.log(`[GINI] Total conversations: ${giniConvs.length}`);
 
   const giniQueries = await Promise.all(
     giniConvs.map(async conv => {
@@ -263,12 +258,8 @@ export const getRecentQueries = asyncHandler(async (req, res) => {
       }
     );
 
-    console.log(`[TUTOR] Total sessions found: ${tutorSessions.length}`);
-    console.log(`[TUTOR] Sessions:`, JSON.stringify(tutorSessions, null, 2));
-
     tutorQueries = await Promise.all(
       tutorSessions.map(async session => {
-        console.log(`\n[TUTOR] Processing session_id: ${session.session_id}`);
 
         /* First row → title (opening message) */
         const [firstRow] = await sequelize.query(
@@ -305,11 +296,6 @@ export const getRecentQueries = asyncHandler(async (req, res) => {
           ? (extractTutorTitle(firstRow) || "AI Tutor conversation")
           : "AI Tutor conversation";
 
-        console.log(`[TUTOR] session_id: ${session.session_id}`);
-        console.log(`[TUTOR] title: "${title}"`);
-        console.log(`[TUTOR] user turns: ${userTurnCount}`);
-        console.log(`[TUTOR] conversation_id (last): ${lastRow?.conversation_id}`);
-
         return {
           source:          "AI Tutor",
           redirect_to:     "/ai-tutor",
@@ -330,10 +316,6 @@ export const getRecentQueries = asyncHandler(async (req, res) => {
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     .slice(0, limit)
     .map(({ created_at, ...rest }) => rest);
-
-  console.log(`\n[getRecentQueries] Final combined (${combined.length} items):`);
-  console.log(JSON.stringify(combined, null, 2));
-  console.log(`========== [getRecentQueries] END ==========\n`);
 
   return res.status(200).json(
     new ApiResponse(200, combined, "Recent queries fetched")
@@ -507,9 +489,6 @@ export const getConversation = asyncHandler(async (req, res) => {
   const { conversation_id } = req.params;   // for tutor this is session_id
   const source              = (req.query.source || "gini").toLowerCase();
 
-  console.log(`\n========== [getConversation] START ==========`);
-  console.log(`[getConversation] user_id: ${user_id}, id: ${conversation_id}, source: ${source}`);
-
   if (!conversation_id) throw new ApiError(400, "conversation_id required");
 
   /* ── AI Gini ── */
@@ -600,16 +579,10 @@ export const getConversation = asyncHandler(async (req, res) => {
       }
     );
 
-    console.log(`[TUTOR CONV] session_id: ${conversation_id}`);
-    console.log(`[TUTOR CONV] firstRow id: ${firstRow?.id}, lastRow id: ${lastRow?.id}`);
-
     if (!lastRow) throw new ApiError(404, "Conversation not found");
 
     /* Parse the COMPLETE messages from the last row */
     const messages = parseTutorMessages(lastRow);
-
-    console.log(`[TUTOR CONV] Total messages parsed: ${messages.length}`);
-    console.log(`[TUTOR CONV] Messages:`, JSON.stringify(messages, null, 2));
 
     const title = extractTutorTitle(firstRow || lastRow) || "AI Tutor conversation";
 
@@ -623,9 +596,6 @@ export const getConversation = asyncHandler(async (req, res) => {
       started_at:  firstRow?.created_at || lastRow.created_at,
       updated_at:  lastRow.created_at,
     };
-
-    console.log(`[TUTOR CONV] Final response — ${messages.length} messages, ${responseData.turn_count} user turns`);
-    console.log(`========== [getConversation] END ==========\n`);
 
     return res.status(200).json(new ApiResponse(200, responseData, "Conversation fetched"));
   }

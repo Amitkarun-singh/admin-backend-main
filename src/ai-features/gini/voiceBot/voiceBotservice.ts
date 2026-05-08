@@ -7,9 +7,10 @@ import type { File } from "../../type/type.d.ts";
 export const voiceBotService = async (
   message: Message[],
   audio: File | undefined,
+  language : string,
   res: Response,
 ): Promise<void> => {
-  console.log("voiceBotService");
+  console.info("voiceBotService");
 
   let transcript: string | null = null;
   let messageWithPrompt: Message[];
@@ -32,9 +33,9 @@ export const voiceBotService = async (
         message,
         transcript,
       );
-      messageWithPrompt = mergeSystemPromptWithMessage(messageWithTranscript);
+      messageWithPrompt = mergeSystemPromptWithMessage(messageWithTranscript,language);
     } else {
-      messageWithPrompt = mergeSystemPromptWithMessage(message);
+      messageWithPrompt = mergeSystemPromptWithMessage(message,language);
     }
 
     // 2. LLM response
@@ -69,7 +70,7 @@ export const voiceBotService = async (
   }
 };
 
-function getSystemPrompt(): string {
+function getSystemPrompt(language : string): string {
   return `You are a helpful voice assistant. Your responses will be converted to speech using a text-to-speech (TTS) system.
   
   Guidelines:
@@ -86,7 +87,9 @@ function getSystemPrompt(): string {
   - Do not mention being an AI unless explicitly asked.
   
   Goal:
-  Provide responses that sound smooth, friendly, and natural when spoken aloud.`;
+  Provide responses that sound smooth, friendly, and natural when spoken aloud.
+  only respond in ${language} language
+  `;
 }
 
 function mergeTranscriptWithMessage(
@@ -98,6 +101,6 @@ function mergeTranscriptWithMessage(
   );
 }
 
-function mergeSystemPromptWithMessage(message: Message[]): Message[] {
-  return [{ role: "system", content: getSystemPrompt() }, ...message];
+function mergeSystemPromptWithMessage(message: Message[],language : string): Message[] {
+  return [{ role: "system", content: getSystemPrompt(language) }, ...message];
 }
