@@ -28,7 +28,13 @@ router.post(
   generatePracticeQuestionsController,
 );
 
-router.post("/ai/gini", upload.single("file"), chatbotLogs, chatbotController);
+router.post(
+  "/ai/gini",
+  authMiddleware,
+  upload.single("file"),
+  chatbotLogs,
+  chatbotController,
+);
 
 router.post(
   "/voice-bot",

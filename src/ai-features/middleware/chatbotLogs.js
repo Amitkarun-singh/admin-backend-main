@@ -20,14 +20,14 @@ export const chatbotLogs = (req, res, next) => {
     return originalWrite.apply(res, [chunk, ...args]);
   };
 
-  res.on("finish", () => {
+  res.on("finish", async () => {
     try {
       const now = new Date();
 
       let messages = req.body.messages ? JSON.parse(req.body.messages) : null;
       messages = messages[messages.length - 1];
 
-      const userId = req.user.user_id;
+      const userId = req.user?.user_id;
 
       const responseBody = parseSSEChunks(responseChunks); // responseChunks.join("");
 
@@ -47,11 +47,7 @@ export const chatbotLogs = (req, res, next) => {
         userId,
       ];
 
-      pool.query(insertQuery, values, (err) => {
-        if (err) {
-          console.error("Chatbot log error:", err.message);
-        }
-      });
+      await pool.query(insertQuery, values);
     } catch (err) {
       console.error("Logging middleware error:", err.message);
     }

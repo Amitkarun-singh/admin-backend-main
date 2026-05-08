@@ -93,6 +93,8 @@ export const tutorLogs = (req: Request, res: Response, next: NextFunction) => {
       req.user?.user_id || null,
     ];
 
+    
+
     await pool.query(insertQuery, value);
   });
 

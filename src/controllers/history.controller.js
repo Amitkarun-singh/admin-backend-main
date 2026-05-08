@@ -313,19 +313,24 @@ export const closeSession = async (user_id) => {
               turn_count = COUNT(rows) in session
               title      = first real user message / userQuery (rows ASC)
    ===================================================== */
+
+
+
 export const getRecentQueries = asyncHandler(async (req, res) => {
   const user_id = Number(req.user.user_id);
-  const limit   = parseInt(req.query.limit) || 20;
+  const limit = parseInt(req.query.limit) || 20;
 
- 
+  /* ─────────────────────────────────────────────
+     AI Gini
+     Show ONLY latest message of each conversation
+  ───────────────────────────────────────────── */
 
-  /* ── AI Gini ── (unchanged) ── */
   const giniConvs = await GiniLog.findAll({
     where: { user_id },
     attributes: [
       "conversation_id",
       [sequelize.fn("MAX", sequelize.col("created_at")), "last_active"],
-      [sequelize.fn("COUNT", sequelize.col("id")),       "turn_count"],
+      [sequelize.fn("COUNT", sequelize.col("id")), "turn_count"],
     ],
     group: ["conversation_id"],
     order: [[sequelize.fn("MAX", sequelize.col("created_at")), "DESC"]],
@@ -334,131 +339,143 @@ export const getRecentQueries = asyncHandler(async (req, res) => {
   });
 
   const giniQueries = await Promise.all(
-    giniConvs.map(async conv => {
+    giniConvs.map(async (conv) => {
+      // ✅ Fetch ONLY latest row
       const rows = await sequelize.query(
         `SELECT messages, subject, \`class\`
-         FROM   chatbot_logs
-         WHERE  conversation_id = :cid AND user_id = :uid
-         ORDER  BY created_at ASC LIMIT 5`,
+         FROM chatbot_logs
+         WHERE conversation_id = :cid
+         AND user_id = :uid
+         ORDER BY created_at DESC, id DESC
+         LIMIT 1`,
         {
-          replacements: { cid: conv.conversation_id, uid: user_id },
+          replacements: {
+            cid: conv.conversation_id,
+            uid: user_id,
+          },
           type: sequelize.QueryTypes.SELECT,
         }
       );
 
-      let title = null, subject = null, cls = null;
-      for (const row of rows) {
-        subject = subject || row.subject;
-        cls     = cls     || row.class;
-        if (!title && row.messages) {
-          try {
-            const msg = JSON.parse(row.messages);
-            if (msg?.role === "user" && msg?.content)
-              title = String(msg.content).slice(0, 100);
-          } catch { /* skip */ }
+      const row = rows[0];
+
+      let title = null;
+
+      if (row?.messages) {
+        try {
+          const msg = JSON.parse(row.messages);
+
+          if (msg?.role === "user" && msg?.content) {
+            title = String(msg.content).slice(0, 100);
+          }
+        } catch {
+          // ignore invalid JSON
         }
-        if (title) break;
       }
 
       return {
-        source:          "AI Gini",
-        redirect_to:     "/ai-gini",
+        source: "AI Gini",
+        redirect_to: "/ai-gini",
         conversation_id: conv.conversation_id,
-        title:           title || subject || "AI Gini conversation",
-        subject:         subject || null,
-        class:           cls    || null,
-        turn_count:      parseInt(conv.turn_count),
-        time:            relativeTime(conv.last_active),
-        created_at:      conv.last_active,
+        title: title || row?.subject || "AI Gini conversation",
+        subject: row?.subject || null,
+        class: row?.class || null,
+        turn_count: parseInt(conv.turn_count),
+        time: relativeTime(conv.last_active),
+        created_at: conv.last_active,
       };
     })
   );
 
-  /* ── AI Tutor ── NEW SCHEMA ──
-     One row per turn. Group by session_id.
-     Fetch the first 10 rows ASC per session for title extraction.
-     Also fetch response_body so voice rows resolve via userQuery.
-     turn_count = total rows in session (each row = one user turn).
-  ── */
+  /* ─────────────────────────────────────────────
+     AI Tutor
+     Show ONLY latest message of each session
+  ───────────────────────────────────────────── */
+
   let tutorQueries = [];
+
   try {
     const tutorSessions = await sequelize.query(
       `SELECT
-         session_id,
-         MAX(created_at) AS last_active,
-         COUNT(id)       AS turn_count
-       FROM   tutor_logs
-       WHERE  ${TUTOR_USER_MATCH}
-         AND  session_id IS NOT NULL
-         AND  session_id != ''
-       GROUP  BY session_id
-       ORDER  BY MAX(created_at) DESC
-       LIMIT  :lim`,
+          session_id,
+          MAX(created_at) AS last_active,
+          COUNT(id) AS turn_count
+       FROM tutor_logs
+       WHERE ${TUTOR_USER_MATCH}
+       AND session_id IS NOT NULL
+       AND session_id != ''
+       GROUP BY session_id
+       ORDER BY MAX(created_at) DESC
+       LIMIT :lim`,
       {
-        replacements: { uid: user_id, lim: limit },
+        replacements: {
+          uid: user_id,
+          lim: limit,
+        },
         type: sequelize.QueryTypes.SELECT,
       }
     );
 
-    console.log(`[TUTOR] Total unique sessions: ${tutorSessions.length}`);
-    console.log(`[TUTOR] Sessions:`, JSON.stringify(tutorSessions, null, 2));
-
     tutorQueries = (
       await Promise.all(
-        tutorSessions.map(async session => {
-          console.log(`\n[TUTOR] Processing session_id: ${session.session_id}`);
-
-          // Fetch first 10 rows ASC — need both request_body AND response_body
-          // so voice messages can fall back to userQuery in response_body
+        tutorSessions.map(async (session) => {
+          // ✅ Fetch ONLY latest row
           const titleRows = await sequelize.query(
             `SELECT request_body, response_body
-             FROM   tutor_logs
-             WHERE  session_id = :sid AND ${TUTOR_USER_MATCH}
-             ORDER  BY created_at ASC, id ASC
-             LIMIT  10`,
+             FROM tutor_logs
+             WHERE session_id = :sid
+             AND ${TUTOR_USER_MATCH}
+             ORDER BY created_at DESC, id DESC
+             LIMIT 1`,
             {
-              replacements: { sid: session.session_id, uid: user_id },
+              replacements: {
+                sid: session.session_id,
+                uid: user_id,
+              },
               type: sequelize.QueryTypes.SELECT,
             }
           );
 
           if (!titleRows.length) {
-            console.warn(`[TUTOR] No rows for session ${session.session_id} — skipping`);
             return null;
           }
 
-          const title     = extractTutorTitleFromRows(titleRows) || "AI Tutor conversation";
-          const turnCount = parseInt(session.turn_count) || 0;
-
-          console.log(`[TUTOR] session_id:  ${session.session_id}`);
-          console.log(`[TUTOR] title:       "${title}"`);
-          console.log(`[TUTOR] turn_count:  ${turnCount}`);
+          const title =
+            extractTutorTitleFromRows(titleRows) ||
+            "AI Tutor conversation";
 
           return {
-            source:          "AI Tutor",
-            redirect_to:     "/ai-tutor",
-            conversation_id: session.session_id,   // session_id IS the conversation key
+            source: "AI Tutor",
+            redirect_to: "/ai-tutor",
+            conversation_id: session.session_id,
             title,
-            turn_count:      turnCount,
-            time:            relativeTime(session.last_active),
-            created_at:      session.last_active,
+            turn_count: parseInt(session.turn_count) || 0,
+            time: relativeTime(session.last_active),
+            created_at: session.last_active,
           };
         })
       )
     ).filter(Boolean);
-
   } catch (err) {
-    console.error(`[TUTOR] FETCH FAILED:`, err.message);
+    console.error("[TUTOR] FETCH FAILED:", err.message);
   }
 
+  /* ─────────────────────────────────────────────
+     Merge + sort
+  ───────────────────────────────────────────── */
+  console.log("\n[TUTOR] tutorQueries:", JSON.stringify(tutorQueries, null, 2));
+  console.log(
+    "[Gini] giniQueries:",
+    JSON.stringify(giniQueries, null, 2)
+  );
   const combined = [...giniQueries, ...tutorQueries]
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     .slice(0, limit)
     .map(({ created_at, ...rest }) => rest);
 
-  return res.status(200).json(
-    new ApiResponse(200, combined, "Recent queries fetched")
-  );
+  return res
+    .status(200)
+    .json(new ApiResponse(200, combined, "Recent queries fetched"));
 });
 
 /* =====================================================
