@@ -10,7 +10,7 @@ import {
   logout,
   refreshAccessToken,
   updateAvatar
-} from "../controllers/auth.controller.js";
+} from "../controllers/auth.controller.ts";
 import { authMiddleware } from "../middlewares/auth.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
 
