@@ -463,11 +463,7 @@ export const getRecentQueries = asyncHandler(async (req, res) => {
   /* ─────────────────────────────────────────────
      Merge + sort
   ───────────────────────────────────────────── */
-  console.log("\n[TUTOR] tutorQueries:", JSON.stringify(tutorQueries, null, 2));
-  console.log(
-    "[Gini] giniQueries:",
-    JSON.stringify(giniQueries, null, 2)
-  );
+ 
   const combined = [...giniQueries, ...tutorQueries]
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     .slice(0, limit)
@@ -728,7 +724,7 @@ export const getConversation = asyncHandler(async (req, res) => {
       }
     );
 
-    console.log(`[TUTOR CONV] session_id: ${conversation_id}, rows: ${allRows.length}`);
+
 
     if (!allRows.length) throw new ApiError(404, "Conversation not found");
 
@@ -750,10 +746,7 @@ export const getConversation = asyncHandler(async (req, res) => {
       updated_at:  allRows[allRows.length - 1].created_at,
     };
 
-    console.log(`[TUTOR CONV] title:       "${title}"`);
-    console.log(`[TUTOR CONV] messages:    ${messages.length}`);
-    console.log(`[TUTOR CONV] user turns:  ${responseData.turn_count}`);
-    console.log(`========== [getConversation] END ==========\n`);
+   
 
     return res.status(200).json(new ApiResponse(200, responseData, "Conversation fetched"));
   }

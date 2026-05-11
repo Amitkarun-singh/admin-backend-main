@@ -5,20 +5,17 @@
    ──────────────────────────────────────────────────
    Step 1 → POST /api/auth/register
             { role, full_name, username, password,
-              phone_number, email, board }
+              phone_number, email, board, idToken }
+            • verifies Firebase idToken
             • board === "CBSE"  → find CBSE school from DB
-                                  → create user linked to it
-                                  → return otpToken
+                                  → create user linked to it (status: Active)
+                                  → return tokens (login-like response)
             • board !== "CBSE" → 403, tell user to contact school
 
-   Step 2 → POST /api/auth/register/resend-otp
-            POST /api/auth/register/verify-otp
-            Verifies phone → activates account → returns tokens
-
-   Step 3 → GET  /api/auth/register/onboarding  (authed)
+   Step 2 → GET  /api/auth/register/onboarding  (authed)
             Returns classes, subjects, languages
 
-   Step 4 → POST /api/auth/register/complete-profile (authed)
+   Step 3 → POST /api/auth/register/complete-profile (authed)
             Creates StudentProfile or TeacherProfile
    ===================================================== */
 import bcrypt from "bcrypt";
@@ -46,6 +43,29 @@ import {
   generateAccessToken,
   generateRefreshToken,
 } from "../utils/jwt.util.js";
+
+import admin from "firebase-admin";
+import serviceAccount from "../../schools2ai-firebase-adminsdk.json" with { type: "json" };
+import { getAuth } from "firebase-admin/auth";
+import AdminPermission    from "../models/admin_permission.model.js";
+import { recordSession }   from "./history.controller.js";
+
+// Initialize Firebase Admin SDK
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+}
+
+async function verifyIdToken(idToken) {
+  try {
+    const decodedToken = await getAuth().verifyIdToken(idToken);
+    return decodedToken;
+  } catch (error) {
+    console.error("Invalid token:", error);
+    throw error;
+  }
+}
 
 const VALID_GENDERS   = ["male", "female", "other"];
 const ALLOWED_BOARD   = "CBSE";
@@ -84,6 +104,7 @@ export const register = asyncHandler(async (req, res) => {
     phone_number,
     email,
     board,
+    idToken,
   } = req.body;
 
   /* ── Field validation ──────────────────────────────── */
@@ -95,12 +116,14 @@ export const register = asyncHandler(async (req, res) => {
   if (!password)             throw new ApiError(400, "password is required");
   if (!phone_number?.trim()) throw new ApiError(400, "phone_number is required");
   if (!board?.trim())        throw new ApiError(400, "board is required");
+  if (!idToken)              throw new ApiError(400, "idToken is required");
 
   if (password.length < 8)
     throw new ApiError(400, "password must be at least 8 characters");
 
-  if (!/^\+?[0-9]{10,13}$/.test(phone_number.replace(/\s/g, "")))
-    throw new ApiError(400, "Enter a valid phone number");
+  /* ── Firebase verification ──────────────────────────── */
+  const decodedToken = await verifyIdToken(idToken);
+  if (!decodedToken) throw new ApiError(401, "Invalid Firebase token");
 
   /* ── BOARD GATE — only CBSE can self-register ──────── */
   if (board.toUpperCase() !== ALLOWED_BOARD) {
@@ -117,9 +140,10 @@ export const register = asyncHandler(async (req, res) => {
   }
 
   /* ── Uniqueness checks ──────────────────────────────── */
+  const contact_number = phone_number.trim().slice(-10);
   const [takenUsername, takenPhone] = await Promise.all([
     User.findOne({ where: { username: username.trim() } }),
-    User.findOne({ where: { phone_number: phone_number.trim() } }),
+    User.findOne({ where: { phone_number: contact_number } }),
   ]);
 
   if (takenUsername) throw new ApiError(409, "Username is already taken");
@@ -135,9 +159,7 @@ export const register = asyncHandler(async (req, res) => {
   if (!roleRecord)
     throw new ApiError(500, `Role "${role}" not found. Ask admin to seed roles.`);
 
-  /* ── Get CBSE school from DB — no hardcoding ─────────
-     Finds the active CBSE school (e.g. your school_id=22)
-     ───────────────────────────────────────────────────── */
+  /* ── Get CBSE school from DB — no hardcoding ───────── */
   const cbseSchool = await getCbseSchool();
 
   /* ── Create user ────────────────────────────────────── */
@@ -147,32 +169,70 @@ export const register = asyncHandler(async (req, res) => {
     username:                   username.trim(),
     full_name:                  full_name.trim(),
     password:                   hashed,
-    phone_number:               phone_number.trim(),
+    phone_number:               contact_number,
     email:                      email?.trim() || null,
     role_id:                    roleRecord.role_id,
-    school_id:                  cbseSchool.school_id,  // dynamically fetched
-    status:                     "Pending",
+    school_id:                  cbseSchool.school_id,
+    status:                     "Active",
     is_password_reset_required: false,
   });
 
-  /* ── Issue OTP ──────────────────────────────────────── */
-  const otp      = generateOTP();
-  const otpToken = createOtpToken(phone_number.trim(), otp);
+  /* ── Issue tokens (Login-like response) ──────────────── */
+  const userWithRole = await User.findOne({
+    where:      { user_id: user.user_id },
+    attributes: { exclude: ["password"] },
+    include: [
+      {
+        model: AdminRole,
+        as:    "role",
+        include: [
+          {
+            model:      AdminPermission,
+            as:         "permissions",
+            attributes: ["permission_key"]
+          }
+        ]
+      }
+    ]
+  });
 
-  console.log(`[REGISTER] OTP for ${phone_number} (DEV ONLY):`, otp);
+  const permissions = userWithRole.role.permissions.map(p => p.permission_key);
+
+  const payload = {
+    user_id:   user.user_id,
+    role:      userWithRole.role.role_name,
+    permissions,
+    school_id: user.school_id
+  };
+
+  const accessToken  = generateAccessToken(payload);
+  const refreshToken = generateRefreshToken(payload);
+
+  res.cookie("refreshToken", refreshToken, {
+    httpOnly: true,
+    secure:   process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge:   7 * 24 * 60 * 60 * 1000
+  });
+
+  await recordSession({
+    user_id: user.user_id,
+    ua:      req.headers["user-agent"],
+    ip:      req.ip || req.headers["x-forwarded-for"],
+  });
 
   return res.status(201).json(
     new ApiResponse(
       201,
       {
-        user_id:      user.user_id,
-        role,
-        school_id:    cbseSchool.school_id,
-        school_name:  cbseSchool.school_name,
-        can_register: true,
-        otpToken,
+        accessToken,
+        role:            payload.role,
+        permissions,
+        school_id:       user.school_id,
+        profile:         userWithRole,
+        profileComplete: false,
       },
-      "Account created. Please verify your phone number."
+      "Account created and verified. Welcome!"
     )
   );
 });
@@ -186,16 +246,17 @@ export const resendOtp = asyncHandler(async (req, res) => {
   const { phone_number } = req.body;
   if (!phone_number) throw new ApiError(400, "phone_number is required");
 
-  const user = await User.findOne({ where: { phone_number: phone_number.trim() } });
+  const contact_number = phone_number.trim().slice(-10);
+  const user = await User.findOne({ where: { phone_number: contact_number } });
   if (!user)
     throw new ApiError(404, "No account found with this phone number");
   if (user.status === "Active")
     throw new ApiError(400, "Account is already verified. Please login.");
 
   const otp      = generateOTP();
-  const otpToken = createOtpToken(phone_number.trim(), otp);
+  const otpToken = createOtpToken(contact_number, otp);
 
-  console.log(`[RESEND OTP] OTP for ${phone_number} (DEV ONLY):`, otp);
+  console.log(`[RESEND OTP] OTP for ${contact_number} (DEV ONLY):`, otp);
 
   return res.status(200).json(
     new ApiResponse(200, { otpToken }, "OTP resent successfully")
@@ -213,9 +274,10 @@ export const verifyRegistrationOtp = asyncHandler(async (req, res) => {
   if (!phone_number || !otp || !otpToken)
     throw new ApiError(400, "phone_number, otp, and otpToken are all required");
 
-  verifyOtpToken(phone_number.trim(), otp, otpToken);
+  const contact_number = phone_number.trim().slice(-10);
+  verifyOtpToken(contact_number, otp, otpToken);
 
-  const user = await User.findOne({ where: { phone_number: phone_number.trim() } });
+  const user = await User.findOne({ where: { phone_number: contact_number } });
   if (!user) throw new ApiError(404, "User not found");
 
   if (user.status === "Active")
