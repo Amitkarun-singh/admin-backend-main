@@ -14,13 +14,15 @@ export class RegisterService {
     const {
       role,
       full_name,
-      username,
+
       password,
       phone_number,
       email,
       board,
       idToken,
     } = registerData;
+
+
 
     const validation = []
 
@@ -38,12 +40,15 @@ export class RegisterService {
 
     // Uniqueness checks
     const contact_number = phone_number.trim().slice(-10);
-    const [takenUsername, takenPhone] = await Promise.all([
-      userRepository.findByUsername(username.trim()),
-      userRepository.findByPhoneNumber(contact_number),
-    ]);
+    const takenPhone = await userRepository.findByPhoneNumber(contact_number);
 
-    if (takenUsername) throw new ApiError(409, "Username already taken");
+    if (takenPhone) {
+      validation.push({
+        field: "phone_number",
+        message: "Phone number already registered",
+        code: "DUPLICATE_PHONE",
+      });
+    }
     if (takenPhone) {
       validation.push({
         field: "phone_number",
@@ -89,7 +94,7 @@ export class RegisterService {
     // Create User
     const hashed = await bcrypt.hash(password, 10);
     const user = await userRepository.create({
-      username: username.trim() || null,
+    
       full_name: full_name.trim(),
       password: hashed,
       phone_number: contact_number,
