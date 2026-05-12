@@ -12,3 +12,4 @@ config.env
 dist
 config.env
 schools2ai-firebase-adminsdk.json
+registration_service.md

@@ -11,6 +11,8 @@ import { Op } from "sequelize";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import TeacherProfile from "../models/teacher_profile.model.js";
+import TeacherClassSectionSubject from "../models/teacher_class_section_subject.model.js";
 
 
 // CLASS CONTROLLERS
@@ -104,36 +106,64 @@ const getAllClasses = asyncHandler(async (req, res) => {
   );
 });
 
-// Get student Classes
+// Get user Classes (Student or Teacher)
 const getStudentClass = asyncHandler(async (req, res) => {
   const { user_id } = req.user;
 
-  // 1. Get student profile
-  const profile = await StudentProfile.findOne({ where: { user_id } });
-  if (!profile) throw new ApiError(404, "Student profile not found");
+  // 1. Try to get student profile
+  const studentProfile = await StudentProfile.findOne({ where: { user_id } });
+  
+  if (studentProfile) {
+    // 2. Get class-section assignment for student
+    const classSection = await StudentClassSection.findOne({
+      where: { student_id: studentProfile.student_id },
+    });
+    if (!classSection) throw new ApiError(404, "Class not assigned to this student");
 
-  // 2. Get class-section assignment
-  const classSection = await StudentClassSection.findOne({
-    where: { student_id: profile.student_id },
+    // 3. Fetch class and section details in parallel
+    const [classRow, sectionRow] = await Promise.all([
+      AdminClass.findByPk(classSection.class_id),
+      AdminSection.findByPk(classSection.section_id),
+    ]);
+
+    if (!classRow) throw new ApiError(404, "Class not found");
+
+    return res.status(200).json(
+      new ApiResponse(200, {
+        student_id:   studentProfile.student_id,
+        class_id:     classRow.class_id,
+        class_name:   classRow.class_name,
+        section_id:   sectionRow?.section_id   ?? null,
+        section_name: sectionRow?.section_name ?? null,
+      }, "Student class fetched")
+    );
+  }
+
+  // 4. Try to get teacher profile
+  const teacherProfile = await TeacherProfile.findOne({ where: { user_id } });
+  if (!teacherProfile) throw new ApiError(404, "User profile not found");
+
+  // 5. Get all class assignments for teacher
+  const teacherAssignments = await TeacherClassSectionSubject.findAll({
+    where: { teacher_id: teacherProfile.teacher_id },
   });
-  if (!classSection) throw new ApiError(404, "Class not assigned to this student");
 
-  // 3. Fetch class and section details in parallel
-  const [classRow, sectionRow] = await Promise.all([
-    AdminClass.findByPk(classSection.class_id),
-    AdminSection.findByPk(classSection.section_id),
-  ]);
-
-  if (!classRow) throw new ApiError(404, "Class not found");
+  const classIds = [...new Set(teacherAssignments.map(a => a.class_id))];
+  const assignedClasses = await AdminClass.findAll({
+    where: { class_id: classIds }
+  });
 
   return res.status(200).json(
     new ApiResponse(200, {
-      student_id:   profile.student_id,
-      class_id:     classRow.class_id,
-      class_name:   classRow.class_name,
-      section_id:   sectionRow?.section_id   ?? null,
-      section_name: sectionRow?.section_name ?? null,
-    }, "Student class fetched")
+      teacher_id: teacherProfile.teacher_id,
+      // Provide top-level class_id/name for compatibility with frontend that expects single class
+      class_id: assignedClasses[0]?.class_id || null,
+      class_name: assignedClasses[0]?.class_name || "", 
+      classes: assignedClasses.map(c => ({
+        class_id: c.class_id,
+        class_name: c.class_name
+      }))
+    }, "Teacher classes fetched")
   );
 });
 

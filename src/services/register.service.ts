@@ -3,6 +3,7 @@ import userRepository from "../repositories/user.repository.js";
 import roleRepository from "../repositories/role.repository.js";
 import schoolRepository from "../repositories/school.repository.js";
 import profileRepository from "../repositories/profile.repository.js";
+import classRepository from "../repositories/class.repository.js";
 import authService from "./auth.service.ts";
 import { ApiError } from "../utils/ApiError.js";
 import { generateOTP, createOtpToken, verifyOtpToken } from "../utils/otp.util.js";
@@ -21,6 +22,7 @@ export class RegisterService {
       board,
       idToken,
     } = registerData;
+    console.log(registerData)
 
 
 
@@ -91,10 +93,41 @@ export class RegisterService {
       throw new ValidationError(validation);
     }
 
+    // Class mapping
+    const inputClasses: string[] = registerData.class ? registerData.class.split(',').map((c: string) => c.trim()) : [];
+    const searchPatterns: string[] = [];
+    inputClasses.forEach((c: string) => {
+      if (c.toLowerCase().startsWith("grade")) {
+        searchPatterns.push(c);
+      } else {
+        searchPatterns.push(`Grade ${c}`);
+        searchPatterns.push(`Grade${c}`);
+      }
+    });
+
+    const classRecords = searchPatterns.length > 0 ? await classRepository.findByNames(searchPatterns) : [];
+
+    // Check if we found at least one record for each input class
+    const foundClassNames = classRecords.map((r: any) => r.class_name.toLowerCase());
+    const missingClasses = inputClasses.filter((input: string) => {
+      const patterns = input.toLowerCase().startsWith("grade") 
+        ? [input.toLowerCase()] 
+        : [`grade ${input.toLowerCase()}`, `grade${input.toLowerCase()}`];
+      return !patterns.some((p: string) => foundClassNames.includes(p));
+    });
+
+    if (inputClasses.length > 0 && missingClasses.length > 0) {
+      validation.push({
+        field: "class",
+        message: `Classes not found: ${missingClasses.join(', ')}`,
+        code: "CLASS_NOT_FOUND",
+      });
+      throw new ValidationError(validation);
+    }
+
     // Create User
     const hashed = await bcrypt.hash(password, 10);
-    const user = await userRepository.create({
-    
+    const user: any = await userRepository.create({
       full_name: full_name.trim(),
       password: hashed,
       phone_number: contact_number,
@@ -103,7 +136,48 @@ export class RegisterService {
       school_id: cbseSchool.school_id,
       status: "Active",
       is_password_reset_required: false,
+      self_register: true,
     });
+
+    const currentYear = new Date().getFullYear().toString();
+
+    // Create Profile and Class Association based on Role
+    if (role.toUpperCase() === "TEACHER") {
+      const teacherProfile: any = await profileRepository.createTeacherProfile({
+        user_id: user.user_id,
+        school_id: cbseSchool.school_id,
+        onboarding_date: new Date(),
+      });
+
+      // Link classes
+      for (const cls of classRecords) {
+        await profileRepository.createTeacherClassSectionSubject({
+          teacher_id: teacherProfile.teacher_id,
+          class_id: (cls as any).class_id,
+          academic_year: currentYear,
+        });
+      }
+      
+      await schoolRepository.incrementCount(cbseSchool.school_id, "teacher_count");
+    } else if (role.toUpperCase() === "STUDENT") {
+      const studentProfile: any = await profileRepository.createStudentProfile({
+        user_id: user.user_id,
+        school_id: cbseSchool.school_id,
+        onboarding_date: new Date(),
+      });
+
+      // Link first class (students only have one)
+      if (classRecords.length > 0) {
+        await profileRepository.createStudentClassSection({
+          student_id: studentProfile.student_id,
+          class_id: (classRecords[0] as any).class_id,
+          academic_year: currentYear,
+          status: "active",
+        });
+      }
+
+      await schoolRepository.incrementCount(cbseSchool.school_id, "student_count");
+    }
 
     // Login after registration
     return await authService.loginWithUserId(user.user_id);

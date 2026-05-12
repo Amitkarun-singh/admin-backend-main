@@ -3,6 +3,7 @@ import TeacherProfile from "../models/teacher_profile.model.js";
 import StudentClassSection from "../models/student_class_section.model.js";
 import ParentProfile from "../models/parent_profile.model.js";
 import ParentStudentMap from "../models/parent_student_map.model.js";
+import TeacherClassSectionSubject from "../models/teacher_class_section_subject.model.js";
 
 export class ProfileRepository {
   async findStudentByUserId(user_id: number | string) {
@@ -39,6 +40,14 @@ export class ProfileRepository {
 
   async findStudentsByIds(studentIds: (number | string)[]) {
     return await StudentProfile.findAll({ where: { student_id: studentIds } });
+  }
+
+  async createTeacherClassSectionSubject(data: any) {
+    return await TeacherClassSectionSubject.create(data);
+  }
+
+  async updateStudentClassSection(student_id: number | string, data: any) {
+    return await StudentClassSection.update(data, { where: { student_id } });
   }
 }
 
