@@ -15,12 +15,13 @@ export class RegisterService {
     const {
       role,
       full_name,
-
       password,
       phone_number,
       email,
       board,
       idToken,
+      self_register
+   
     } = registerData;
     console.log(registerData)
 
@@ -44,13 +45,7 @@ export class RegisterService {
     const contact_number = phone_number.trim().slice(-10);
     const takenPhone = await userRepository.findByPhoneNumber(contact_number);
 
-    if (takenPhone) {
-      validation.push({
-        field: "phone_number",
-        message: "Phone number already registered",
-        code: "DUPLICATE_PHONE",
-      });
-    }
+  
     if (takenPhone) {
       validation.push({
         field: "phone_number",
@@ -125,6 +120,8 @@ export class RegisterService {
       throw new ValidationError(validation);
     }
 
+    
+
     // Create User
     const hashed = await bcrypt.hash(password, 10);
     const user: any = await userRepository.create({
@@ -136,7 +133,7 @@ export class RegisterService {
       school_id: cbseSchool.school_id,
       status: "Active",
       is_password_reset_required: false,
-      self_register: true,
+      self_register
     });
 
     const currentYear = new Date().getFullYear().toString();
@@ -183,10 +180,12 @@ export class RegisterService {
     return await authService.loginWithUserId(user.user_id);
   }
 
+  /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
   async completeStudentProfile(user_id: number | string, school_id: number | string, profileData: any) {
     const { class_id, preferred_language, dob, gender, analytics_enabled } = profileData;
 
-    let profile = await profileRepository.findStudentByUserId(user_id);
+    let profile: any = await profileRepository.findStudentByUserId(user_id);
     if (profile) {
       await profile.update({
         preferred_language,
@@ -224,10 +223,13 @@ export class RegisterService {
     return profile;
   }
 
+
+  ///////////////////////////////////////////////////////////////////////////
+
   async completeTeacherProfile(user_id: number | string, school_id: number | string, profileData: any) {
     const { primary_subject_id, preferred_language, experience, age, device_type } = profileData;
 
-    let profile = await profileRepository.findTeacherByUserId(user_id);
+    let profile: any = await profileRepository.findTeacherByUserId(user_id);
     if (profile) {
       await profile.update({
         primary_subject_id,
