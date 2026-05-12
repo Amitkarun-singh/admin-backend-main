@@ -58,6 +58,13 @@ vi.mock('bcrypt', () => ({
   }
 }));
 
+
+interface ExpectedValidationError {
+  extra: {
+    errors: unknown[];
+  };
+}
+
 describe('RegisterService', () => {
   let registerService: RegisterService;
 
@@ -93,16 +100,16 @@ describe('RegisterService', () => {
 
     it('should successfully register a student', async () => {
       // Setup mocks
-      vi.mocked(authService.verifyIdToken).mockResolvedValue({} as any);
-      vi.mocked(userRepository.findByPhoneNumber).mockResolvedValue(null as any);
-      vi.mocked(userRepository.findByEmail).mockResolvedValue(null as any);
-      vi.mocked(roleRepository.findByName).mockResolvedValue({ role_id: 1 } as any);
-      vi.mocked(schoolRepository.findActiveCbseSchool).mockResolvedValue({ school_id: 1 } as any);
-      vi.mocked(classRepository.findByNames).mockResolvedValue([{ class_name: 'grade10', class_id: 10 }] as any);
-      vi.mocked(bcrypt.hash).mockResolvedValue('hashed-password' as any);
-      vi.mocked(userRepository.create).mockResolvedValue({ user_id: 100 } as any);
-      vi.mocked(profileRepository.createStudentProfile).mockResolvedValue({ student_id: 200 } as any);
-      vi.mocked(authService.loginWithUserId).mockResolvedValue({ accessToken: 'access', refreshToken: 'refresh' } as any);
+      vi.mocked(authService.verifyIdToken).mockResolvedValue({} as never);
+      vi.mocked(userRepository.findByPhoneNumber).mockResolvedValue(null as never);
+      vi.mocked(userRepository.findByEmail).mockResolvedValue(null as never);
+      vi.mocked(roleRepository.findByName).mockResolvedValue({ role_id: 1 } as never);
+      vi.mocked(schoolRepository.findActiveCbseSchool).mockResolvedValue({ school_id: 1 } as never);
+      vi.mocked(classRepository.findByNames).mockResolvedValue([{ class_name: 'grade10', class_id: 10 }] as never);
+      vi.mocked(bcrypt.hash).mockResolvedValue('hashed-password' as never);
+      vi.mocked(userRepository.create).mockResolvedValue({ user_id: 100 } as never);
+      vi.mocked(profileRepository.createStudentProfile).mockResolvedValue({ student_id: 200 } as never);
+      vi.mocked(authService.loginWithUserId).mockResolvedValue({ accessToken: 'access', refreshToken: 'refresh' } as never);
 
       const result = await registerService.register(validStudentData);
 
@@ -121,19 +128,19 @@ describe('RegisterService', () => {
     });
 
     it('should successfully register a teacher', async () => {
-      vi.mocked(authService.verifyIdToken).mockResolvedValue({} as any);
-      vi.mocked(userRepository.findByPhoneNumber).mockResolvedValue(null as any);
-      vi.mocked(userRepository.findByEmail).mockResolvedValue(null as any);
-      vi.mocked(roleRepository.findByName).mockResolvedValue({ role_id: 2 } as any);
-      vi.mocked(schoolRepository.findActiveCbseSchool).mockResolvedValue({ school_id: 1 } as any);
+      vi.mocked(authService.verifyIdToken).mockResolvedValue({} as never);
+      vi.mocked(userRepository.findByPhoneNumber).mockResolvedValue(null as never);
+      vi.mocked(userRepository.findByEmail).mockResolvedValue(null as never);
+      vi.mocked(roleRepository.findByName).mockResolvedValue({ role_id: 2 } as never);
+      vi.mocked(schoolRepository.findActiveCbseSchool).mockResolvedValue({ school_id: 1 } as never);
       vi.mocked(classRepository.findByNames).mockResolvedValue([
         { class_name: 'grade 9', class_id: 9 },
         { class_name: 'grade 10', class_id: 10 }
-      ] as any);
-      vi.mocked(bcrypt.hash).mockResolvedValue('hashed-password' as any);
-      vi.mocked(userRepository.create).mockResolvedValue({ user_id: 101 } as any);
-      vi.mocked(profileRepository.createTeacherProfile).mockResolvedValue({ teacher_id: 201 } as any);
-      vi.mocked(authService.loginWithUserId).mockResolvedValue({ accessToken: 'access', refreshToken: 'refresh' } as any);
+      ] as never);
+      vi.mocked(bcrypt.hash).mockResolvedValue('hashed-password' as never);
+      vi.mocked(userRepository.create).mockResolvedValue({ user_id: 101 } as never);
+      vi.mocked(profileRepository.createTeacherProfile).mockResolvedValue({ teacher_id: 201 } as never);
+      vi.mocked(authService.loginWithUserId).mockResolvedValue({ accessToken: 'access', refreshToken: 'refresh' } as never);
 
       const result = await registerService.register(validTeacherData);
 
@@ -144,60 +151,60 @@ describe('RegisterService', () => {
     });
 
     it('should throw ValidationError if board is not CBSE', async () => {
-      vi.mocked(authService.verifyIdToken).mockResolvedValue({} as any);
+      vi.mocked(authService.verifyIdToken).mockResolvedValue({} as never);
       
       try {
         await registerService.register({ ...validStudentData, board: 'ICSE' });
         expect.fail('Should throw error');
       } catch (err) {
         expect(err).toBeInstanceOf(ValidationError);
-        expect((err as ValidationError).errors).toContainEqual(expect.objectContaining({ field: 'board' }));
+        expect((err as ExpectedValidationError).extra.errors).toContainEqual(expect.objectContaining({ field: 'board' }));
       }
     });
 
     it('should throw ValidationError if phone number already exists', async () => {
-      vi.mocked(authService.verifyIdToken).mockResolvedValue({} as any);
-      vi.mocked(userRepository.findByPhoneNumber).mockResolvedValue({ id: 1 } as any);
+      vi.mocked(authService.verifyIdToken).mockResolvedValue({} as never);
+      vi.mocked(userRepository.findByPhoneNumber).mockResolvedValue({ id: 1 } as never);
       
       try {
         await registerService.register(validStudentData);
         expect.fail('Should throw error');
       } catch (err) {
         expect(err).toBeInstanceOf(ValidationError);
-        expect((err as ValidationError).errors).toContainEqual(expect.objectContaining({ field: 'phone_number' }));
+        expect((err as ExpectedValidationError).extra.errors).toContainEqual(expect.objectContaining({ field: 'phone_number' }));
       }
     });
 
     it('should throw ValidationError if email already exists', async () => {
-      vi.mocked(authService.verifyIdToken).mockResolvedValue({} as any);
-      vi.mocked(userRepository.findByPhoneNumber).mockResolvedValue(null as any);
-      vi.mocked(userRepository.findByEmail).mockResolvedValue({ id: 1 } as any);
+      vi.mocked(authService.verifyIdToken).mockResolvedValue({} as never);
+      vi.mocked(userRepository.findByPhoneNumber).mockResolvedValue(null as never);
+      vi.mocked(userRepository.findByEmail).mockResolvedValue({ id: 1 } as never);
       
       try {
         await registerService.register(validStudentData);
         expect.fail('Should throw error');
       } catch (err) {
         expect(err).toBeInstanceOf(ValidationError);
-        expect((err as ValidationError).errors).toContainEqual(expect.objectContaining({ field: 'email' }));
+        expect((err as ExpectedValidationError).extra.errors).toContainEqual(expect.objectContaining({ field: 'email' }));
       }
     });
 
     it('should throw ValidationError if class mapping fails (missing classes)', async () => {
-      vi.mocked(authService.verifyIdToken).mockResolvedValue({} as any);
-      vi.mocked(userRepository.findByPhoneNumber).mockResolvedValue(null as any);
-      vi.mocked(userRepository.findByEmail).mockResolvedValue(null as any);
-      vi.mocked(roleRepository.findByName).mockResolvedValue({ role_id: 1 } as any);
-      vi.mocked(schoolRepository.findActiveCbseSchool).mockResolvedValue({ school_id: 1 } as any);
+      vi.mocked(authService.verifyIdToken).mockResolvedValue({} as never);
+      vi.mocked(userRepository.findByPhoneNumber).mockResolvedValue(null as never);
+      vi.mocked(userRepository.findByEmail).mockResolvedValue(null as never);
+      vi.mocked(roleRepository.findByName).mockResolvedValue({ role_id: 1 } as never);
+      vi.mocked(schoolRepository.findActiveCbseSchool).mockResolvedValue({ school_id: 1 } as never);
       vi.mocked(classRepository.findByNames).mockResolvedValue([
         { class_name: 'grade 9', class_id: 9 }
-      ] as any);
+      ] as never);
 
       try {
         await registerService.register({ ...validTeacherData, class: '9, 10' });
         expect.fail('Should throw error');
       } catch (err) {
         expect(err).toBeInstanceOf(ValidationError);
-        expect((err as ValidationError).errors).toContainEqual(expect.objectContaining({ field: 'class' }));
+        expect((err as ExpectedValidationError).extra.errors).toContainEqual(expect.objectContaining({ field: 'class' }));
       }
     });
   });

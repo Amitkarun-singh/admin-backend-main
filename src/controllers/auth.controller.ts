@@ -16,7 +16,7 @@ import { getSignedPdfUrl } from "../utils/signedUrl.js";
 
 // types for req.user (since it's added by authMiddleware)
 interface AuthenticatedRequest extends Request {
-  user?: any;
+  user: any;
 }
 
 const login = asyncHandler(async (req: Request, res: Response) => {
@@ -104,7 +104,7 @@ const refreshAccessToken = asyncHandler(async (req: Request, res: Response) => {
     if (!user) throw new ApiError(401, "Invalid token");
 
     const payload = {
-      user_id: user.user_id,
+      user_id: (user as any).user_id,
       role: decoded.role,
       permissions: decoded.permissions,
       school_id: decoded.school_id
@@ -137,12 +137,12 @@ const getLoggedInUserProfile = asyncHandler(async (req: AuthenticatedRequest, re
     const school = school_id ? await schoolRepository.findById(school_id) : null;
     profileData = { role, user, school };
   } else if (role === "TEACHER") {
-    const teacher = await profileRepository.findTeacherByUserId(user_id);
+    const teacher: any = await profileRepository.findTeacherByUserId(user_id);
     const school = teacher?.school_id ? await schoolRepository.findById(teacher.school_id) : null;
     profileData = { role, teacher, school };
   } else if (role === "STUDENT") {
-    const student = await profileRepository.findStudentByUserId(user_id);
-    const user = await userRepository.findWithRoleAndPermissions(user_id);
+    const student: any = await profileRepository.findStudentByUserId(user_id);
+    const user: any = await userRepository.findWithRoleAndPermissions(user_id);
     const school = student?.school_id ? await schoolRepository.findById(student.school_id) : null;
     
     profileData = {
@@ -153,7 +153,7 @@ const getLoggedInUserProfile = asyncHandler(async (req: AuthenticatedRequest, re
       dob: student?.dob,
       language: student?.preferred_language,
       role: role,
-      school_name: school?.school_name,
+      school_name: (school as any)?.school_name,
     };
   }
 

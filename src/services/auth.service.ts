@@ -107,7 +107,7 @@ export class AuthService {
   async forgotPasswordSendOtp(phone_number: string) {
     const user = await userRepository.findByPhoneNumber(phone_number);
     if (!user) throw new ApiError(404, "No account found");
-    if (user.status.toLowerCase() !== "active") throw new ApiError(403, "Account inactive");
+    if ((user as any).status.toLowerCase() !== "active") throw new ApiError(403, "Account inactive");
 
     const otp = generateOTP();
     const otpToken = createOtpToken(phone_number, otp);
@@ -120,7 +120,7 @@ export class AuthService {
     if (!user) throw new ApiError(404, "User not found");
 
     const resetToken = jwt.sign(
-      { user_id: user.user_id, purpose: "forgot_password" },
+      { user_id: (user as any).user_id, purpose: "forgot_password" },
       process.env.ACCESS_TOKEN_SECRET!,
       { expiresIn: "10m" }
     );
