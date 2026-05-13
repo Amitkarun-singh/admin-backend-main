@@ -15,6 +15,15 @@ export class ClassRepository {
       }
     });
   }
+
+  async findById(class_id: number | string) {
+    return await AdminClass.findByPk(class_id);
+  }
+
+  async findSectionById(section_id: number | string) {
+    const AdminSection = (await import("../models/admin_section.model.js")).default;
+    return await AdminSection.findByPk(section_id);
+  }
 }
 
 export default new ClassRepository();

@@ -8,6 +8,7 @@ import authService from "../services/auth.service.js";
 import userRepository from "../repositories/user.repository.js";
 import schoolRepository from "../repositories/school.repository.js";
 import profileRepository from "../repositories/profile.repository.js";
+import classRepository from "../repositories/class.repository.js";
 import { recordSession, closeSession } from "./history.controller.js";
 import { generateAccessToken, generateRefreshToken } from "../utils/jwt.util.js";
 import { generateOTP, createOtpToken, verifyOtpToken } from "../utils/otp.util.js";
@@ -138,25 +139,55 @@ const getLoggedInUserProfile = asyncHandler(async (req: AuthenticatedRequest, re
     profileData = { role, user, school };
   } else if (role === "TEACHER") {
     const teacher: any = await profileRepository.findTeacherByUserId(user_id);
+    const user: any = await userRepository.findWithRoleAndPermissions(user_id);
     const school = teacher?.school_id ? await schoolRepository.findById(teacher.school_id) : null;
-    profileData = { role, teacher, school };
+
+    const teacherClasses: any[] = teacher ? await profileRepository.findTeacherClassSections(teacher.teacher_id) : [];
+    const classSection = teacherClasses.length > 0 ? teacherClasses[0] : null;
+
+    const teacherClass: any = classSection?.class_id ? await classRepository.findById(classSection.class_id) : null;
+    const teacherSection: any = classSection?.section_id ? await classRepository.findSectionById(classSection.section_id) : null;
+    // console.log("teach", teacher)
+    profileData = {
+      gender: (teacher as any)?.gender?.toLowerCase() || null,
+      dob: (teacher as any)?.dob || null,
+      full_name: user?.full_name,
+      number: user?.phone_number,
+      email: user?.email,
+      language: (teacher as any)?.preferred_language || null,
+      role: role,
+      school_name: (school as any)?.school_name,
+      board_name: (school as any)?.board,
+     
+      class_name: teacherClass?.class_name,
+      section_name: teacherSection?.section_name,
+    };
   } else if (role === "STUDENT") {
     const student: any = await profileRepository.findStudentByUserId(user_id);
     const user: any = await userRepository.findWithRoleAndPermissions(user_id);
     const school = student?.school_id ? await schoolRepository.findById(student.school_id) : null;
     
+    const classSection: any = student ? await profileRepository.findStudentClassSection(student.student_id) : null;
+    const studentClass: any = classSection?.class_id ? await classRepository.findById(classSection.class_id) : null;
+    const studentSection: any = classSection?.section_id ? await classRepository.findSectionById(classSection.section_id) : null;
+
     profileData = {
+      gender : student?.gender?.toLowerCase() || null,
+      dob : student?.dob,
       full_name: user?.full_name,
       number: user?.phone_number,
       email: user?.email,
-      gender: student?.gender,
-      dob: student?.dob,
       language: student?.preferred_language,
       role: role,
       school_name: (school as any)?.school_name,
+      board_name: (school as any)?.board,
+      class_id: classSection?.class_id,
+      section_id: classSection?.section_id,
+      class_name: studentClass?.class_name,
+      section_name: studentSection?.section_name,
     };
   }
-console.log("profile data fetched")
+// console.log("profile data fetched", profileData)
   return res.status(200).json(new ApiResponse(200, profileData, "Profile fetched"));
 });
 

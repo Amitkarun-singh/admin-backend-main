@@ -49,6 +49,10 @@ export class ProfileRepository {
   async updateStudentClassSection(student_id: number | string, data: any) {
     return await StudentClassSection.update(data, { where: { student_id } });
   }
+
+  async findTeacherClassSections(teacher_id: number | string) {
+    return await TeacherClassSectionSubject.findAll({ where: { teacher_id } });
+  }
 }
 
 export default new ProfileRepository();

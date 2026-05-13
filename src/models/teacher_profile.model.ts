@@ -31,7 +31,10 @@ TeacherProfile.init(
     device_type: DataTypes.STRING,
     device_access: DataTypes.JSON,
     ppt_generation_enabled: DataTypes.BOOLEAN,
-    cost_limit: DataTypes.DECIMAL(10,2)
+    cost_limit: DataTypes.DECIMAL(10,2),
+    dob: DataTypes.DATE,
+     preferred_language: DataTypes.STRING,
+    gender: DataTypes.ENUM("male","female","other"),
     },
     {
     sequelize,
