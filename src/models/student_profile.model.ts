@@ -1,7 +1,20 @@
-import { DataTypes } from "sequelize";
+import { DataTypes , Model} from "sequelize";
 import sequelize from "../config/db.js";
 
-export default sequelize.define("StudentProfile", {
+export default class StudentProfile extends Model {
+    declare student_id: number;
+    declare user_id: number;
+    declare school_id: number;
+    declare preferred_language: string;
+    declare onboarding_date: Date;
+    declare cost_limit: number;
+    declare dob: Date;
+    declare gender: string;
+    declare analytics_enabled: boolean;
+}   
+
+StudentProfile.init(
+    {
     student_id: { type: DataTypes.BIGINT, primaryKey: true, autoIncrement: true },
     user_id: DataTypes.BIGINT,
     school_id: DataTypes.BIGINT,
@@ -12,6 +25,7 @@ export default sequelize.define("StudentProfile", {
     gender: DataTypes.ENUM("male","female","other"),
     analytics_enabled: DataTypes.BOOLEAN,
 },{
+    sequelize,
     tableName: "student_profiles",
     underscored: true,
     timestamps: true

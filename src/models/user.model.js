@@ -1,8 +1,9 @@
-import { DataTypes } from "sequelize";
+import { DataTypes, Model } from "sequelize";
 import sequelize from "../config/db.js";
 
-export default sequelize.define(
-  "User",
+export default class User extends Model { }
+
+User.init(
   {
     user_id: { type: DataTypes.BIGINT, primaryKey: true, autoIncrement: true },
 
@@ -32,8 +33,15 @@ export default sequelize.define(
       allowNull: false,
       defaultValue: false,
     },
+
+    self_register:{
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    }
   },
   {
+    sequelize,
     tableName: "users",
     underscored: true,
     timestamps: true,

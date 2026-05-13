@@ -146,7 +146,7 @@ const getLoggedInUserProfile = asyncHandler(async (req: AuthenticatedRequest, re
     const school = student?.school_id ? await schoolRepository.findById(student.school_id) : null;
     
     profileData = {
-      Student_name: user?.full_name,
+      full_name: user?.full_name,
       number: user?.phone_number,
       email: user?.email,
       gender: student?.gender,
@@ -156,7 +156,7 @@ const getLoggedInUserProfile = asyncHandler(async (req: AuthenticatedRequest, re
       school_name: (school as any)?.school_name,
     };
   }
-
+console.log("profile data fetched")
   return res.status(200).json(new ApiResponse(200, profileData, "Profile fetched"));
 });
 

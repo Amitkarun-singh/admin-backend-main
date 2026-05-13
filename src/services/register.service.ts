@@ -8,6 +8,7 @@ import authService from "./auth.service.ts";
 import { ApiError } from "../utils/ApiError.js";
 import { generateOTP, createOtpToken, verifyOtpToken } from "../utils/otp.util.js";
 import { ValidationError } from "../error/subError.ts";
+import { AdminRole, AdminSchool, StudentProfile, TeacherProfile, User } from "../models/index.js";
 
 export class RegisterService {
   //self register user
@@ -66,7 +67,7 @@ export class RegisterService {
     }
 
     // Role and School
-    const roleRecord: any = await roleRepository.findByName(role);
+    const roleRecord: AdminRole = await roleRepository.findByName(role);
     if (!roleRecord) {
       validation.push({
         field: "role",
@@ -75,7 +76,7 @@ export class RegisterService {
       });
     }
 
-    const cbseSchool: any = await schoolRepository.findActiveCbseSchool();
+    const cbseSchool: AdminSchool = await schoolRepository.findActiveCbseSchool();
     if (!cbseSchool) {
       validation.push({
         field: "school",
@@ -124,7 +125,7 @@ export class RegisterService {
 
     // Create User
     const hashed = await bcrypt.hash(password, 10);
-    const user: any = await userRepository.create({
+    const user: User = await userRepository.create({
       full_name: full_name.trim(),
       password: hashed,
       phone_number: contact_number,
@@ -140,7 +141,7 @@ export class RegisterService {
 
     // Create Profile and Class Association based on Role
     if (role.toUpperCase() === "TEACHER") {
-      const teacherProfile: any = await profileRepository.createTeacherProfile({
+      const teacherProfile: TeacherProfile = await profileRepository.createTeacherProfile({
         user_id: user.user_id,
         school_id: cbseSchool.school_id,
         onboarding_date: new Date(),
@@ -157,7 +158,7 @@ export class RegisterService {
       
       await schoolRepository.incrementCount(cbseSchool.school_id, "teacher_count");
     } else if (role.toUpperCase() === "STUDENT") {
-      const studentProfile: any = await profileRepository.createStudentProfile({
+      const studentProfile: StudentProfile = await profileRepository.createStudentProfile({
         user_id: user.user_id,
         school_id: cbseSchool.school_id,
         onboarding_date: new Date(),
