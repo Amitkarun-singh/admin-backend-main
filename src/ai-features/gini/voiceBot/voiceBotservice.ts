@@ -88,7 +88,10 @@ function getSystemPrompt(language : string): string {
   
   Goal:
   Provide responses that sound smooth, friendly, and natural when spoken aloud.
-  only respond in ${language} language
+  langauage : ${language}
+  if langauge is "hindi" always respond in hindi
+  if langauge is "english" always respond in english
+  if language is "auto" detected then decide the language on your own and respond in that language
   `;
 }
 
