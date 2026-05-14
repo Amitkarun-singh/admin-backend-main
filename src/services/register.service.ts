@@ -142,7 +142,7 @@ export class RegisterService {
     // Create Profile and Class Association based on Role
     if (role.toUpperCase() === "TEACHER") {
       const teacherProfile: TeacherProfile = await profileRepository.createTeacherProfile({
-        user_id: user.user_id,
+        user_id: (user as any).user_id,
         school_id: cbseSchool.school_id,
         onboarding_date: new Date(),
       });
@@ -159,7 +159,7 @@ export class RegisterService {
       await schoolRepository.incrementCount(cbseSchool.school_id, "teacher_count");
     } else if (role.toUpperCase() === "STUDENT") {
       const studentProfile: StudentProfile = await profileRepository.createStudentProfile({
-        user_id: user.user_id,
+        user_id: (user as any).user_id,
         school_id: cbseSchool.school_id,
         onboarding_date: new Date(),
       });
@@ -178,7 +178,7 @@ export class RegisterService {
     }
 
     // Login after registration
-    return await authService.loginWithUserId(user.user_id);
+    return await authService.loginWithUserId((user as any).user_id);
   }
 
   /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

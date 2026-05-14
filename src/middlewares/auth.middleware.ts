@@ -1,7 +1,9 @@
 import jwt from "jsonwebtoken";
 import { ApiError } from "../utils/ApiError.js";
+import type { Request, Response, NextFunction } from "express";
+import type { UserTokenPayload } from "../ai-features/type/type.d.ts";
 
-export const authMiddleware = (req, res, next) => {
+export const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
   console.log("Auth middleware");
   const authHeader = req.headers.authorization;
 
@@ -13,7 +15,7 @@ export const authMiddleware = (req, res, next) => {
   const token = authHeader.split(" ")[1];
 
   try {
-    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET) as UserTokenPayload;
 
     req.user = decoded;
     next();

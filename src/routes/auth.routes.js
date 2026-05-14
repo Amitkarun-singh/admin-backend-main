@@ -6,13 +6,14 @@ import {
   forgotPasswordSendOtp,
   forgotPasswordVerifyOtp,
   forgotPasswordReset,
-  getLoggedInUserProfile,
+  
   logout,
   refreshAccessToken,
   updateAvatar
 } from "../controllers/auth.controller.ts";
 import { authMiddleware } from "../middlewares/auth.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
+import { getUserProfile } from "../controllers/profile.controller.js";
 
 const router = express.Router();
 
@@ -37,7 +38,7 @@ router.post("/forgot-password/reset",      forgotPasswordReset);
 
 // ── Protected ─────────────────────────────────────────────────────────────
 router.post("/update-avatar", upload.single("file"), authMiddleware, updateAvatar);
-router.get( "/profile",       authMiddleware, getLoggedInUserProfile);
+router.get( "/profile",       authMiddleware, getUserProfile);
 router.post("/logout",        authMiddleware, logout);
 
 export default router;
