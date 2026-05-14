@@ -7,8 +7,8 @@ export const practiceQuestionsLog = (req, res, next) => {
 
   const insertQuery = `
   INSERT INTO practice_questions_logs 
-  (conversation_id, method, url, status_code, device, request_body, response_body, created_at , user_details) 
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?,?)
+  (conversation_id, method, url, status_code, device, request_body, response_body, created_at , user_details, user_id) 
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?,?,?)
 `;
 
   res.json = function (body) {
@@ -31,6 +31,7 @@ export const practiceQuestionsLog = (req, res, next) => {
       JSON.stringify(responseBody),
       now,
       JSON.stringify(req.user),
+      req.user.user_id
     ];
 
     pool.query(insertQuery, value, (error, results) => {
