@@ -7,11 +7,12 @@ export const tutorLogs = (req: Request, res: Response, next: NextFunction) => {
 
   let responseBody: any;
   let finalStreamMessage: string | null = null;
+   const lang : string | null = req.query?.language  as string;
 
   const insertQuery = `
     INSERT INTO tutor_logs 
-    (conversation_id, method, url, status_code, device, request_body, response_body, created_at , user_details,session_id, user_id) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?,?,?,?)
+    (conversation_id, method, url, status_code, device, request_body, response_body, created_at , user_details,session_id, user_id,language) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?,?,?,?,?)
   `;
 
   // ---- Patch res.json ----
@@ -91,6 +92,7 @@ export const tutorLogs = (req: Request, res: Response, next: NextFunction) => {
       JSON.stringify(req.user),
       req.body.sessionId,
       req.user?.user_id || null,
+      lang
     ];
 
     

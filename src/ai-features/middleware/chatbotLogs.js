@@ -57,28 +57,27 @@ export const chatbotLogs = (req, res, next) => {
 };
 
 const parseSSEChunks = (responseChunks) => {
+  const fullContent = responseChunks.join("");
   let aiResponse = "";
+  const lines = fullContent.split("\n");
 
-  for (const chunk of responseChunks) {
-    const lines = chunk.split("\n");
+  for (const line of lines) {
+    if (!line.startsWith("data:")) continue;
 
-    for (let line of lines) {
-      if (!line.startsWith("data:")) continue;
+    const payload = line.replace("data:", "").trim();
 
-      const payload = line.replace("data:", "").trim();
+    if (payload === "[DONE]" || !payload) continue;
 
-      if (payload === "[DONE]" || !payload) continue;
+    try {
+      const parsed = JSON.parse(payload);
+      // Handle both OpenAI format and new StreamAdapter format
+      const content = parsed?.choices?.[0]?.delta?.content || parsed?.content;
 
-      try {
-        const parsed = JSON.parse(payload);
-        const content = parsed?.choices?.[0]?.delta?.content;
-
-        if (content) {
-          aiResponse += content;
-        }
-      } catch (err) {
-        // ignore invalid JSON
+      if (content) {
+        aiResponse += content;
       }
+    } catch (err) {
+      // ignore invalid JSON
     }
   }
 
