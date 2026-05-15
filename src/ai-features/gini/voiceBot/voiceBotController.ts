@@ -6,7 +6,8 @@ export const voiceBotController = async (req: Request, res: Response) => {
   const { message } = req.body;
 
   const file = req.file;
-  const lang = (req.query.language || "English") as string;
+  const lang = (req.query?.language || "English") as string;
+
  
 
   const msgArr = JSON.parse(message);
