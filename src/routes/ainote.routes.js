@@ -11,6 +11,7 @@ import { upload }          from "../middlewares/multer.middleware.js";
 import { aiLogger }        from "../middlewares/aiLogger.middleware.js";
 import { authMiddleware }  from "../middlewares/auth.middleware.js";
 import { requireFeature }  from "../middlewares/feature.middleware.js";
+import { activityMiddleware } from "../middlewares/activity.middleware.js";
 
 const router = express.Router();
 
@@ -18,6 +19,7 @@ const router = express.Router();
 // Applied after auth so req.user is available inside requireFeature
 router.use(authMiddleware);
 router.use(requireFeature(15));
+router.use(activityMiddleware);
 
 // Dropdown APIs (still gated — no point calling them if feature is off)
 router.get("/languages", aiLogger("ai_notes", "generate_notes"), getLanguages);

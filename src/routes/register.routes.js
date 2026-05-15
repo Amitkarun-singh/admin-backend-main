@@ -12,8 +12,10 @@ import {
   completeProfile,
 } from "../controllers/register.controller.js";
 import { authMiddleware } from "../middlewares/auth.middleware.js";
+import { activityMiddleware } from "../middlewares/activity.middleware.js";
 
 const router = express.Router();
+router.use(activityMiddleware);
 
 /* ── PUBLIC ─────────────────────────────────────────── */
 router.post("/",            register);           // Step 1
