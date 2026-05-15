@@ -14,8 +14,10 @@ import {
 
 import { authMiddleware } from "../middlewares/auth.middleware.js";
 import { requirePermission } from "../middlewares/permission.middleware.js";
+import { activityMiddleware } from "../middlewares/activity.middleware.js";
 
 const router = express.Router();
+router.use(activityMiddleware);
 
 /* SCHOOL */
 router.put(

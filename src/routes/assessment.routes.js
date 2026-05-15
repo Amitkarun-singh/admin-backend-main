@@ -20,11 +20,13 @@ import {
 } from "../controllers/assessment.controller.js";
 import { authMiddleware }  from "../middlewares/auth.middleware.js";
 import { requireFeature }  from "../middlewares/feature.middleware.js";
+import { activityMiddleware } from "../middlewares/activity.middleware.js";
 
 const router = express.Router();
 
 // Apply auth to every route in this file
 router.use(authMiddleware);
+router.use(activityMiddleware);
 
 // Apply feature gate to every route in this file
 // Feature ID 13 = AI_ASSESSMENT
