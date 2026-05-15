@@ -10,8 +10,10 @@ import {
 } from "../controllers/history.controller.js";
 
 import { authMiddleware } from "../middlewares/auth.middleware.js";
+import { activityMiddleware } from "../middlewares/activity.middleware.js";
 
 const router = express.Router();
+router.use(activityMiddleware);
 
 router.get("/recent-queries",    authMiddleware, getRecentQueries);
 router.get("/features-explored", authMiddleware, getFeaturesExplored);
