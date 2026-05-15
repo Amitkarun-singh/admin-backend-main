@@ -71,6 +71,14 @@ export const voiceBotService = async (
 };
 
 function getSystemPrompt(language : string): string {
+  let lang = ""
+  if(language === "English" || language === "english"){
+    lang = "Always respond in English"
+  }else if (language === "Hindi" || language === "hindi"){
+    lang = "Always respond in Hindi"
+  }else if (language === "Auto" || language === "auto"){
+    lang = "Auto detect language and respond in that language"
+  }
   return `You are a helpful voice assistant. Your responses will be converted to speech using a text-to-speech (TTS) system.
   
   Guidelines:
@@ -88,10 +96,7 @@ function getSystemPrompt(language : string): string {
   
   Goal:
   Provide responses that sound smooth, friendly, and natural when spoken aloud.
-  langauage : ${language}
-  if langauge is "hindi" always respond in hindi
-  if langauge is "english" always respond in english
-  if language is "auto" detected then decide the language on your own and respond in that language
+  ${lang}
   `;
 }
 
