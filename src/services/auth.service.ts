@@ -4,10 +4,10 @@ import { getAuth } from "firebase-admin/auth";
 import { ApiError } from "../utils/ApiError.js";
 import userRepository from "../repositories/user.repository.js";
 import { generateAccessToken, generateRefreshToken } from "../utils/jwt.util.js";
-import { recordSession } from "../controllers/history.controller.js";
-import { generateOTP, createOtpToken, verifyOtpToken } from "../utils/otp.util.js";
+
 import { NotFoundError, ValidationError } from "../error/subError.ts";
 import firebaseApp from "../configs/firebase/firebaseConfig.ts";
+import { getSignedPdfUrl } from "../utils/signedUrl.js";
 
 export class AuthService {
   //validate firebase token
@@ -97,45 +97,45 @@ export class AuthService {
     };
   }
 
-  async sendLoginOtp(phone_number: string) {
-    const user = await userRepository.findByPhoneNumber(phone_number);
-    if (!user) throw new ApiError(404, "User not found");
+  // async sendLoginOtp(phone_number: string) {
+  //   const user = await userRepository.findByPhoneNumber(phone_number);
+  //   if (!user) throw new ApiError(404, "User not found");
 
-    const otp = generateOTP();
-    const otpToken = createOtpToken(phone_number, otp);
-    return { otpToken, otp }; // Return otp for dev logging
-  }
+  //   const otp = generateOTP();
+  //   const otpToken = createOtpToken(phone_number, otp);
+  //   return { otpToken, otp }; // Return otp for dev logging
+  // }
 
-  async forgotPasswordSendOtp(phone_number: string) {
-    const user = await userRepository.findByPhoneNumber(phone_number);
-    if (!user) throw new ApiError(404, "No account found");
-    if ((user as any).status.toLowerCase() !== "active") throw new ApiError(403, "Account inactive");
+  // async forgotPasswordSendOtp(phone_number: string) {
+  //   const user = await userRepository.findByPhoneNumber(phone_number);
+  //   if (!user) throw new ApiError(404, "No account found");
+  //   if ((user as any).status.toLowerCase() !== "active") throw new ApiError(403, "Account inactive");
 
-    const otp = generateOTP();
-    const otpToken = createOtpToken(phone_number, otp);
-    return { otpToken, otp };
-  }
+  //   const otp = generateOTP();
+  //   const otpToken = createOtpToken(phone_number, otp);
+  //   return { otpToken, otp };
+  // }
 
-  async forgotPasswordVerifyOtp(phone_number: string, otp: string, otpToken: string) {
-    verifyOtpToken(phone_number, otp, otpToken);
-    const user = await userRepository.findByPhoneNumber(phone_number);
-    if (!user) throw new ApiError(404, "User not found");
+  // async forgotPasswordVerifyOtp(phone_number: string, otp: string, otpToken: string) {
+  //   verifyOtpToken(phone_number, otp, otpToken);
+  //   const user = await userRepository.findByPhoneNumber(phone_number);
+  //   if (!user) throw new ApiError(404, "User not found");
 
-    const resetToken = jwt.sign(
-      { user_id: (user as any).user_id, purpose: "forgot_password" },
-      process.env.ACCESS_TOKEN_SECRET!,
-      { expiresIn: "10m" }
-    );
-    return { resetToken };
-  }
+  //   const resetToken = jwt.sign(
+  //     { user_id: (user as any).user_id, purpose: "forgot_password" },
+  //     process.env.ACCESS_TOKEN_SECRET!,
+  //     { expiresIn: "10m" }
+  //   );
+  //   return { resetToken };
+  // }
 
-  async forgotPasswordReset(user_id: number | string, newPassword: string) {
-    const hashed = await bcrypt.hash(newPassword, 10);
-    await userRepository.update(user_id, {
-      password: hashed,
-      is_password_reset_required: false,
-    });
-  }
+  // async forgotPasswordReset(user_id: number | string, newPassword: string) {
+  //   const hashed = await bcrypt.hash(newPassword, 10);
+  //   await userRepository.update(user_id, {
+  //     password: hashed,
+  //     is_password_reset_required: false,
+  //   });
+  // }
 
   async resetFirstTimePassword(user_id: number | string, newPassword: string) {
     const user = await userRepository.findById(user_id);
@@ -156,11 +156,10 @@ export class AuthService {
     return await this.loginWithUserId(user_id);
   }
 
-  async resetPassword(phone_number: string, newPassword: string, confirmPassword: string, isToken: string) {
+  async resetPassword(phone_number: string, newPassword: string, confirmPassword: string, idToken: string) {
     try {
-
-      await this.verifyIdToken(isToken);
-    } catch (error) {
+      await this.verifyIdToken(idToken);
+    } catch (error: any) {
       throw new ValidationError(error);
     }
 
@@ -204,6 +203,19 @@ export class AuthService {
       school_id: userWithRole.school_id,
       profile: userWithRole,
     };
+  }
+
+  async signAvatar(key: string | null | undefined, role: string): Promise<string | null> {
+    console.log(`[AVATAR][${role}] raw key from DB:`, key ?? "null — no avatar uploaded yet");
+    if (!key) return null;
+    try {
+      const url = await getSignedPdfUrl(key);
+      console.log(`[AVATAR][${role}] signed URL:`, url ? url.slice(0, 80) + "…" : "null");
+      return url ?? null;
+    } catch (err: any) {
+      console.error(`[AVATAR][${role}] signing failed:`, err.message);
+      return null;
+    }
   }
 
 

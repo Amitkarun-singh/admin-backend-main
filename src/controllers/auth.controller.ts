@@ -21,40 +21,40 @@ interface AuthenticatedRequest extends Request {
   user: any;
 }
 
-/* ─────────────────────────────────────────────────────────────
-   HELPER: get streak info for any user
-   Returns zeros safely if the row doesn't exist yet
-───────────────────────────────────────────────────────────── */
-async function getStreakData(user_id: number) {
-  try {
-    const row: any = await UserStreak.findOne({ where: { user_id } });
-    return {
-      current_streak: row?.current_streak ?? 0,
-      longest_streak: row?.longest_streak ?? 0,
-      last_active_date: row?.last_active_date ?? null,
-    };
-  } catch {
-    return { current_streak: 0, longest_streak: 0, last_active_date: null };
-  }
-}
+// /* ─────────────────────────────────────────────────────────────
+//    HELPER: get streak info for any user
+//    Returns zeros safely if the row doesn't exist yet
+// ───────────────────────────────────────────────────────────── */
+// async function getStreakData(user_id: number) {
+//   try {
+//     const row: any = await UserStreak.findOne({ where: { user_id } });
+//     return {
+//       current_streak: row?.current_streak ?? 0,
+//       longest_streak: row?.longest_streak ?? 0,
+//       last_active_date: row?.last_active_date ?? null,
+//     };
+//   } catch {
+//     return { current_streak: 0, longest_streak: 0, last_active_date: null };
+//   }
+// }
 
-/* ─────────────────────────────────────────────────────────────
-   HELPER: get overall practice score (0-100) for a student
-───────────────────────────────────────────────────────────── */
-async function getOverallScore(student_id: number): Promise<number> {
-  try {
-    const [row]: any = await sequelize.query(
-      `SELECT ROUND(AVG(pq.is_correct) * 100) AS overallScore
-       FROM   practice_tests pt
-       JOIN   practice_questions pq ON pt.id = pq.test_id
-       WHERE  pt.student_id = :student_id`,
-      { replacements: { student_id }, type: (sequelize as any).QueryTypes.SELECT }
-    );
-    return Number(row?.overallScore ?? 0);
-  } catch {
-    return 0;
-  }
-}
+// /* ─────────────────────────────────────────────────────────────
+//    HELPER: get overall practice score (0-100) for a student
+// ───────────────────────────────────────────────────────────── */
+// async function getOverallScore(student_id: number): Promise<number> {
+//   try {
+//     const [row]: any = await sequelize.query(
+//       `SELECT ROUND(AVG(pq.is_correct) * 100) AS overallScore
+//        FROM   practice_tests pt
+//        JOIN   practice_questions pq ON pt.id = pq.test_id
+//        WHERE  pt.student_id = :student_id`,
+//       { replacements: { student_id }, type: (sequelize as any).QueryTypes.SELECT }
+//     );
+//     return Number(row?.overallScore ?? 0);
+//   } catch {
+//     return 0;
+//   }
+// }
 
 /* ─────────────────────────────────────────────────────────────
    HELPER: sign avatar S3 key → URL (null if no avatar yet)
@@ -322,10 +322,10 @@ async function verifyIdToken(req: Request, res: Response) {
 }
 
 async function resetPassword(req: Request, res: Response) {
-  const { phoneNumber, newPassword, confirmPassword, isToken } = req.body;
+  const { phoneNumber, newPassword, confirmPassword, idToken } = req.body;
   if (newPassword !== confirmPassword) throw new ApiError(400, "Passwords do not match");
   const phone_number = phoneNumber.trim().slice(-10);
-  const result = await authService.resetPassword(phone_number, newPassword, confirmPassword, isToken);
+  const result = await authService.resetPassword(phone_number, newPassword, confirmPassword, idToken);
   return res.status(200).json(new ApiResponse(200, result, "OTP verified"));
 }
 
