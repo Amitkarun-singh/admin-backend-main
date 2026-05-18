@@ -6,7 +6,7 @@ import userRepository from "../repositories/user.repository.js";
 import { generateAccessToken, generateRefreshToken } from "../utils/jwt.util.js";
 import { recordSession } from "../controllers/history.controller.js";
 import { generateOTP, createOtpToken, verifyOtpToken } from "../utils/otp.util.js";
-import { ValidationError } from "../error/subError.ts";
+import { NotFoundError, ValidationError } from "../error/subError.ts";
 import firebaseApp from "../configs/firebase/firebaseConfig.ts";
 
 export class AuthService {
@@ -143,9 +143,9 @@ export class AuthService {
 
     const userData = user as any;
 
-    // if (!userData.is_password_reset_required) {
-    //   throw new ApiError(400, "Password already reset");
-    // }
+    if (!userData.is_password_reset_required) {
+      throw new ApiError(400, "Password already reset");
+    }
 
     const hashed = await bcrypt.hash(newPassword, 10);
     await userRepository.update(user_id, {
@@ -154,6 +154,30 @@ export class AuthService {
     });
 
     return await this.loginWithUserId(user_id);
+  }
+
+  async resetPassword(phone_number: string, newPassword: string, confirmPassword: string, isToken: string) {
+    try {
+
+      await this.verifyIdToken(isToken);
+    } catch (error) {
+      throw new ValidationError(error);
+    }
+
+    const user = await userRepository.findByPhoneNumber(phone_number);
+
+
+    if (!user) throw new NotFoundError("User", phone_number);
+
+    const userData = user as any;
+
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await userRepository.update(userData.user_id, {
+      password: hashed,
+    });
+
+    return //await this.loginWithUserId(userData.user_id);
   }
 
   async loginWithUserId(user_id: number | string) {

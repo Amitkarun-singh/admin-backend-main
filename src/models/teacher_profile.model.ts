@@ -15,32 +15,36 @@ class TeacherProfile extends Model {
     declare device_access: Record<string, boolean>;
     declare ppt_generation_enabled: boolean;
     declare cost_limit: number;
+    declare gender: string;
+    declare dob: Date;
+    declare preferred_language: string;
 }
 
 TeacherProfile.init(
     {
-    teacher_id: { type: DataTypes.BIGINT, primaryKey: true, autoIncrement: true },
-    user_id: DataTypes.BIGINT,
-    school_id: DataTypes.BIGINT,
-    primary_subject_id: DataTypes.INTEGER,
-    secondary_subject_ids: DataTypes.JSON,
-    experience: DataTypes.INTEGER,
-    age: DataTypes.INTEGER,
-    onboarding_date: DataTypes.DATE,
-    school_tenure: DataTypes.INTEGER,
-    device_type: DataTypes.STRING,
-    device_access: DataTypes.JSON,
-    ppt_generation_enabled: DataTypes.BOOLEAN,
-    cost_limit: DataTypes.DECIMAL(10,2),
-    dob: DataTypes.DATE,
-     preferred_language: DataTypes.STRING,
-    gender: DataTypes.ENUM("male","female","other"),
+        teacher_id: { type: DataTypes.BIGINT, primaryKey: true, autoIncrement: true },
+        user_id: DataTypes.BIGINT,
+        school_id: DataTypes.BIGINT,
+        primary_subject_id: DataTypes.INTEGER,
+        secondary_subject_ids: DataTypes.JSON,
+        experience: DataTypes.INTEGER,
+        age: DataTypes.INTEGER,
+        onboarding_date: DataTypes.DATE,
+        school_tenure: DataTypes.INTEGER,
+        device_type: DataTypes.STRING,
+        device_access: DataTypes.JSON,
+        ppt_generation_enabled: DataTypes.BOOLEAN,
+        cost_limit: DataTypes.DECIMAL(10, 2),
+
+        dob: DataTypes.DATE,
+        preferred_language: DataTypes.STRING,
+        gender: DataTypes.ENUM("male", "female", "other"),
     },
     {
-    sequelize,
-    tableName: "teacher_profiles",
-    underscored: true,
-    timestamps: true
+        sequelize,
+        tableName: "teacher_profiles",
+        underscored: true,
+        timestamps: true
     });
 
 export default TeacherProfile;
