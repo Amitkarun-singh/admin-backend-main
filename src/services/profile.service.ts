@@ -6,6 +6,7 @@ import profileRepository from "../repositories/profile.repository.js";
 import classRepository from "../repositories/class.repository.js";
 import UserStreak from "../models/user_streak.model.js";
 import sequelize from "../config/db.js";
+import { getSignedPdfUrl } from "../utils/signedUrl.js";
 
 
 
@@ -58,8 +59,11 @@ class ProfileService {
         : Promise.resolve(null),
     ]);
 
+    const avatarUrl = await this.signAvatar((user as any)?.avatar, "STUDENT");
+
     return {
       role: "STUDENT",
+      avatar: avatarUrl,
 
       gender: student?.gender?.toLowerCase() || null,
       dob: student?.dob || null,
@@ -119,8 +123,11 @@ class ProfileService {
         : Promise.resolve(null),
     ]);
 
+    const avatarUrl = await this.signAvatar((user as any)?.avatar, "TEACHER");
+
     return {
       role: "TEACHER",
+      avatar: avatarUrl,
 
       gender: teacher?.gender?.toLowerCase() || null,
       dob: teacher?.dob || null,
@@ -152,8 +159,11 @@ class ProfileService {
       this.getStreakData(user_id),
     ]);
 
+    const avatarUrl = await this.signAvatar((user as any)?.avatar, role);
+
     return {
       role,
+      avatar: avatarUrl,
 
       full_name: user?.full_name || null,
       number: user?.phone_number || null,
@@ -166,9 +176,23 @@ class ProfileService {
   }
 
   /* ─────────────────────────────────────────────────────────────
+   HELPER: sign avatar S3 key → URL (null if no avatar yet)
+───────────────────────────────────────────────────────────── */
+  async signAvatar(key: string | null | undefined, role: string): Promise<string | null> {
+    if (!key) return null;
+    try {
+      const url = await getSignedPdfUrl(key);
+      return url ?? null;
+    } catch (err: any) {
+      console.error(`[AVATAR][${role}] signing failed:`, err.message);
+      return null;
+    }
+  }
+
+  /* ─────────────────────────────────────────────────────────────
    HELPER: get streak info for any user
    Returns zeros safely if the row doesn't exist yet
-───────────────────────────────────────────────────────────── */
+ ───────────────────────────────────────────────────────────── */
   async getStreakData(user_id: number) {
     try {
       const row: any = await UserStreak.findOne({ where: { user_id } });

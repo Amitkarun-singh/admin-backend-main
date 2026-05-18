@@ -42,25 +42,41 @@ export class AuthService {
         ? await userRepository.findByUsername(username)
         : await userRepository.findByEmail(email!);
 
-      if (!user) throw new ApiError(404, "User not found");
+      if (!user) throw new NotFoundError("User", username || email);
 
       const valid = await bcrypt.compare(password, user.password);
-      if (!valid) throw new ApiError(401, "Invalid credentials");
+      if (!valid) throw new ValidationError([{
+        field: "password",
+        message: "Invalid password",
+        code: "INVALID_PASSWORD",
+      },]);
     } else if (phone_number && idToken) {
       const decodedToken = await this.verifyIdToken(idToken);
-      if (!decodedToken) throw new ApiError(401, "Invalid credentials");
+      if (!decodedToken) throw new ValidationError([{
+        field: "idToken",
+        message: "Invalid Firebase token",
+        code: "INVALID_TOKEN",
+      }]);
 
       const contact_number = phone_number.trim().slice(-10);
       user = await userRepository.findByPhoneNumber(contact_number);
-      if (!user) throw new ApiError(404, "User not found");
+      if (!user) throw new NotFoundError("User", phone_number);
     } else {
-      throw new ApiError(400, "Invalid login payload");
+      throw new ValidationError([{
+        field: "loginData",
+        message: "Invalid login payload",
+        code: "INVALID_PAYLOAD",
+      }]);
     }
 
     const userData = user as any;
 
     if (userData.status.toLowerCase() !== "active") {
-      throw new ApiError(403, "User inactive");
+      throw new ValidationError([{
+        field: "status",
+        message: "User inactive",
+        code: "USER_INACTIVE",
+      }]);
     }
 
     if (userData.is_password_reset_required) {
@@ -73,7 +89,7 @@ export class AuthService {
     }
 
     const userWithRole: any = await userRepository.findWithRoleAndPermissions(userData.user_id);
-    if (!userWithRole) throw new ApiError(404, "User not found");
+    if (!userWithRole) throw new NotFoundError("User with role and permissions", userData.user_id);
 
     const permissions = userWithRole.role.permissions.map((p: any) => p.permission_key);
 

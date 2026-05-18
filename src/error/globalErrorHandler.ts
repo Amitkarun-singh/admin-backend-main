@@ -47,6 +47,6 @@ export const globalErrorHandler = (
     message: err.message,
     ...err.extra,
   };
-  console.log("global ", err.extra);
+  // console.log("global ", err.extra);
   res.status(err.statusCode).json(response);
 };

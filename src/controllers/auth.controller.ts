@@ -59,18 +59,18 @@ interface AuthenticatedRequest extends Request {
 /* ─────────────────────────────────────────────────────────────
    HELPER: sign avatar S3 key → URL (null if no avatar yet)
 ───────────────────────────────────────────────────────────── */
-async function signAvatar(key: string | null | undefined, role: string): Promise<string | null> {
-  console.log(`[AVATAR][${role}] raw key from DB:`, key ?? "null — no avatar uploaded yet");
-  if (!key) return null;
-  try {
-    const url = await getSignedPdfUrl(key);
-    console.log(`[AVATAR][${role}] signed URL:`, url ? url.slice(0, 80) + "…" : "null");
-    return url ?? null;
-  } catch (err: any) {
-    console.error(`[AVATAR][${role}] signing failed:`, err.message);
-    return null;
-  }
-}
+// async function signAvatar(key: string | null | undefined, role: string): Promise<string | null> {
+//   console.log(`[AVATAR][${role}] raw key from DB:`, key ?? "null — no avatar uploaded yet");
+//   if (!key) return null;
+//   try {
+//     const url = await getSignedPdfUrl(key);
+//     console.log(`[AVATAR][${role}] signed URL:`, url ? url.slice(0, 80) + "…" : "null");
+//     return url ?? null;
+//   } catch (err: any) {
+//     console.error(`[AVATAR][${role}] signing failed:`, err.message);
+//     return null;
+//   }
+// }
 
 /* =====================================================
    LOGIN
