@@ -80,7 +80,7 @@ app.use("/predict", predictPapersRouter);
 
 /* ---------------- HEALTH CHECK ---------------- */
 app.get("/health", (_, res) => {
-  res.status(200).json({ status: "OK", errorMessage });
+  res.status(200).json({ status: "OK" });
 });
 
 /* ---------------- GLOBAL ERROR HANDLER ---------------- */
@@ -89,7 +89,7 @@ app.use(globalErrorHandler);
 
 /* ---------------- START SERVER + DB ---------------- */
 
-app.listen(process.env.PORT || 3000, () => {
+app.listen(process.env.PORT || 3000, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${process.env.PORT || 3000}`);
 });
 (async () => {

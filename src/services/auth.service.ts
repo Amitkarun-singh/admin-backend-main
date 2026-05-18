@@ -25,6 +25,8 @@ export class AuthService {
     }
   }
 
+
+
   async login(loginData: {
     username?: string;
     email?: string;
@@ -36,7 +38,7 @@ export class AuthService {
     let user: any;
 
     if ((username || email) && password) {
-      user = username 
+      user = username
         ? await userRepository.findByUsername(username)
         : await userRepository.findByEmail(email!);
 
@@ -141,9 +143,9 @@ export class AuthService {
 
     const userData = user as any;
 
-    if (!userData.is_password_reset_required) {
-      throw new ApiError(400, "Password already reset");
-    }
+    // if (!userData.is_password_reset_required) {
+    //   throw new ApiError(400, "Password already reset");
+    // }
 
     const hashed = await bcrypt.hash(newPassword, 10);
     await userRepository.update(user_id, {
@@ -179,6 +181,8 @@ export class AuthService {
       profile: userWithRole,
     };
   }
+
+
 }
 
 export default new AuthService();

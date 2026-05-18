@@ -29,8 +29,8 @@ async function getStreakData(user_id: number) {
   try {
     const row: any = await UserStreak.findOne({ where: { user_id } });
     return {
-      current_streak:   row?.current_streak   ?? 0,
-      longest_streak:   row?.longest_streak   ?? 0,
+      current_streak: row?.current_streak ?? 0,
+      longest_streak: row?.longest_streak ?? 0,
       last_active_date: row?.last_active_date ?? null,
     };
   } catch {
@@ -103,7 +103,7 @@ const login = asyncHandler(async (req: Request, res: Response) => {
    ===================================================== */
 const resetFirstTimePassword = asyncHandler(async (req: Request, res: Response) => {
   const authHeader = req.headers.authorization;
-  const tempToken  = authHeader?.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
+  const tempToken = authHeader?.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
   if (!tempToken) throw new ApiError(401, "Temp token required");
 
   const { newPassword, confirmPassword } = req.body;
@@ -158,13 +158,13 @@ const refreshAccessToken = asyncHandler(async (req: Request, res: Response) => {
     if (!user) throw new ApiError(401, "Invalid token");
 
     const payload = {
-      user_id:     (user as any).user_id,
-      role:        decoded.role,
+      user_id: (user as any).user_id,
+      role: decoded.role,
       permissions: decoded.permissions,
-      school_id:   decoded.school_id,
+      school_id: decoded.school_id,
     };
 
-    const newAccessToken  = generateAccessToken(payload);
+    const newAccessToken = generateAccessToken(payload);
     const newRefreshToken = generateRefreshToken(payload);
 
     res.cookie("refreshToken", newRefreshToken, {
@@ -202,16 +202,16 @@ const getLoggedInUserProfile = asyncHandler(async (req: AuthenticatedRequest, re
     const avatarUrl = await signAvatar((user as any)?.avatar, role);
 
     profileData = {
-      avatar:           avatarUrl,
+      avatar: avatarUrl,
       role,
       user,
       school,
-      current_streak:   streak.current_streak,
-      longest_streak:   streak.longest_streak,
+      current_streak: streak.current_streak,
+      longest_streak: streak.longest_streak,
       last_active_date: streak.last_active_date,
     };
 
-  /* ── TEACHER ── */
+    /* ── TEACHER ── */
   } else if (role === "TEACHER") {
     const [teacher, user, streak]: any[] = await Promise.all([
       profileRepository.findTeacherByUserId(user_id),
@@ -219,33 +219,33 @@ const getLoggedInUserProfile = asyncHandler(async (req: AuthenticatedRequest, re
       getStreakData(user_id),
     ]);
 
-    const school         = teacher?.school_id        ? await schoolRepository.findById(teacher.school_id)              : null;
-    const teacherClasses = teacher                   ? await profileRepository.findTeacherClassSections(teacher.teacher_id) : [];
-    const classSection   = (teacherClasses as any[])[0] ?? null;
-    const teacherClass   = classSection?.class_id    ? await classRepository.findById(classSection.class_id)           : null;
-    const teacherSection = classSection?.section_id  ? await classRepository.findSectionById(classSection.section_id) : null;
+    const school = teacher?.school_id ? await schoolRepository.findById(teacher.school_id) : null;
+    const teacherClasses = teacher ? await profileRepository.findTeacherClassSections(teacher.teacher_id) : [];
+    const classSection = (teacherClasses as any[])[0] ?? null;
+    const teacherClass = classSection?.class_id ? await classRepository.findById(classSection.class_id) : null;
+    const teacherSection = classSection?.section_id ? await classRepository.findSectionById(classSection.section_id) : null;
 
     const avatarUrl = await signAvatar((user as any)?.avatar, role);
 
     profileData = {
-      avatar:           avatarUrl,
-      gender:           (teacher as any)?.gender?.toLowerCase() || null,
-      dob:              (teacher as any)?.dob || null,
-      full_name:        user?.full_name,
-      number:           user?.phone_number,
-      email:            user?.email,
-      language:         (teacher as any)?.preferred_language || null,
+      avatar: avatarUrl,
+      gender: (teacher as any)?.gender?.toLowerCase() || null,
+      dob: (teacher as any)?.dob || null,
+      full_name: user?.full_name,
+      number: user?.phone_number,
+      email: user?.email,
+      language: (teacher as any)?.preferred_language || null,
       role,
-      school_name:      (school as any)?.school_name,
-      board_name:       (school as any)?.board,
-      class_name:       (teacherClass  as any)?.class_name,
-      section_name:     (teacherSection as any)?.section_name,
-      current_streak:   (streak as any).current_streak,
-      longest_streak:   (streak as any).longest_streak,
+      school_name: (school as any)?.school_name,
+      board_name: (school as any)?.board,
+      class_name: (teacherClass as any)?.class_name,
+      section_name: (teacherSection as any)?.section_name,
+      current_streak: (streak as any).current_streak,
+      longest_streak: (streak as any).longest_streak,
       last_active_date: (streak as any).last_active_date,
     };
 
-  /* ── STUDENT ── */
+    /* ── STUDENT ── */
   } else if (role === "STUDENT") {
     // Run independent fetches in parallel
     const [student, user, streak]: any[] = await Promise.all([
@@ -256,36 +256,36 @@ const getLoggedInUserProfile = asyncHandler(async (req: AuthenticatedRequest, re
 
     // These need student first
     const [school, classSection, overall_score] = await Promise.all([
-      student?.school_id   ? schoolRepository.findById(student.school_id)                        : Promise.resolve(null),
-      student              ? profileRepository.findStudentClassSection(student.student_id)       : Promise.resolve(null),
+      student?.school_id ? schoolRepository.findById(student.school_id) : Promise.resolve(null),
+      student ? profileRepository.findStudentClassSection(student.student_id) : Promise.resolve(null),
       getOverallScore(user_id),
     ]);
 
     const [studentClass, studentSection] = await Promise.all([
-      (classSection as any)?.class_id   ? classRepository.findById((classSection as any).class_id)             : Promise.resolve(null),
-      (classSection as any)?.section_id ? classRepository.findSectionById((classSection as any).section_id)    : Promise.resolve(null),
+      (classSection as any)?.class_id ? classRepository.findById((classSection as any).class_id) : Promise.resolve(null),
+      (classSection as any)?.section_id ? classRepository.findSectionById((classSection as any).section_id) : Promise.resolve(null),
     ]);
 
     const avatarUrl = await signAvatar((user as any)?.avatar, role);
 
     profileData = {
-      avatar:           avatarUrl,           // signed S3 URL, null if none uploaded
-      gender:           student?.gender?.toLowerCase() || null,
-      dob:              student?.dob,
-      full_name:        user?.full_name,
-      number:           user?.phone_number,
-      email:            user?.email,
-      language:         student?.preferred_language,
+      avatar: avatarUrl,           // signed S3 URL, null if none uploaded
+      gender: student?.gender?.toLowerCase() || null,
+      dob: student?.dob,
+      full_name: user?.full_name,
+      number: user?.phone_number,
+      email: user?.email,
+      language: student?.preferred_language,
       role,
-      school_name:      (school        as any)?.school_name,
-      board_name:       (school        as any)?.board,
-      class_id:         (classSection  as any)?.class_id,
-      section_id:       (classSection  as any)?.section_id,
-      class_name:       (studentClass  as any)?.class_name,
-      section_name:     (studentSection as any)?.section_name,
+      school_name: (school as any)?.school_name,
+      board_name: (school as any)?.board,
+      class_id: (classSection as any)?.class_id,
+      section_id: (classSection as any)?.section_id,
+      class_name: (studentClass as any)?.class_name,
+      section_name: (studentSection as any)?.section_name,
       // ── new fields ──────────────────────────────────
-      current_streak:   (streak as any).current_streak,    // e.g. 3
-      longest_streak:   (streak as any).longest_streak,    // e.g. 7
+      current_streak: (streak as any).current_streak,    // e.g. 3
+      longest_streak: (streak as any).longest_streak,    // e.g. 7
       last_active_date: (streak as any).last_active_date,  // e.g. "2026-05-15"
       overall_score,                                        // e.g. 12  (0-100)
     };
@@ -315,10 +315,10 @@ async function sendLoginOtp(req: Request, res: Response) {
 }
 
 async function forgotPasswordSendOtp(req: Request, res: Response) {
-  const { phone_number } = req.body;
-  const result = await authService.forgotPasswordSendOtp(phone_number);
-  console.log("Forgot-password OTP (DEV ONLY):", result.otp);
-  return res.status(200).json(new ApiResponse(200, { otpToken: result.otpToken }, "OTP sent"));
+  const { idToken } = req.body;
+  const result = await authService.verifyIdToken(idToken);
+
+  return res.status(200).json(new ApiResponse(200, {}, "user verified"));
 }
 
 async function forgotPasswordVerifyOtp(req: Request, res: Response) {
