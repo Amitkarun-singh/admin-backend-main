@@ -76,7 +76,7 @@ interface AuthenticatedRequest extends Request {
    LOGIN
    ===================================================== */
 const login = asyncHandler(async (req: Request, res: Response) => {
-  const result = await authService.login(req.body);
+  const result: any = await authService.login(req.body);
 
   if (result.requiresPasswordReset) {
     return res.status(200).json(new ApiResponse(200, result, "Password reset required"));

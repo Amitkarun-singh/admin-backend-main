@@ -32,6 +32,7 @@ import appFeedbackRouter from "./ai-features/app_feedback/appFeedbackRoute.js";
 import featureRoutes from "./routes/feature.routes.js";
 // import dotenv from "dotenv";
 // dotenv.config();
+import notificationRouter from "./routes/notification.routes.ts"
 const app = express();
 app.use(traceMiddleware);
 
@@ -77,6 +78,8 @@ app.use("/feedback", appFeedbackRouter);
 app.use("/student", performanceRouter);
 app.use("/pyq", previousPapersRouter);
 app.use("/predict", predictPapersRouter);
+
+app.use("/notification", notificationRouter)
 
 /* ---------------- HEALTH CHECK ---------------- */
 app.get("/health", (_, res) => {

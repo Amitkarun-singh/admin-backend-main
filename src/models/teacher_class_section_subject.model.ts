@@ -7,7 +7,7 @@ export default class TeacherClassSectionSubject extends Model {
     declare section_id: number;
     declare class_subject_id: number;
     declare academic_year: string;
-
+    declare id: number;
 }
 
 TeacherClassSectionSubject.init({

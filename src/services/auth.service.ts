@@ -27,7 +27,7 @@ export class AuthService {
 
 
 
-  async login(loginData: {
+  async verifyCredentials(loginData: {
     username?: string;
     email?: string;
     password?: string;
@@ -35,10 +35,9 @@ export class AuthService {
     idToken?: string;
   }) {
     const { username, email, password, phone_number, idToken } = loginData;
-    let user: any;
 
     if ((username || email) && password) {
-      user = username
+      const user = username
         ? await userRepository.findByUsername(username)
         : await userRepository.findByEmail(email!);
 
@@ -49,8 +48,12 @@ export class AuthService {
         field: "password",
         message: "Invalid password",
         code: "INVALID_PASSWORD",
-      },]);
-    } else if (phone_number && idToken) {
+      }]);
+
+      return user;
+    }
+
+    if (phone_number && idToken) {
       const decodedToken = await this.verifyIdToken(idToken);
       if (!decodedToken) throw new ValidationError([{
         field: "idToken",
@@ -59,16 +62,27 @@ export class AuthService {
       }]);
 
       const contact_number = phone_number.trim().slice(-10);
-      user = await userRepository.findByPhoneNumber(contact_number);
+      const user = await userRepository.findByPhoneNumber(contact_number);
       if (!user) throw new NotFoundError("User", phone_number);
-    } else {
-      throw new ValidationError([{
-        field: "loginData",
-        message: "Invalid login payload",
-        code: "INVALID_PAYLOAD",
-      }]);
+
+      return user;
     }
 
+    throw new ValidationError([{
+      field: "loginData",
+      message: "Invalid login payload",
+      code: "INVALID_PAYLOAD",
+    }]);
+  }
+
+  async login(loginData: {
+    username?: string;
+    email?: string;
+    password?: string;
+    phone_number?: string;
+    idToken?: string;
+  }) {
+    const user = await this.verifyCredentials(loginData);
     const userData = user as any;
 
     if (userData.status.toLowerCase() !== "active") {
@@ -88,29 +102,7 @@ export class AuthService {
       return { requiresPasswordReset: true, tempToken };
     }
 
-    const userWithRole: any = await userRepository.findWithRoleAndPermissions(userData.user_id);
-    if (!userWithRole) throw new NotFoundError("User with role and permissions", userData.user_id);
-
-    const permissions = userWithRole.role.permissions.map((p: any) => p.permission_key);
-
-    const payload = {
-      user_id: userData.user_id,
-      role: userWithRole.role.role_name,
-      permissions,
-      school_id: userData.school_id,
-    };
-
-    const accessToken = generateAccessToken(payload);
-    const refreshToken = generateRefreshToken(payload);
-
-    return {
-      accessToken,
-      refreshToken,
-      role: payload.role,
-      permissions,
-      school_id: userData.school_id,
-      profile: userWithRole,
-    };
+    return this.loginWithUserId(userData.user_id);
   }
 
   // async sendLoginOtp(phone_number: string) {
@@ -197,9 +189,14 @@ export class AuthService {
 
   async loginWithUserId(user_id: number | string) {
     const userWithRole: any = await userRepository.findWithRoleAndPermissions(user_id);
-    if (!userWithRole) throw new ApiError(404, "User not found");
+    if (!userWithRole) throw new NotFoundError("User with role and permissions", String(user_id));
 
     const permissions = userWithRole.role.permissions.map((p: any) => p.permission_key);
+
+    // Sign avatar if present
+    if (userWithRole.avatar) {
+      userWithRole.avatar = await this.signAvatar(userWithRole.avatar, userWithRole.role.role_name);
+    }
 
     const payload = {
       user_id: userWithRole.user_id,
