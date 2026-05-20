@@ -16,6 +16,11 @@ const AiNote = sequelize.define(
             allowNull: false,
         },
 
+        stream:{
+            type: DataTypes.STRING,
+            allowNull: true,
+        },
+
         // Class: 6, 7, 8, 9, 10, 11, 12
         class: {
             type: DataTypes.STRING,

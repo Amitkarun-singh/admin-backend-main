@@ -5,40 +5,39 @@ import {
   getSubjects,
   getChapters,
   getAiNotes,
-  generateAiNotes,
+  createAiNotes,
 } from "../controllers/ainote.controller.js";
-import { upload }          from "../middlewares/multer.middleware.js";
-import { aiLogger }        from "../middlewares/aiLogger.middleware.js";
-import { authMiddleware }  from "../middlewares/auth.middleware.js";
-import { requireFeature }  from "../middlewares/feature.middleware.js";
+import { upload }             from "../middlewares/multer.middleware.js";
+import { aiLogger }           from "../middlewares/aiLogger.middleware.js";
+import { authMiddleware }     from "../middlewares/auth.middleware.js";
+import { requireFeature }     from "../middlewares/feature.middleware.js";
 import { activityMiddleware } from "../middlewares/activity.middleware.js";
 
 const router = express.Router();
 
-// Feature ID 15 = AI_NOTES
-// Applied after auth so req.user is available inside requireFeature
-router.use(authMiddleware);
-router.use(requireFeature(15));
-router.use(activityMiddleware);
+// ── Auth + feature guard (Feature ID 15 = AI_NOTES) ─────────────────────────
+// router.use(authMiddleware);
+// router.use(requireFeature(15));
+// router.use(activityMiddleware);
 
-// Dropdown APIs (still gated — no point calling them if feature is off)
-router.get("/languages", aiLogger("ai_notes", "generate_notes"), getLanguages);
-router.get("/classes",   aiLogger("ai_notes", "generate_notes"), getClasses);
-router.get("/subjects",  aiLogger("ai_notes", "generate_notes"), getSubjects);
-router.get("/chapters",  aiLogger("ai_notes", "generate_notes"), getChapters);
+// ── Cascade dropdown endpoints ───────────────────────────────────────────────
+router.get("/languages", aiLogger("ai_notes_new", "view"), getLanguages);
+router.get("/classes",   aiLogger("ai_notes_new", "view"), getClasses);
+router.get("/subjects",  aiLogger("ai_notes_new", "view"), getSubjects);
+router.get("/chapters",  aiLogger("ai_notes_new", "view"), getChapters);
 
-// Generate AI notes
+// ── Manual note creation (user fills the form — no AI generation) ────────────
 router.post(
-  "/generate",
-  aiLogger("ai_notes", "generate_notes"),
+  "/create",
+  aiLogger("ai_notes_new", "create_note"),
   upload.fields([
-    { name: "notes", maxCount: 20 },
-    { name: "books", maxCount: 20 },
+    { name: "notes", maxCount: 20 },  // full-notes PDFs (one per chapter)
+    { name: "books", maxCount: 20 },  // book PDFs (one per chapter)
   ]),
-  generateAiNotes
+  createAiNotes
 );
 
-// Final notes fetch
-router.get("/", aiLogger("ai_notes", "generate_notes"), getAiNotes);
+// ── Fetch notes (with signed S3 URLs) ────────────────────────────────────────
+router.get("/", aiLogger("ai_notes_new", "view"), getAiNotes);
 
 export default router;
