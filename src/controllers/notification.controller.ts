@@ -19,14 +19,20 @@ export async function notificationRegister(req: Request, res: Response) {
 }
 
 export async function notificationSend(req: Request, res: Response) {
-    const { token, deviceId, userId } = req.body;
-    //console.log("token, deviceId, userId", token, deviceId, userId)
+    const { title, body } = req.body;
+    const userId = req.user.user_id;
+    if (!title || typeof title !== "string") {
+        return res.status(400).json({ message: "Title is required or not a string", title })
+    }
+    if (!body || typeof body !== "string") {
+        return res.status(400).json({ message: "Body is required or not a string", body })
+    }
     try {
-        const result = await NotificationService.send(token, deviceId, userId);
-        res.status(201).json({ message: "Registration successful", result })
+        const result = await NotificationService.send(title, body, userId);
+        res.status(201).json({ message: "Notification sent successfully", result })
     } catch (error) {
         console.log("error", error)
-        res.status(500).json({ message: "Failed to register notification", error })
+        res.status(500).json({ message: "Failed to send notification", error })
     }
 }
 
