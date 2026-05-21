@@ -8,6 +8,8 @@ import UserStreak from "../models/user_streak.model.js";
 import sequelize from "../config/db.js";
 import { getSignedPdfUrl } from "../utils/signedUrl.js";
 
+import { uploadAvatarToS3 } from "../utils/s3Upload.js";
+
 
 
 class ProfileService {
@@ -59,7 +61,7 @@ class ProfileService {
         : Promise.resolve(null),
     ]);
 
-    const avatarUrl = await this.signAvatar((user as any)?.avatar, "STUDENT");
+    const avatarUrl = await getSignedPdfUrl((user as any)?.avatar);
 
     return {
       role: "STUDENT",
@@ -123,7 +125,7 @@ class ProfileService {
         : Promise.resolve(null),
     ]);
 
-    const avatarUrl = await this.signAvatar((user as any)?.avatar, "TEACHER");
+    const avatarUrl = await getSignedPdfUrl((user as any)?.avatar);
 
     return {
       role: "TEACHER",
@@ -159,7 +161,7 @@ class ProfileService {
       this.getStreakData(user_id),
     ]);
 
-    const avatarUrl = await this.signAvatar((user as any)?.avatar, role);
+    const avatarUrl = await getSignedPdfUrl((user as any)?.avatar);
 
     return {
       role,
@@ -178,15 +180,18 @@ class ProfileService {
   /* ─────────────────────────────────────────────────────────────
    HELPER: sign avatar S3 key → URL (null if no avatar yet)
 ───────────────────────────────────────────────────────────── */
-  async signAvatar(key: string | null | undefined, role: string): Promise<string | null> {
-    if (!key) return null;
-    try {
-      const url = await getSignedPdfUrl(key);
-      return url ?? null;
-    } catch (err: any) {
-      console.error(`[AVATAR][${role}] signing failed:`, err.message);
-      return null;
+
+
+  async getMyAvatar(user_id: number) {
+    const user: any = await userRepository.findById(user_id);
+
+    if (!user) {
+      return { avatar: null };
     }
+
+    const avatarUrl = await getSignedPdfUrl(user.avatar);
+
+    return { avatar: avatarUrl };
   }
 
   /* ─────────────────────────────────────────────────────────────
@@ -222,6 +227,15 @@ class ProfileService {
     } catch {
       return 0;
     }
+  }
+
+  async updateAvatar(user_id: string, file: Express.Multer.File) {
+
+    const { key } = await uploadAvatarToS3(file, user_id);
+    await userRepository.update(user_id, { avatar: key });
+
+
+    return { avatar: key };
   }
 
 

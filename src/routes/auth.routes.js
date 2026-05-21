@@ -7,12 +7,13 @@ import {
   resetPassword,
   logout,
   refreshAccessToken,
-  updateAvatar
+
 } from "../controllers/auth.controller.ts";
 import { authMiddleware } from "../middlewares/auth.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
-import { getUserProfile } from "../controllers/profile.controller.js";
+import { getUserProfile, updateAvatar } from "../controllers/profile.controller.js";
 import { activityMiddleware } from "../middlewares/activity.middleware.js";
+
 
 const router = express.Router();
 router.use(activityMiddleware);

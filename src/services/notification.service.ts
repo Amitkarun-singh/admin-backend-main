@@ -31,7 +31,8 @@ class NotificationService {
         return json;
     }
     async send(title: string, body: string, userId: number) {
-        const resp = await fetch(`${process.env.NOTIFICATION_SERVICE_URL}/send-individuals`, {
+        const userIds = [userId];
+        const resp = await fetch(`${process.env.NOTIFICATION_SERVICE_URL}/send-indiviuals`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -39,11 +40,11 @@ class NotificationService {
             body: JSON.stringify({
                 title,
                 body,
-                userId
+                userIds: userIds
             })
         });
         if (!resp.ok) {
-            throw new Error("Failed to register notification");
+            throw new Error("Failed to send notification",);
         }
         const json = await resp.json();
         console.log("JSON", json)
@@ -106,7 +107,7 @@ class NotificationService {
                 throw new Error(`Failed to register notification topic ${topic}`);
             }
             const json = await resp.json();
-            console.log(`JSON for topic ${topic}`, json)
+            // console.log(`JSON for topic ${topic}`, json)
         }
         return { message: "Subscription successful" }
     }

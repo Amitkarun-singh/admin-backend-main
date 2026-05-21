@@ -4,7 +4,7 @@ export async function notificationRegister(req: Request, res: Response) {
     const { token, deviceId } = req.body;
     const userId = req.user.user_id;
 
-
+    console.log("notificationRegister")
     //console.log("token, deviceId, userId", token, deviceId, userId)
     try {
         const result = await NotificationService.register(token, deviceId, userId);

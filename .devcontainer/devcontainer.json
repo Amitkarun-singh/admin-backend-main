@@ -1,6 +1,6 @@
 {
   "name": "Backend app-api.schools2ai.com",
-  "image": "mcr.microsoft.com/devcontainers/javascript-node:20",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:20-bullseye",
   "forwardPorts": [
     3000
   ],
