@@ -1,6 +1,8 @@
 import express from "express";
 import {
   getLanguages,
+  getBoards,
+  getStreams,
   getClasses,
   getSubjects,
   getChapters,
@@ -19,25 +21,41 @@ const router = express.Router();
 // router.use(authMiddleware);
 // router.use(requireFeature(15));
 // router.use(activityMiddleware);
+// ── Dropdown chain (all public) ───────────────────────────────────────────
+//
+//  Step 1 — fetch available languages
+router.get("/languages", getLanguages);
+//
+//  Step 2 — fetch boards for a language
+//  ?language=
+router.get("/boards", getBoards);
+//
+//  Step 3a — fetch classes (for class 10 and below, no stream needed)
+//  ?language= &board=
+router.get("/classes", getClasses);
+//
+//  Step 3b — fetch streams (only relevant for class 11 & 12)
+//  ?language= &board=
+router.get("/streams", getStreams);
+//
+//  Step 4 — fetch subjects
+//  ?language= &board= &class=  (&stream=  when class is 11 or 12)
+router.get("/subjects", getSubjects);
+//
+//  Step 5 — fetch chapters
+//  ?language= &board= &class= &subject=  (&stream=  when class is 11 or 12)
+router.get("/chapters", getChapters);
 
-// ── Cascade dropdown endpoints ───────────────────────────────────────────────
-router.get("/languages", aiLogger("ai_notes_new", "view"), getLanguages);
-router.get("/classes",   aiLogger("ai_notes_new", "view"), getClasses);
-router.get("/subjects",  aiLogger("ai_notes_new", "view"), getSubjects);
-router.get("/chapters",  aiLogger("ai_notes_new", "view"), getChapters);
+//  ?language= &board= &class= &subject= &topic= &stream=
+router.get("/", getAiNotes);
 
-// ── Manual note creation (user fills the form — no AI generation) ────────────
 router.post(
-  "/create",
-  aiLogger("ai_notes_new", "create_note"),
+  "/",
   upload.fields([
-    { name: "notes", maxCount: 20 },  // full-notes PDFs (one per chapter)
-    { name: "books", maxCount: 20 },  // book PDFs (one per chapter)
+    { name: "notes", maxCount: 50 },
+    { name: "books", maxCount: 50 },
   ]),
   createAiNotes
 );
-
-// ── Fetch notes (with signed S3 URLs) ────────────────────────────────────────
-router.get("/", aiLogger("ai_notes_new", "view"), getAiNotes);
 
 export default router;
