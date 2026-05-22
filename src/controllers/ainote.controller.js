@@ -1,455 +1,54 @@
-// import AiNote from "../models/ainote.model.js";
-// import { Sequelize } from "sequelize";
-// import sequelize from "../config/db.js";
-// import { GoogleGenAI } from "@google/genai";
-// import { OpenRouter } from "@openrouter/sdk";
-// import OpenAI from "openai";
-// import { parseNotes } from "../utils/parseNotes.js";
-// import { uploadToS3 } from "../utils/s3Upload.js";
-// import fs from "fs";
-// import { getSignedPdfUrl } from "../utils/signedUrl.js";
-// // import "dotenv/config";
-
-// // Initialize Gemini client
-// let ai;
-
-// try {
-//   ai ==
-//     new GoogleGenAI({
-//       apiKey: process.env.GEMINI_API_KEY,
-//     });
-// } catch {
-//   console.log("GEMINI_API_KEY is required");
-// }
-
-// let openai;
-
-// try {
-//   openai = new OpenAI({
-//     baseURL: "https://openrouter.ai/api/v1",
-//     apiKey: process.env.OPENROUTER_API_KEY,
-//   });
-// } catch {
-//   console.log("OPENROUTER_API_KEY is required");
-// }
-
-// /**
-//  * ============================================
-//  * 1. Get available Languages
-//  * GET /api/ainote/languages
-//  * ============================================
-//  */
-// export const getLanguages = async (req, res) => {
-//   try {
-//     const languages = await AiNote.findAll({
-//       attributes: ["language"],
-//       group: ["language"],
-//     });
-
-//     res.status(200).json({
-//       success: true,
-//       data: languages.map((l) => l.language),
-//     });
-//   } catch (error) {
-//     console.error("Get Languages Error:", error);
-//     res.status(500).json({ success: false });
-//   }
-// };
-
-// /**
-//  * ============================================
-//  * 2. Get Classes (based on language + board)
-//  * GET /api/ainote/classes
-//  * ============================================
-//  */
-// export const getClasses = async (req, res) => {
-//   try {
-//     const { language, board } = req.query;
-
-//     if (!language || !board) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "language and board are required",
-//       });
-//     }
-
-//     const classes = await AiNote.findAll({
-//       where: { language, board },
-//       attributes: ["class"],
-//       group: ["class"],
-//       order: [[Sequelize.literal("CAST(class AS UNSIGNED)"), "ASC"]],
-//     });
-
-//     res.status(200).json({
-//       success: true,
-//       data: classes.map((c) => c.class),
-//     });
-//   } catch (error) {
-//     console.error("Get Classes Error:", error);
-//     res.status(500).json({ success: false });
-//   }
-// };
-
-// /**
-//  * ============================================
-//  * 3. Get Subjects (based on language + class)
-//  * GET /api/ainote/subjects
-//  * ============================================
-//  */
-// export const getSubjects = async (req, res) => {
-//   try {
-//     const { language, class: className } = req.query;
-
-//     if (!language || !className) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "language and class are required",
-//       });
-//     }
-
-//     const subjects = await AiNote.findAll({
-//       where: { language, class: className },
-//       attributes: ["subject"],
-//       group: ["subject"],
-//       order: [["subject", "ASC"]],
-//     });
-
-//     res.status(200).json({
-//       success: true,
-//       data: subjects.map((s) => s.subject),
-//     });
-//   } catch (error) {
-//     console.error("Get Subjects Error:", error);
-//     res.status(500).json({ success: false });
-//   }
-// };
-
-// /**
-//  * ============================================
-//  * 4. Get Chapters (based on language + class + subject)
-//  * GET /api/ainote/chapters
-//  * ============================================
-//  */
-// export const getChapters = async (req, res) => {
-//   try {
-//     const { language, class: className, subject } = req.query;
-
-//     if (!language || !className || !subject) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "language, class and subject are required",
-//       });
-//     }
-
-//     const chapters = await AiNote.findAll({
-//       where: { language, class: className, subject },
-//       attributes: ["topic"],
-//       group: ["topic"],
-//       order: [["topic", "ASC"]],
-//     });
-
-//     res.status(200).json({
-//       success: true,
-//       data: chapters.map((c) => c.topic),
-//     });
-//   } catch (error) {
-//     console.error("Get Chapters Error:", error);
-//     res.status(500).json({ success: false });
-//   }
-// };
-
-// /**
-//  * ============================================
-//  * 5. Get AI Notes (final fetch)
-//  * GET /api/ainote
-//  * ============================================
-//  */
-// export const getAiNotes = async (req, res) => {
-//   try {
-//     const { language, board, class: className, subject, topic } = req.query;
-
-//     const where = {};
-//     if (language) where.language = language;
-//     if (board) where.board = board;
-//     if (className) where.class = className;
-//     if (subject) where.subject = subject;
-//     if (topic) where.topic = topic;
-
-//     const notes = await AiNote.findAll({
-//       where,
-//       order: [["created_at", "ASC"]],
-//     });
-
-//     const updatedNotes = await Promise.all(
-//       notes.map(async (note) => {
-//         const signedUrl = await getSignedPdfUrl(note.full_notes);
-//         const signedBookUrl = await getSignedPdfUrl(note.book_url);
-
-//         return {
-//           ...note.toJSON(),
-//           pdfUrl: signedUrl, // ✅ frontend will use this
-//           bookUrl: signedBookUrl, // ✅ frontend will use this
-//         };
-//       })
-//     );
-
-
-//     res.status(200).json({
-//       success: true,
-//       count: notes.length,
-//       data: updatedNotes,
-//     });
-//   } catch (error) {
-//     console.error("Get AI Notes Error:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Failed to fetch AI notes",
-//     });
-//   }
-// };
-
-// export async function generateNotes({
-//   language,
-//   board,
-//   className,
-//   subject,
-//   chapter,
-// }) {
-//   const prompt = `
-//             You are an AI notes generation assistant.
-
-//             Generate exam-oriented notes in this exact format:
-
-//             Short Notes:
-//             RULES:
-//             - Generate notes strictly based on the selected subject and chapter.
-//             - Use very simple, student-friendly language.
-//             - Keep explanations short and clear.
-//             - Focus only on important exam points.
-//             - Use bullet points and short sections.
-//             - Avoid long paragraphs and unnecessary details.
-
-//             OUTPUT FORMAT (STRICTLY FOLLOW):
-
-//             Class {class} {subject} – Chapter: {chapter}
-
-//             1. Introduction  
-//             2–3 line overview of the chapter.
-
-//             2. Key Concepts  
-//             Short explanation of the most important concepts.
-
-//             3. Important Formulas  
-//             List only essential formulas.
-
-//             4. Important Exam Points  
-//             Bullet list of key facts.
-
-//             5. Quick Summary  
-//             Very short final revision.
-
-//             Now generate notes in the same format for:
-
-//             Board: ${board}
-//             Class: ${className}
-//             Subject: ${subject}
-//             Chapter: ${chapter}
-//             Language: ${language}
-//             `;
-
-//   try {
-//     const response = await openai.chat.completions.create({
-//       model: "openai/gpt-oss-120b",
-//       messages: [
-//         {
-//           role: "system",
-//           content: "You generate structured educational notes for students.",
-//         },
-//         {
-//           role: "user",
-//           content: prompt,
-//         },
-//       ],
-//     });
-
-//     const text = response?.choices?.[0]?.message?.content;
-
-//     if (text) {
-//       console.log("Generated using OpenAI");
-//       return text;
-//     }
-//     throw new Error("Empty OpenAI response");
-//   } catch (openaiError) {
-//     console.warn("OpenAI failed, switching to Gemini...");
-
-//     // ----------- FALLBACK TO GEMINI -----------
-//     try {
-//       const response = await gemini.models.generateContent({
-//         model: "gemini-2.0-flash",
-//         contents: prompt,
-//       });
-
-//       const text =
-//         response?.text || response?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-//       if (!text) throw new Error("Empty Gemini response");
-
-//       console.log("Generated using Gemini");
-//       return text;
-//     } catch (geminiError) {
-//       console.error("Both OpenAI and Gemini failed");
-//       throw new Error("AI services unavailable");
-//     }
-//   }
-// }
-
-// function sleep(ms) {
-//   return new Promise((resolve) => setTimeout(resolve, ms));
-// }
-
-// async function retry(fn, retries = 3) {
-//   try {
-//     return await fn();
-//   } catch (err) {
-//     if (err.status === 429 && retries > 0) {
-//       await sleep(4000);
-//       return retry(fn, retries - 1);
-//     }
-//     throw err;
-//   }
-// }
-
-// export const generateAiNotes = async (req, res) => {
-//   const transaction = await sequelize.transaction();
-
-//   // ✅ Collect all temp paths BEFORE try block so finally can always access them
-//   const allTempFiles = [
-//     ...(req.files?.notes || []),
-//     ...(req.files?.books || []),
-//   ].map(f => f.path);
-
-//   try {
-//     const { language, board, class: className, subject, chapters } = req.body;
-
-//     const chapterList = JSON.parse(chapters);
-
-//     console.log("chapterList length:", chapterList.length);
-//     console.log("noteFiles length:", req.files?.notes?.length);
-//     console.log("bookFiles length:", req.files?.books?.length);
-
-
-//     const noteFiles = req.files.notes;
-//     const bookFiles = req.files.books;
-
-//     if (!noteFiles || noteFiles.length !== chapterList.length) {
-//       throw new Error(
-//         `Notes files mismatch: expected ${chapterList.length}, got ${noteFiles?.length ?? 0}`
-//       );
-//     }
-
-//     if (!bookFiles || bookFiles.length !== chapterList.length) {
-//       throw new Error(
-//         `Books files mismatch: expected ${chapterList.length}, got ${bookFiles?.length ?? 0}`
-//       );
-//     }
-
-//     const results = [];
-
-//     for (let i = 0; i < chapterList.length; i++) {
-//       const topic = chapterList[i].trim();
-//       const noteFile = noteFiles[i];
-//       const bookFile = bookFiles[i];
-
-//       const bookUpload = await uploadToS3(bookFile, "Books", language, board, className, subject, topic);
-//       const bookKey = bookUpload.key;
-
-//       const noteUpload = await uploadToS3(noteFile, "Notes", language, board, className, subject, topic);
-//       const noteKey = noteUpload.key;
-
-//       let subjectLanguage;
-
-//       if (subject.includes("Hindi") || subject.includes("English")) {
-//         subjectLanguage = subject;
-//       }else{
-//         subjectLanguage = language;
-//       }
-
-//       const aiText = await generateNotes({ subjectLanguage, board, className, subject, chapter: topic });
-//       const parsed = parseNotes(aiText);
-
-//       const note = await AiNote.create(
-//         {
-//           language,
-//           board,
-//           class: className,
-//           subject,
-//           topic,
-//           short_notes: parsed.short_notes,
-//           full_notes: noteKey,
-//           book_url: bookKey,
-//           generated_by: "AI",
-//         },
-//         { transaction }
-//       );
-
-//       results.push({ topic, noteKey, bookKey, id: note.id });
-
-//       await sleep(2000);
-//     }
-
-//     await transaction.commit();
-
-//     res.status(200).json({
-//       success: true,
-//       message: "AI Notes + Books uploaded successfully",
-//       results,
-//     });
-
-//   } catch (error) {
-//     await transaction.rollback();
-//     console.error("Generate AI Notes Error:", error);
-
-//     res.status(500).json({
-//       success: false,
-//       message: error.message,
-//     });
-
-//   } finally {
-//     // ✅ Always runs — deletes ALL temp files after success or failure
-//     for (const filePath of allTempFiles) {
-//       try {
-//         if (fs.existsSync(filePath)) {
-//           fs.unlinkSync(filePath);
-//           console.log(`🗑️ Deleted temp file: ${filePath}`);
-//         }
-//       } catch (err) {
-//         console.warn(`⚠️ Could not delete temp file ${filePath}:`, err.message);
-//       }
-//     }
-//   }
-// };
-
-
 import AiNoteNew from "../models/ainote_new.model.js";
-import { Sequelize } from "sequelize";
+import { Sequelize, Op } from "sequelize";
 import sequelize from "../config/db.js";
 import { uploadToS3 } from "../utils/s3Upload.js";
 import fs from "fs";
 import { getSignedPdfUrl } from "../utils/signedUrl.js";
 
-// ─────────────────────────────────────────────
-// Helper: sleep
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Classes that require a stream selection */
+const STREAM_CLASSES = ["11", "12"];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
- * ============================================
- * 1. Get available Languages
- * GET /api/ainote-new/languages
- * ============================================
+ * Returns true when the given class requires a stream (11 or 12).
+ * Accepts both string and number.
  */
+function requiresStream(className) {
+  return STREAM_CLASSES.includes(String(className));
+}
+
+/**
+ * Build a Sequelize `where` clause that handles stream correctly:
+ *  - class 11/12 → filter by the provided stream value
+ *  - other classes → always force stream IS NULL
+ *
+ * This prevents cross-contamination (e.g. class-10 records leaking into
+ * class-11 Science stream results).
+ */
+function buildStreamCondition(className, stream) {
+  if (requiresStream(className)) {
+    // stream is mandatory for 11/12 — caller should have validated this
+    return { stream: stream ?? null };
+  }
+  // For all other classes, stream must be NULL in the DB
+  return { stream: null };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. Get available Languages
+// GET /api/ainote-new/languages
+// ─────────────────────────────────────────────────────────────────────────────
 export const getLanguages = async (req, res) => {
   try {
     const languages = await AiNoteNew.findAll({
@@ -467,12 +66,42 @@ export const getLanguages = async (req, res) => {
   }
 };
 
-/**
- * ============================================
- * 2. Get Classes (based on language + board)
- * GET /api/ainote-new/classes
- * ============================================
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// 2. Get Boards
+// GET /api/ainote-new/boards?language=
+// ─────────────────────────────────────────────────────────────────────────────
+export const getBoards = async (req, res) => {
+  try {
+    const { language } = req.query;
+
+    if (!language) {
+      return res.status(400).json({
+        success: false,
+        message: "language is required",
+      });
+    }
+
+    const boards = await AiNoteNew.findAll({
+      where: { language },
+      attributes: ["board"],
+      group: ["board"],
+      order: [["board", "ASC"]],
+    });
+
+    res.status(200).json({
+      success: true,
+      data: boards.map((b) => b.board),
+    });
+  } catch (error) {
+    console.error("Get Boards Error:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch boards" });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3. Get Classes
+// GET /api/ainote-new/classes?language=&board=
+// ─────────────────────────────────────────────────────────────────────────────
 export const getClasses = async (req, res) => {
   try {
     const { language, board } = req.query;
@@ -497,29 +126,80 @@ export const getClasses = async (req, res) => {
     });
   } catch (error) {
     console.error("Get Classes Error:", error);
-    res.status(500).json({ success: false });
+    res.status(500).json({ success: false, message: "Failed to fetch classes" });
   }
 };
 
-/**
- * ============================================
- * 3. Get Subjects (based on language + class)
- * GET /api/ainote-new/subjects
- * ============================================
- */
-export const getSubjects = async (req, res) => {
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. Get Streams  (only meaningful for class 11 & 12)
+// GET /api/ainote-new/streams?language=&board=
+//
+// Returns distinct non-null stream values.
+// Frontend should call this only after the user picks class 11 or 12.
+// ─────────────────────────────────────────────────────────────────────────────
+export const getStreams = async (req, res) => {
   try {
-    const { language, class: className } = req.query;
+    const { language, board } = req.query;
 
-    if (!language || !className) {
+    if (!language || !board) {
       return res.status(400).json({
         success: false,
-        message: "language and class are required",
+        message: "language and board are required",
+      });
+    }
+
+    const streams = await AiNoteNew.findAll({
+      where: {
+        language,
+        board,
+        class: { [Op.in]: STREAM_CLASSES },  // only 11 & 12 have streams
+        stream: { [Op.ne]: null },            // exclude NULL rows
+      },
+      attributes: ["stream"],
+      group: ["stream"],
+      order: [["stream", "ASC"]],
+    });
+
+    res.status(200).json({
+      success: true,
+      data: streams.map((s) => s.stream),
+    });
+  } catch (error) {
+    console.error("Get Streams Error:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch streams" });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. Get Subjects
+// GET /api/ainote-new/subjects?language=&board=&class=  [&stream= for 11/12]
+// ─────────────────────────────────────────────────────────────────────────────
+export const getSubjects = async (req, res) => {
+  try {
+    const { language, board, class: className, stream } = req.query;
+
+    if (!language || !board || !className) {
+      return res.status(400).json({
+        success: false,
+        message: "language, board and class are required",
+      });
+    }
+
+    // For class 11/12 stream is required
+    if (requiresStream(className) && !stream) {
+      return res.status(400).json({
+        success: false,
+        message: "stream is required for class 11 and 12",
       });
     }
 
     const subjects = await AiNoteNew.findAll({
-      where: { language, class: className },
+      where: {
+        language,
+        board,
+        class: className,
+        ...buildStreamCondition(className, stream),
+      },
       attributes: ["subject"],
       group: ["subject"],
       order: [["subject", "ASC"]],
@@ -531,29 +211,40 @@ export const getSubjects = async (req, res) => {
     });
   } catch (error) {
     console.error("Get Subjects Error:", error);
-    res.status(500).json({ success: false });
+    res.status(500).json({ success: false, message: "Failed to fetch subjects" });
   }
 };
 
-/**
- * ============================================
- * 4. Get Chapters (based on language + class + subject)
- * GET /api/ainote-new/chapters
- * ============================================
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. Get Chapters
+// GET /api/ainote-new/chapters?language=&board=&class=&subject=  [&stream=]
+// ─────────────────────────────────────────────────────────────────────────────
 export const getChapters = async (req, res) => {
   try {
-    const { language, class: className, subject } = req.query;
+    const { language, board, class: className, subject, stream } = req.query;
 
-    if (!language || !className || !subject) {
+    if (!language || !board || !className || !subject) {
       return res.status(400).json({
         success: false,
-        message: "language, class and subject are required",
+        message: "language, board, class and subject are required",
+      });
+    }
+
+    if (requiresStream(className) && !stream) {
+      return res.status(400).json({
+        success: false,
+        message: "stream is required for class 11 and 12",
       });
     }
 
     const chapters = await AiNoteNew.findAll({
-      where: { language, class: className, subject },
+      where: {
+        language,
+        board,
+        class: className,
+        subject,
+        ...buildStreamCondition(className, stream),
+      },
       attributes: ["topic"],
       group: ["topic"],
       order: [["topic", "ASC"]],
@@ -565,26 +256,29 @@ export const getChapters = async (req, res) => {
     });
   } catch (error) {
     console.error("Get Chapters Error:", error);
-    res.status(500).json({ success: false });
+    res.status(500).json({ success: false, message: "Failed to fetch chapters" });
   }
 };
 
-/**
- * ============================================
- * 5. Get Notes (final fetch with signed URLs)
- * GET /api/ainote-new
- * ============================================
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// 7. Get Notes  (final fetch with signed URLs)
+// GET /api/ainote-new?language=&board=&class=&subject=&topic=  [&stream=]
+// ─────────────────────────────────────────────────────────────────────────────
 export const getAiNotes = async (req, res) => {
   try {
-    const { language, board, class: className, subject, topic } = req.query;
+    const { language, board, class: className, subject, topic, stream } = req.query;
 
     const where = {};
-    if (language)   where.language = language;
-    if (board)      where.board    = board;
-    if (className)  where.class    = className;
-    if (subject)    where.subject  = subject;
-    if (topic)      where.topic    = topic;
+    if (language)  where.language = language;
+    if (board)     where.board    = board;
+    if (subject)   where.subject  = subject;
+    if (topic)     where.topic    = topic;
+
+    // Apply class + stream together so the filter is always consistent
+    if (className) {
+      where.class = className;
+      Object.assign(where, buildStreamCondition(className, stream));
+    }
 
     const notes = await AiNoteNew.findAll({
       where,
@@ -606,7 +300,7 @@ export const getAiNotes = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      count: notes.length,
+      count: updatedNotes.length,
       data:  updatedNotes,
     });
   } catch (error) {
@@ -618,11 +312,25 @@ export const getAiNotes = async (req, res) => {
   }
 };
 
-
+// ─────────────────────────────────────────────────────────────────────────────
+// 8. Create AI Notes  (batch upload)
+// POST /api/ainote-new  — multipart/form-data
+//
+// Body fields:
+//   language, board, class, subject
+//   stream?               — required when class is 11 or 12, must be null otherwise
+//   chapters              — JSON string: string[]
+//   short_notes?          — JSON string: (string|null)[]  same length as chapters
+//   noteChapterIndices?   — JSON string: number[]  0-based indices with a note PDF
+//   bookChapterIndices?   — JSON string: number[]  0-based indices with a book PDF
+//   notes[]               — PDF files  (count must equal noteChapterIndices.length)
+//   books[]               — PDF files  (count must equal bookChapterIndices.length)
+//   created_by?           — default "AI"
+// ─────────────────────────────────────────────────────────────────────────────
 export const createAiNotes = async (req, res) => {
   const transaction = await sequelize.transaction();
 
-  // Collect all temp file paths upfront so `finally` can always clean them
+  // Collect all temp file paths up-front so `finally` can always clean them
   const allTempFiles = [
     ...(req.files?.notes || []),
     ...(req.files?.books || []),
@@ -637,10 +345,12 @@ export const createAiNotes = async (req, res) => {
       stream,
       chapters,
       short_notes: shortNotesRaw,
+      noteChapterIndices: noteIndicesRaw,
+      bookChapterIndices: bookIndicesRaw,
       created_by = "AI",
     } = req.body;
 
-    // ── Validate required text fields ──────────────────────────────────────
+    // ── Validate required text fields ─────────────────────────────────────
     if (!language || !board || !className || !subject || !chapters) {
       return res.status(400).json({
         success: false,
@@ -648,72 +358,127 @@ export const createAiNotes = async (req, res) => {
       });
     }
 
-    const chapterList  = JSON.parse(chapters);
+    // ── Stream validation ─────────────────────────────────────────────────
+    if (requiresStream(className) && !stream) {
+      return res.status(400).json({
+        success: false,
+        message: "stream is required for class 11 and 12",
+      });
+    }
+
+    if (!requiresStream(className) && stream) {
+      return res.status(400).json({
+        success: false,
+        message: `stream must not be provided for class ${className}`,
+      });
+    }
+
+    // The stream value to store — null for classes other than 11/12
+    const resolvedStream = requiresStream(className) ? stream : null;
+
+    const chapterList    = JSON.parse(chapters);
     const shortNotesList = shortNotesRaw ? JSON.parse(shortNotesRaw) : [];
 
-    console.log("chapters count:", chapterList.length);
-    console.log("noteFiles  count:", req.files?.notes?.length);
-    console.log("bookFiles  count:", req.files?.books?.length);
+    // Parse index arrays — safe default to [] when not sent
+    const noteIndices = noteIndicesRaw ? JSON.parse(noteIndicesRaw) : [];
+    const bookIndices = bookIndicesRaw ? JSON.parse(bookIndicesRaw) : [];
 
     const noteFiles = req.files?.notes || [];
     const bookFiles = req.files?.books || [];
 
-    // ── File count validation ───────────────────────────────────────────────
-    // Files are optional per chapter — but if provided they must match count
-    if (noteFiles.length > 0 && noteFiles.length !== chapterList.length) {
+    console.log("chapters count     :", chapterList.length);
+    console.log("stream             :", resolvedStream);
+    console.log("noteFiles count    :", noteFiles.length);
+    console.log("bookFiles count    :", bookFiles.length);
+    console.log("noteChapterIndices :", noteIndices);
+    console.log("bookChapterIndices :", bookIndices);
+
+    // ── Validate: index arrays must match actual file counts ──────────────
+    if (noteFiles.length !== noteIndices.length) {
       throw new Error(
-        `Notes files mismatch: expected ${chapterList.length}, got ${noteFiles.length}`
+        `noteChapterIndices length (${noteIndices.length}) must match notes file count (${noteFiles.length})`
       );
     }
 
-    if (bookFiles.length > 0 && bookFiles.length !== chapterList.length) {
+    if (bookFiles.length !== bookIndices.length) {
       throw new Error(
-        `Books files mismatch: expected ${chapterList.length}, got ${bookFiles.length}`
+        `bookChapterIndices length (${bookIndices.length}) must match books file count (${bookFiles.length})`
       );
     }
+
+    // ── Validate: indices must be within chapter range ────────────────────
+    for (const idx of noteIndices) {
+      if (idx < 0 || idx >= chapterList.length) {
+        throw new Error(
+          `noteChapterIndices contains out-of-range index ${idx} (chapters length: ${chapterList.length})`
+        );
+      }
+    }
+
+    for (const idx of bookIndices) {
+      if (idx < 0 || idx >= chapterList.length) {
+        throw new Error(
+          `bookChapterIndices contains out-of-range index ${idx} (chapters length: ${chapterList.length})`
+        );
+      }
+    }
+
+    // ── Build sparse maps: chapterIndex → File ────────────────────────────
+    const noteFileMap = {};
+    noteIndices.forEach((chIdx, fileIdx) => {
+      noteFileMap[chIdx] = noteFiles[fileIdx];
+    });
+
+    const bookFileMap = {};
+    bookIndices.forEach((chIdx, fileIdx) => {
+      bookFileMap[chIdx] = bookFiles[fileIdx];
+    });
 
     const results = [];
 
     for (let i = 0; i < chapterList.length; i++) {
       const topic      = chapterList[i].trim();
       const shortNotes = shortNotesList[i] ?? null;
-      const noteFile   = noteFiles[i] ?? null;
-      const bookFile   = bookFiles[i] ?? null;
+      const noteFile   = noteFileMap[i] ?? null;
+      const bookFile   = bookFileMap[i] ?? null;
 
-      // Upload PDFs to S3 only when a file was provided for this chapter
       let noteKey = null;
       let bookKey = null;
 
       if (bookFile) {
-        const bookUpload = await uploadToS3(bookFile, "Books", language, board, className, subject, topic);
+        const bookUpload = await uploadToS3(
+          bookFile, "Books", language, board, className, subject, topic
+        );
         bookKey = bookUpload.key;
+        console.log(`✅ Book uploaded for chapter [${i}] "${topic}":`, bookKey);
       }
 
       if (noteFile) {
-        const noteUpload = await uploadToS3(noteFile, "Notes", language, board, className, subject, topic);
+        const noteUpload = await uploadToS3(
+          noteFile, "Notes", language, board, className, subject, topic
+        );
         noteKey = noteUpload.key;
+        console.log(`✅ Note uploaded for chapter [${i}] "${topic}":`, noteKey);
       }
 
-      // Save record — short_notes comes directly from the user's input
       const note = await AiNoteNew.create(
         {
           language,
           board,
-          stream:       stream ?? null,
-          class:        className,
+          stream:      resolvedStream,   // null for class ≤ 10, value for 11/12
+          class:       className,
           subject,
           topic,
-          short_notes:  shortNotes,
-          full_notes:   noteKey,
-          book_url:     bookKey,
+          short_notes: shortNotes,
+          full_notes:  noteKey,
+          book_url:    bookKey,
           created_by,
         },
         { transaction }
       );
 
-      results.push({ topic, noteKey, bookKey, id: note.id });
+      results.push({ index: i, topic, noteKey, bookKey, id: note.id });
 
-      // Small delay between iterations to avoid S3 rate limits
       await sleep(500);
     }
 
@@ -735,7 +500,6 @@ export const createAiNotes = async (req, res) => {
     });
 
   } finally {
-    // Always delete temp files whether the request succeeded or failed
     for (const filePath of allTempFiles) {
       try {
         if (fs.existsSync(filePath)) {

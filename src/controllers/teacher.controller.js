@@ -18,6 +18,61 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { parseExcel } from "../utils/excel.util.js";
 
 /* =====================================================
+   SHARED HELPER — fetch secondary subjects with full details
+   Mirrors exactly what Sequelize does for primarySubject include
+   ===================================================== */
+const fetchSecondarySubjects = async (rawIds) => {
+  console.log("[fetchSecondarySubjects] rawIds received:", rawIds, "| type:", typeof rawIds);
+
+  // secondary_subject_ids can come from DB as a JSON string "[2,33]" or already an array
+  let ids = rawIds;
+  if (typeof rawIds === "string") {
+    try {
+      ids = JSON.parse(rawIds);
+      console.log("[fetchSecondarySubjects] parsed from string:", ids);
+    } catch (e) {
+      console.error("[fetchSecondarySubjects] failed to parse rawIds:", rawIds, e);
+      return [];
+    }
+  }
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    console.log("[fetchSecondarySubjects] no valid ids, returning []");
+    return [];
+  }
+
+  // Sanitise — keep only numeric values
+  const cleanIds = ids.map(Number).filter((n) => !isNaN(n) && n > 0);
+  console.log("[fetchSecondarySubjects] cleanIds for query:", cleanIds);
+
+  if (!cleanIds.length) return [];
+
+  const subjects = await AdminSubject.findAll({
+    where: { subject_id: cleanIds },
+    attributes: ["subject_id", "subject_name", "board", "language", "class_id"],
+    include: [
+      {
+        model: AdminClass,
+        as: "class",
+        attributes: ["class_id", "class_name"],
+      },
+    ],
+  });
+
+  console.log(
+    "[fetchSecondarySubjects] subjects found:",
+    subjects.map((s) => ({
+      subject_id:   s.subject_id,
+      subject_name: s.subject_name,
+      class_id:     s.class_id,
+      class:        s.class,
+    }))
+  );
+
+  return subjects;
+};
+
+/* =====================================================
    CREATE TEACHER
    ===================================================== */
 const createTeacher = asyncHandler(async (req, res) => {
@@ -26,10 +81,22 @@ const createTeacher = asyncHandler(async (req, res) => {
   if (!school) throw new ApiError(404, "School not found");
 
   const {
-    username, password, phone_number, email, full_name,
-    primary_subject_id, secondary_subject_ids,
-    experience, age, onboarding_date, school_tenure,
-    device_type, device_access, ppt_generation_enabled, cost_limit,
+    username,
+    password,
+    phone_number,
+    email,
+    full_name,
+    primary_subject_id,
+    secondary_subject_ids,
+    experience,
+    age,
+    onboarding_date,
+    school_tenure,
+    device_type,
+    device_access,
+    ppt_generation_enabled,
+    cost_limit,
+    qualification,
   } = req.body;
 
   if (!username || !password)
@@ -38,7 +105,10 @@ const createTeacher = asyncHandler(async (req, res) => {
   const transaction = await sequelize.transaction();
 
   try {
-    const role = await AdminRole.findOne({ where: { role_name: "TEACHER" }, transaction });
+    const role = await AdminRole.findOne({
+      where: { role_name: "TEACHER" },
+      transaction,
+    });
     if (!role) throw new ApiError(400, "Teacher role not found");
 
     const hashed = await bcrypt.hash(password, 10);
@@ -53,7 +123,7 @@ const createTeacher = asyncHandler(async (req, res) => {
         role_id:                    role.role_id,
         school_id,
         status:                     "Active",
-        is_password_reset_required: true,   // ✅ admin-created → must reset on first login
+        is_password_reset_required: true,
       },
       { transaction }
     );
@@ -72,15 +142,22 @@ const createTeacher = asyncHandler(async (req, res) => {
         device_access:          device_access         || null,
         ppt_generation_enabled: ppt_generation_enabled ?? false,
         cost_limit:             cost_limit            || null,
+        qualification:          qualification         || null,
       },
       { transaction }
     );
 
-    await AdminSchool.increment("teacher_count", { by: 1, where: { school_id }, transaction });
+    await AdminSchool.increment("teacher_count", {
+      by: 1,
+      where: { school_id },
+      transaction,
+    });
 
     await transaction.commit();
 
-    return res.status(201).json(new ApiResponse(201, teacher, "Teacher created successfully"));
+    return res
+      .status(201)
+      .json(new ApiResponse(201, teacher, "Teacher created successfully"));
   } catch (error) {
     await transaction.rollback();
     throw error;
@@ -104,7 +181,10 @@ const bulkTeacherUpload = asyncHandler(async (req, res) => {
   const transaction = await sequelize.transaction();
 
   try {
-    const role = await AdminRole.findOne({ where: { role_name: "TEACHER" }, transaction });
+    const role = await AdminRole.findOne({
+      where: { role_name: "TEACHER" },
+      transaction,
+    });
     if (!role) throw new ApiError(400, "Teacher role not found");
 
     let createdCount = 0;
@@ -125,7 +205,7 @@ const bulkTeacherUpload = asyncHandler(async (req, res) => {
           role_id:                    role.role_id,
           school_id,
           status:                     "Active",
-          is_password_reset_required: true,   // ✅
+          is_password_reset_required: true,
         },
         { transaction }
       );
@@ -133,7 +213,13 @@ const bulkTeacherUpload = asyncHandler(async (req, res) => {
       let primarySubjectId = null;
 
       if (row.class_name && row.subject_name) {
-        const classRecord = await AdminClass.findOne({ where: { class_name: row.class_name }, transaction });
+        const classRecord = await AdminClass.findOne({
+          where: { class_name: row.class_name },
+          transaction,
+        });
+
+        console.log(`[bulkTeacherUpload] Row ${index + 2} - classRecord for "${row.class_name}":`, classRecord?.class_id ?? "not found");
+
         if (classRecord) {
           const primarySubject = await AdminSubject.findOne({
             where: {
@@ -144,6 +230,9 @@ const bulkTeacherUpload = asyncHandler(async (req, res) => {
             },
             transaction,
           });
+
+          console.log(`[bulkTeacherUpload] Row ${index + 2} - primarySubject for "${row.subject_name}":`, primarySubject?.subject_id ?? "not found");
+
           primarySubjectId = primarySubject?.subject_id ?? null;
         }
       }
@@ -162,6 +251,7 @@ const bulkTeacherUpload = asyncHandler(async (req, res) => {
           device_access:          row.device_access         || null,
           ppt_generation_enabled: row.ppt_generation_enabled ?? false,
           cost_limit:             row.cost_limit            || null,
+          qualification:          row.qualification         || null,
         },
         { transaction }
       );
@@ -169,11 +259,18 @@ const bulkTeacherUpload = asyncHandler(async (req, res) => {
       createdCount++;
     }
 
-    await AdminSchool.increment("teacher_count", { by: createdCount, where: { school_id }, transaction });
+    await AdminSchool.increment("teacher_count", {
+      by: createdCount,
+      where: { school_id },
+      transaction,
+    });
+
     await transaction.commit();
     fs.unlinkSync(file.path);
 
-    return res.status(201).json(new ApiResponse(201, { created: createdCount }, "Teachers uploaded successfully"));
+    return res
+      .status(201)
+      .json(new ApiResponse(201, { created: createdCount }, "Teachers uploaded successfully"));
   } catch (error) {
     await transaction.rollback();
     if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
@@ -200,33 +297,45 @@ const getAllTeachers = asyncHandler(async (req, res) => {
         as: "primarySubject",
         attributes: ["subject_id", "subject_name", "board", "language", "class_id"],
         required: false,
-        include: [{ model: AdminClass, as: "class", attributes: ["class_id", "class_name"] }],
+        include: [
+          {
+            model: AdminClass,
+            as: "class",
+            attributes: ["class_id", "class_name"],
+          },
+        ],
       },
     ],
   });
 
-  const teachersWithSecondary = await Promise.all(
+  console.log(`[getAllTeachers] total teachers fetched: ${teachers.length}`);
+
+  const enriched = await Promise.all(
     teachers.map(async (teacher) => {
-      let secondarySubjects = [];
-      if (teacher.secondary_subject_ids?.length) {
-        secondarySubjects = await AdminSubject.findAll({
-          where: { subject_id: teacher.secondary_subject_ids },
-          attributes: ["subject_id", "subject_name", "board", "language", "class_id"],
-          include: [{ model: AdminClass, as: "class", attributes: ["class_id", "class_name"] }],
-        });
-      }
-      return { ...teacher.toJSON(), secondarySubjects };
+      console.log(
+        `[getAllTeachers] teacher_id=${teacher.teacher_id} | secondary_subject_ids raw:`,
+        teacher.secondary_subject_ids
+      );
+      const secondarySubjects = await fetchSecondarySubjects(teacher.secondary_subject_ids);
+      return {
+        ...teacher.toJSON(),
+        secondarySubjects,
+      };
     })
   );
 
-  return res.status(200).json(new ApiResponse(200, teachersWithSecondary, "Teachers fetched"));
+  return res
+    .status(200)
+    .json(new ApiResponse(200, enriched, "Teachers fetched"));
 });
 
 /* =====================================================
-   GET SINGLE TEACHER
+   GET SINGLE TEACHER — full profile
    ===================================================== */
 const getTeacherById = asyncHandler(async (req, res) => {
   const { id } = req.params;
+
+  console.log(`[getTeacherById] fetching teacher_id: ${id}`);
 
   const teacher = await TeacherProfile.findByPk(id, {
     include: [
@@ -240,23 +349,64 @@ const getTeacherById = asyncHandler(async (req, res) => {
         as: "primarySubject",
         attributes: ["subject_id", "subject_name", "board", "language", "class_id"],
         required: false,
-        include: [{ model: AdminClass, as: "class", attributes: ["class_id", "class_name"] }],
+        include: [
+          {
+            model: AdminClass,
+            as: "class",
+            attributes: ["class_id", "class_name"],
+          },
+        ],
       },
     ],
   });
 
   if (!teacher) throw new ApiError(404, "Teacher not found");
 
-  let secondarySubjects = [];
-  if (teacher.secondary_subject_ids?.length) {
-    secondarySubjects = await AdminSubject.findAll({
-      where: { subject_id: teacher.secondary_subject_ids },
-      attributes: ["subject_id", "subject_name", "board", "language", "class_id"],
-      include: [{ model: AdminClass, as: "class", attributes: ["class_id", "class_name"] }],
-    });
-  }
+  console.log(`[getTeacherById] teacher_id=${teacher.teacher_id}`);
+  console.log(`[getTeacherById] primary_subject_id:`, teacher.primary_subject_id);
+  console.log(`[getTeacherById] primarySubject resolved:`, teacher.primarySubject);
+  console.log(`[getTeacherById] secondary_subject_ids raw:`, teacher.secondary_subject_ids);
 
-  return res.status(200).json(new ApiResponse(200, { ...teacher.toJSON(), secondarySubjects }, "Teacher fetched"));
+  // Secondary subjects — full objects with class info, same shape as primarySubject
+  const secondarySubjects = await fetchSecondarySubjects(teacher.secondary_subject_ids);
+
+  console.log(`[getTeacherById] secondarySubjects resolved count: ${secondarySubjects.length}`);
+
+  // All class-section-subject assignments for this teacher
+  const assignments = await TeacherClassSectionSubject.findAll({
+    where: { teacher_id: id },
+    include: [
+      {
+        model: AdminClass,
+        as: "class",
+        attributes: ["class_id", "class_name"],
+      },
+      {
+        model: AdminSection,
+        as: "section",
+        attributes: ["section_id", "section_name"],
+      },
+      {
+        model: AdminSubject,
+        as: "subject",
+        attributes: ["subject_id", "subject_name", "board", "language"],
+      },
+    ],
+  });
+
+  console.log(`[getTeacherById] assignments count: ${assignments.length}`);
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        ...teacher.toJSON(),
+        secondarySubjects,
+        assignments,
+      },
+      "Teacher fetched"
+    )
+  );
 });
 
 /* =====================================================
@@ -272,7 +422,9 @@ const updateTeacher = asyncHandler(async (req, res) => {
 
   await teacher.update(allowedUpdates);
 
-  return res.status(200).json(new ApiResponse(200, teacher, "Teacher updated successfully"));
+  return res
+    .status(200)
+    .json(new ApiResponse(200, teacher, "Teacher updated successfully"));
 });
 
 /* =====================================================
@@ -294,11 +446,17 @@ const deleteTeacher = asyncHandler(async (req, res) => {
     await teacher.destroy({ transaction });
     await User.destroy({ where: { user_id }, transaction });
 
-    await AdminSchool.increment("teacher_count", { by: -1, where: { school_id }, transaction });
+    await AdminSchool.increment("teacher_count", {
+      by: -1,
+      where: { school_id },
+      transaction,
+    });
 
     await transaction.commit();
 
-    return res.status(200).json(new ApiResponse(200, null, "Teacher deleted successfully"));
+    return res
+      .status(200)
+      .json(new ApiResponse(200, null, "Teacher deleted successfully"));
   } catch (error) {
     await transaction.rollback();
     throw error;
