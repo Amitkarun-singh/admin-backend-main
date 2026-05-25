@@ -14,6 +14,7 @@ import {
 } from "./chatbot/chatbotController.ts";
 import { practiceQuestionsLog } from "../middleware/practiceQuestionsLog.js";
 import { rateLimit } from "../middleware/rateLimite.js";
+import rateLimitWithToken from "../middleware/rateLimiteWithToken.ts";
 import { voiceBotController } from "./voiceBot/voiceBotController.ts";
 import { chatbotLogs } from "../middleware/chatbotLogs.js";
 import { tutorLogs } from "../middleware/tutorLogs.ts";
@@ -33,6 +34,7 @@ router.post(
   authMiddleware,
   upload.single("file"),
   chatbotLogs,
+  rateLimitWithToken,
   chatbotController,
 );
 

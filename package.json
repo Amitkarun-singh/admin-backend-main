@@ -41,6 +41,7 @@
     "sequelize": "^6.37.7",
     "sequelize-cli": "^6.6.5",
     "tesseract.js": "^7.0.0",
+    "tiktoken": "^1.0.22",
     "tsx": "^4.21.0",
     "uuid": "^13.0.0",
     "vitest": "^4.1.4",
