@@ -18,17 +18,17 @@ import registerRoutes from "./routes/register.routes.js";
 
 import historyRoutes from "./routes/history.routes.js";
 import { globalErrorHandler } from "./error/globalErrorHandler.ts";
-import { traceMiddleware } from "./ai-features/middleware/traceMiddleware.ts";
+import { traceMiddleware } from "./middlewares/traceMiddleware,meiddleware.ts";
 
 // Imports for AI features
-import giniRouter from "./ai-features/gini/giniRouter.js";
-import performanceRouter from "./ai-features/studentPerformance/studentPerformanceRouter.js";
-import previousPapersRouter from "./ai-features/previousPapers/previousPapersRouter.js";
-import predictPapersRouter from "./ai-features/predictPapers/predictPapersRouter.js";
+import giniRouter from "./routes/giniRouter.routes.ts";
+import performanceRouter from "./routes/studentPerformance.Router.js";
+import previousPapersRouter from "./routes/previousPapers.router.js";
+import predictPapersRouter from "./routes/predictPapers.router.ts";
 import summarizeRoute from "./routes/summarize.routes.js";
 import ainoteRoute from "./routes/ainote.routes.js";
 import assessmentRoutes from "./routes/assessment.routes.js";
-import appFeedbackRouter from "./ai-features/app_feedback/appFeedbackRoute.js";
+import appFeedbackRouter from "./routes/appFeedback.route.ts";
 import featureRoutes from "./routes/feature.routes.js";
 // import dotenv from "dotenv";
 // dotenv.config();

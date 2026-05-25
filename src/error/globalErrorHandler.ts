@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { AppError } from "./AppError.ts";
-import { StreamAdapter } from "../ai-features/pattern/adapter/StreamAdapter.ts";
+import { StreamAdapter } from "../interface/adapter/StreamAdapter.ts";
 const error = new StreamAdapter();
 export const globalErrorHandler = (
   err: any,

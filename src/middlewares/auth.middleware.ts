@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 import { ApiError } from "../utils/ApiError.js";
 import type { Request, Response, NextFunction } from "express";
-import type { UserTokenPayload } from "../ai-features/type/type.d.ts";
+import type { UserTokenPayload } from "../type/type.js";
 
 export const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
   console.log("Auth middleware");
