@@ -14,7 +14,7 @@ import {
 } from "../controllers/chatbot.controller.ts";
 import { practiceQuestionsLog } from "../middlewares/practiceQuestionsLog.middleware.js";
 
-import rateLimitWithToken from "../middlewares/rateLimiteWithToken.ts";
+import rateLimitWithToken from "../middlewares/rateLimiteWithToken.middleware.ts";
 import { voiceBotController } from "../controllers/voiceBot.controller.ts";
 import { chatbotLogs } from "../middlewares/chatbotLogs.middleware.js";
 import { tutorLogs } from "../middlewares/tutorLogs.middleware.ts";
