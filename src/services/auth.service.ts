@@ -105,45 +105,7 @@ export class AuthService {
     return this.loginWithUserId(userData.user_id);
   }
 
-  // async sendLoginOtp(phone_number: string) {
-  //   const user = await userRepository.findByPhoneNumber(phone_number);
-  //   if (!user) throw new ApiError(404, "User not found");
-
-  //   const otp = generateOTP();
-  //   const otpToken = createOtpToken(phone_number, otp);
-  //   return { otpToken, otp }; // Return otp for dev logging
-  // }
-
-  // async forgotPasswordSendOtp(phone_number: string) {
-  //   const user = await userRepository.findByPhoneNumber(phone_number);
-  //   if (!user) throw new ApiError(404, "No account found");
-  //   if ((user as any).status.toLowerCase() !== "active") throw new ApiError(403, "Account inactive");
-
-  //   const otp = generateOTP();
-  //   const otpToken = createOtpToken(phone_number, otp);
-  //   return { otpToken, otp };
-  // }
-
-  // async forgotPasswordVerifyOtp(phone_number: string, otp: string, otpToken: string) {
-  //   verifyOtpToken(phone_number, otp, otpToken);
-  //   const user = await userRepository.findByPhoneNumber(phone_number);
-  //   if (!user) throw new ApiError(404, "User not found");
-
-  //   const resetToken = jwt.sign(
-  //     { user_id: (user as any).user_id, purpose: "forgot_password" },
-  //     process.env.ACCESS_TOKEN_SECRET!,
-  //     { expiresIn: "10m" }
-  //   );
-  //   return { resetToken };
-  // }
-
-  // async forgotPasswordReset(user_id: number | string, newPassword: string) {
-  //   const hashed = await bcrypt.hash(newPassword, 10);
-  //   await userRepository.update(user_id, {
-  //     password: hashed,
-  //     is_password_reset_required: false,
-  //   });
-  // }
+  
 
   async resetFirstTimePassword(user_id: number | string, newPassword: string) {
     const user = await userRepository.findById(user_id);
@@ -152,7 +114,11 @@ export class AuthService {
     const userData = user as any;
 
     if (!userData.is_password_reset_required) {
-      throw new ApiError(400, "Password already reset");
+      throw new ValidationError([{
+        field: "password",
+        message: "Password already reset",
+        code: "PASSWORD_ALREADY_RESET",
+      }]);
     }
 
     const hashed = await bcrypt.hash(newPassword, 10);
