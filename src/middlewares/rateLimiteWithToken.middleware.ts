@@ -1,7 +1,9 @@
-import type {Response, Request, NextFunction} from 'express';
+import type { Response, Request, NextFunction } from "express";
+import redisClient from "../configs/redis/redis.ts";
 
 import express from "express";
 import { encoding_for_model } from "tiktoken";
+import { TokenLimitExceededError } from "../error/AppError.ts";
 
 const app = express();
 
@@ -9,92 +11,81 @@ app.use(express.json());
 
 const encoder = encoding_for_model("gpt-4o-mini");
 
-/**
- * Count tokens helper
- */
 function countTokens(text = "") {
   return encoder.encode(text).length;
 }
 
-/**
- * Token counting middleware
- */
-export default function tokenCounter(req : Request, res : Response, next : NextFunction) {
+export default async function tokenCounter(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  const userId = String(req.user.user_id);
+
+  // Get existing balance
+  let tokens = await redisClient.get(userId);
+
+  // First time user
+  if (!tokens) {
+    await redisClient.set(userId, 500);
+    tokens = "500";
+  }
+
+  const remainingTokens = Number(tokens);
+
   const requestBody = JSON.stringify(req.body || {});
   const requestTokens = countTokens(requestBody);
 
   console.log("Request Tokens:", requestTokens);
 
-  // Store original send
-  const originalSend = res.send;
-  const originalWrite = res.write;
+  // BLOCK REQUEST BEFORE PROCESSING
+  if (remainingTokens <= 0 || remainingTokens < requestTokens) {
+     throw new TokenLimitExceededError()
+  }
 
-  res.send = function (body) {
+  let responseTokens = 0;
+
+  const originalWrite = res.write;
+  const originalSend = res.send;
+
+  // Count streamed responses
+  res.write = function (chunk: any, ...args: any[]) {
+    const responseBody =
+      typeof chunk === "string"
+        ? chunk
+        : Buffer.isBuffer(chunk)
+        ? chunk.toString()
+        : JSON.stringify(chunk);
+
+    responseTokens += countTokens(responseBody);
+
+    return originalWrite.apply(res, [chunk, ...args]);
+  };
+
+  // Count normal responses
+  res.send = function (body: any) {
     const responseBody =
       typeof body === "string" ? body : JSON.stringify(body);
 
-    const responseTokens = countTokens(responseBody);
-
-    console.log("Response Tokens:", responseTokens);
-    console.log("Total Tokens:", requestTokens + responseTokens);
-
-    // Optional headers
-    // res.setHeader("X-Request-Tokens", requestTokens);
-    // res.setHeader("X-Response-Tokens", responseTokens);
-    // res.setHeader(
-    //   "X-Total-Tokens",
-    //   requestTokens + responseTokens
-    // );
+    responseTokens += countTokens(responseBody);
 
     return originalSend.call(this, body);
   };
-  let responseTokens = 0
-    res.write = function (chunks, ...args:unknown[]) {
-    const responseBody =
-      typeof chunks === "string" ? chunks : JSON.stringify(chunks);
 
-      
-       responseTokens += countTokens(responseBody);
-      
-       
-       
-       
-       
-       
-       // Optional headers
-       // res.setHeader("X-Request-Tokens", requestTokens);
-       // res.setHeader("X-Response-Tokens", responseTokens);
-       // res.setHeader(
-        //   "X-Total-Tokens",
-        //   requestTokens + responseTokens
-        // );
-        return originalWrite.apply(res, [chunks, ...args]);
-        // return originalWrite.call(this, [chunks,...args]);
-      };
-      
-      res.on("finish", ()=>{
+  // After response finished
+  res.on("finish", async () => {
+    const totalTokens = requestTokens + responseTokens;
 
-        // console.log("############################")
-        console.log("Response Tokens:", requestTokens);
-        console.log("Response Tokens:", responseTokens);
-         console.log("Total Tokens:", requestTokens + responseTokens);
-        // console.log("############################")
-      })
-      
-      next();
-      
+    console.log("Request Tokens:", requestTokens);
+    console.log("Response Tokens:", responseTokens);
+    console.log("Total Tokens:", totalTokens);
+
+    const updatedBalance = remainingTokens - totalTokens;
+
+    await redisClient.set(userId, updatedBalance);
+
+    console.log("Remaining Tokens:", updatedBalance);
+  });
+
+  next();
 }
-
-
-
-// app.use(tokenCounter);
-
-// app.post("/chat", (req, res) => {
-//   res.json({
-//     message: "Hello from API",
-//   });
-// });
-
-// app.listen(3000, () => {
-//   console.log("Server running on port 3000");
-// });

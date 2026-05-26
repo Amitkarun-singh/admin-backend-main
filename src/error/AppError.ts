@@ -22,3 +22,14 @@ export class AppError extends Error {
     Error.captureStackTrace(this, this.constructor);
   }
 }
+
+export class TokenLimitExceededError extends AppError {
+  constructor(extra = {}) {
+    super({
+      statusCode: 429,
+      type: "TOKEN_LIMIT_EXCEEDED",
+      message: "Token limit exceeded",
+      extra,
+    });
+  }
+}
