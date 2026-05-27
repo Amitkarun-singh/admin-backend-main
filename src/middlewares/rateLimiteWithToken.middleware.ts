@@ -1,6 +1,6 @@
 import type { Response, Request, NextFunction } from "express";
 import redisClient from "../configs/redis/redis.ts";
-
+import UserRepository from "../repositories/user.repository.ts"
 import express from "express";
 import { encoding_for_model } from "tiktoken";
 import { TokenLimitExceededError } from "../error/AppError.ts";
@@ -24,11 +24,15 @@ export default async function tokenCounter(
 
   // Get existing balance
   let tokens = await redisClient.get(userId);
+  console.log("Tokens 1:", tokens);
+
 
   // First time user
   if (!tokens) {
-    await redisClient.set(userId, 500);
-    tokens = "500";
+    tokens = await  UserRepository.getToken(userId)
+    console.log("Tokens 2:", tokens);
+    await redisClient.set(userId, tokens);
+    
   }
 
   const remainingTokens = Number(tokens);
@@ -81,6 +85,8 @@ export default async function tokenCounter(
     console.log("Total Tokens:", totalTokens);
 
     const updatedBalance = remainingTokens - totalTokens;
+
+    await UserRepository.updateToken(userId,updatedBalance.toString())
 
     await redisClient.set(userId, updatedBalance);
 

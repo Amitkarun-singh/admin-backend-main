@@ -12,8 +12,11 @@
 	//"forwardPorts": [],
 	"runArgs": ["--name",
 				"app-api.schools2ai.com",
-				"--hostname",
-				"host"
+				"--network",
+				"dev-net",
+				"-p",
+				"3000:3000",
+				"--memory=512m"
 			]
 
 	// Use 'postCreateCommand' to run commands after the container is created.

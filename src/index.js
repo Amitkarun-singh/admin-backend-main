@@ -33,6 +33,8 @@ import featureRoutes from "./routes/feature.routes.js";
 // import dotenv from "dotenv";
 // dotenv.config();
 import notificationRouter from "./routes/notification.routes.ts"
+import UserRepository from "./repositories/user.repository.ts"
+import {ApiResponse} from "./utils/ApiResponse.js"
 const app = express();
 app.use(traceMiddleware);
 
@@ -80,6 +82,12 @@ app.use("/pyq", previousPapersRouter);
 app.use("/predict", predictPapersRouter);
 
 app.use("/notification", notificationRouter)
+
+app.get("/token", async (req, res)=>{
+   const userId = String(req.user.user_id);
+   const token = await  UserRepository.getToken(userId)
+   return ApiResponse(200, token, "token")
+})
 
 /* ---------------- HEALTH CHECK ---------------- */
 app.get("/health", (_, res) => {

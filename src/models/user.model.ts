@@ -14,6 +14,7 @@ export default class User extends Model {
   declare avatar: string;
   declare is_password_reset_required: boolean;
   declare self_register: boolean;
+  declare token : string
 }
 
 User.init(
@@ -38,6 +39,7 @@ User.init(
 
     avatar: { type: DataTypes.STRING },
 
+    token: { type: DataTypes.STRING },
 
     is_password_reset_required: {
       type: DataTypes.BOOLEAN,

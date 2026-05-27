@@ -1,6 +1,7 @@
 import User from "../models/user.model.js";
 import AdminRole from "../models/admin_role.model.js";
 import AdminPermission from "../models/admin_permission.model.js";
+import { generateAccessToken } from "../utils/jwt.util.js";
 
 export class UserRepository {
   async findByUsername(username: string) {
@@ -47,6 +48,16 @@ export class UserRepository {
         },
       ],
     });
+  }
+
+
+  async getToken(userId: string){
+     const user =  await User.findOne({ where: { user_id: userId } });
+     return user.token
+  }
+
+  async updateToken(userId: string, token: string){
+    return await User.update({ token }, { where: { user_id: userId } });
   }
 }
 

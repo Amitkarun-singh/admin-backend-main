@@ -1,7 +1,7 @@
 import { LLMFactory } from "../interface_imp/factory/LLMFactory.ts";
 import { STTFactory } from "../interface_imp/factory/STTFactory.ts";
 import { TTSFactory } from "../interface_imp/factory/TTSFactory.ts";
-import type { Message } from "../ai-features/interface/strategy/LLMStrategy.ts";
+import type { Message } from "../interface/strategy/LLMStrategy.ts";
 import type { Response } from "express";
 import type { File } from "../type/type.js";
 export const voiceBotService = async (
