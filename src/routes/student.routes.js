@@ -4,6 +4,8 @@ import {
   bulkStudentUpload,
   getAllStudents,
   getStudentById,
+  getStudentProfile,
+  getStudentAnalytics,
   updateStudent,
   deleteStudent
 } from "../controllers/student.controller.js";
@@ -16,57 +18,16 @@ import { activityMiddleware } from "../middlewares/activity.middleware.js";
 const router = express.Router();
 router.use(activityMiddleware);
 
-/* =====================================================
-   STUDENT ROUTES
-   ===================================================== */
+router.post("/student",       authMiddleware, requirePermission("MANAGE_SCHOOL"), createStudent);
+router.post("/students/bulk", authMiddleware, requirePermission("MANAGE_SCHOOL"), upload.single("file"), bulkStudentUpload);
+router.get("/students",       authMiddleware, requirePermission("MANAGE_SCHOOL"), getAllStudents);
+router.get("/student/:id",    authMiddleware, requirePermission("MANAGE_SCHOOL"), getStudentById);
 
-// Create single student
-router.post(
-  "/student",
-  authMiddleware,
-  requirePermission("MANAGE_SCHOOL"),
-  createStudent
-);
+// ── new ──
+router.get("/student/:id/profile",   authMiddleware, requirePermission("MANAGE_SCHOOL"), getStudentProfile);
+router.get("/student/:id/analytics", authMiddleware, requirePermission("MANAGE_SCHOOL"), getStudentAnalytics);
 
-// Bulk upload students (Excel)
-router.post(
-  "/students/bulk",
-  authMiddleware,
-  requirePermission("MANAGE_SCHOOL"),
-  upload.single("file"),
-  bulkStudentUpload
-);
-
-// Get all students
-router.get(
-  "/students",
-  authMiddleware,
-  requirePermission("MANAGE_SCHOOL"),
-  getAllStudents
-);
-
-// Get single student
-router.get(
-  "/student/:id",
-  authMiddleware,
-  requirePermission("MANAGE_SCHOOL"),
-  getStudentById
-);
-
-// Update student
-router.put(
-  "/student/:id",
-  authMiddleware,
-  requirePermission("MANAGE_SCHOOL"),
-  updateStudent
-);
-
-// Delete student
-router.delete(
-  "/student/:id",
-  authMiddleware,
-  requirePermission("MANAGE_SCHOOL"),
-  deleteStudent
-);
+router.put("/student/:id",    authMiddleware, requirePermission("MANAGE_SCHOOL"), updateStudent);
+router.delete("/student/:id", authMiddleware, requirePermission("MANAGE_SCHOOL"), deleteStudent);
 
 export default router;

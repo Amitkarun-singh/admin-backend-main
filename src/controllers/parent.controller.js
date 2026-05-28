@@ -6,6 +6,9 @@ import AdminRole from "../models/admin_role.model.js";
 import ParentProfile from "../models/parent_profile.model.js";
 import ParentStudentMap from "../models/parent_student_map.model.js";
 import StudentProfile from "../models/student_profile.model.js";
+import StudentClassSection from "../models/student_class_section.model.js";
+import AdminClass from "../models/admin_class.model.js";
+import AdminSection from "../models/admin_section.model.js";
 
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -19,10 +22,7 @@ const VALID_RELATIONS = ["father", "mother", "guardian"];
 const createParent = asyncHandler(async (req, res) => {
   const school_id = req.user.school_id;
 
-  const {
-    username, password, phone_number, email, full_name,
-    parent_name, relation,
-  } = req.body;
+  const { username, password, phone_number, email, full_name, parent_name, relation } = req.body;
 
   if (!username || !password)
     throw new ApiError(400, "Required fields missing: username, password");
@@ -40,15 +40,10 @@ const createParent = asyncHandler(async (req, res) => {
 
     const parentUser = await User.create(
       {
-        username,
-        full_name:                  full_name    || null,
-        password:                   hashed,
-        phone_number:               phone_number || null,
-        email:                      email        || null,
-        role_id:                    parentRole.role_id,
-        school_id,
-        status:                     "Active",
-        is_password_reset_required: true,   // ✅ admin-created → must reset on first login
+        username, full_name: full_name || null,
+        password: hashed, phone_number: phone_number || null,
+        email: email || null, role_id: parentRole.role_id,
+        school_id, status: "Active", is_password_reset_required: true,
       },
       { transaction }
     );
@@ -135,6 +130,49 @@ const getParentById = asyncHandler(async (req, res) => {
 });
 
 /* =====================================================
+   GET PARENT FULL PROFILE (with linked students + class info)
+   ===================================================== */
+const getParentProfile = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const parent = await ParentProfile.findByPk(id, {
+    include: [
+      {
+        model: User,
+        as: "user",
+        attributes: ["user_id", "username", "full_name", "phone_number", "email", "status", "avatar"],
+      },
+      {
+        model: StudentProfile,
+        as: "students",
+        attributes: ["student_id", "dob", "gender", "preferred_language", "onboarding_date", "analytics_enabled"],
+        through: { attributes: [] },
+        include: [
+          {
+            model: User,
+            as: "user",
+            attributes: ["user_id", "username", "full_name", "email", "phone_number", "avatar", "status"],
+          },
+          {
+            model: StudentClassSection,
+            as: "classSection",
+            attributes: ["class_id", "section_id", "roll_number", "academic_year", "status"],
+            include: [
+              { model: AdminClass,   as: "class",   attributes: ["class_id", "class_name"]   },
+              { model: AdminSection, as: "section", attributes: ["section_id", "section_name"] },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+
+  if (!parent) throw new ApiError(404, "Parent not found");
+
+  return res.status(200).json(new ApiResponse(200, parent, "Parent profile fetched"));
+});
+
+/* =====================================================
    UPDATE PARENT
    ===================================================== */
 const updateParent = asyncHandler(async (req, res) => {
@@ -184,6 +222,7 @@ export {
   createParent,
   getAllParents,
   getParentById,
+  getParentProfile,
   updateParent,
   deleteParent,
 };

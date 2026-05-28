@@ -41,10 +41,14 @@ const createStudent = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Required fields missing: student_username, student_password, parent_username, parent_password");
   }
 
-  if (relation && !VALID_RELATIONS.includes(relation))
+  // ── Normalize to lowercase so "Mother", "MOTHER", "mother" all work ──
+  const normalizedRelation = relation?.toLowerCase() || null;
+  const normalizedGender   = gender?.toLowerCase()   || null;
+
+  if (normalizedRelation && !VALID_RELATIONS.includes(normalizedRelation))
     throw new ApiError(400, `Invalid relation. Must be one of: ${VALID_RELATIONS.join(", ")}`);
 
-  if (gender && !VALID_GENDERS.includes(gender))
+  if (normalizedGender && !VALID_GENDERS.includes(normalizedGender))
     throw new ApiError(400, `Invalid gender. Must be one of: ${VALID_GENDERS.join(", ")}`);
 
   const transaction = await sequelize.transaction();
@@ -58,57 +62,46 @@ const createStudent = asyncHandler(async (req, res) => {
     if (!studentRole || !parentRole)
       throw new ApiError(400, "Student or Parent role missing");
 
-    /* ── Parent User ── */
     const parentHashed = await bcrypt.hash(parent_password, 10);
-
     const parentUser = await User.create(
       {
-        username:                   parent_username,
-        full_name:                  parent_full_name || null,
-        password:                   parentHashed,
-        phone_number:               parent_phone     || null,
-        email:                      parent_email     || null,
-        role_id:                    parentRole.role_id,
-        school_id,
-        status:                     "Active",
-        is_password_reset_required: true,   // ✅ admin-created → must reset on first login
+        username: parent_username, full_name: parent_full_name || null,
+        password: parentHashed, phone_number: parent_phone || null,
+        email: parent_email || null, role_id: parentRole.role_id,
+        school_id, status: "Active", is_password_reset_required: true,
       },
       { transaction }
     );
 
     const parent = await ParentProfile.create(
-      { user_id: parentUser.user_id, school_id, parent_name: parent_name || null, relation: relation || null },
+      {
+        user_id: parentUser.user_id, school_id,
+        parent_name: parent_name || null,
+        relation: normalizedRelation,   // ← normalized value
+      },
       { transaction }
     );
 
-    /* ── Student User ── */
     const studentHashed = await bcrypt.hash(student_password, 10);
-
     const studentUser = await User.create(
       {
-        username:                   student_username,
-        full_name:                  student_full_name || null,
-        password:                   studentHashed,
-        phone_number:               student_phone     || null,
-        email:                      student_email     || null,
-        role_id:                    studentRole.role_id,
-        school_id,
-        status:                     "Active",
-        is_password_reset_required: true,   // ✅ admin-created → must reset on first login
+        username: student_username, full_name: student_full_name || null,
+        password: studentHashed, phone_number: student_phone || null,
+        email: student_email || null, role_id: studentRole.role_id,
+        school_id, status: "Active", is_password_reset_required: true,
       },
       { transaction }
     );
 
     const student = await StudentProfile.create(
       {
-        user_id:            studentUser.user_id,
-        school_id,
+        user_id: studentUser.user_id, school_id,
         preferred_language: preferred_language || null,
-        onboarding_date:    onboarding_date    || null,
-        cost_limit:         cost_limit         || null,
-        dob:                dob                || null,
-        gender:             gender             || null,
-        analytics_enabled:  analytics_enabled  ?? false,
+        onboarding_date: onboarding_date || null,
+        cost_limit: cost_limit || null,
+        dob: dob || null,
+        gender: normalizedGender,       // ← normalized value
+        analytics_enabled: analytics_enabled ?? false,
       },
       { transaction }
     );
@@ -120,18 +113,15 @@ const createStudent = asyncHandler(async (req, res) => {
 
     await StudentClassSection.create(
       {
-        student_id:    student.student_id,
-        class_id:      class_id      || null,
-        section_id:    section_id    || null,
-        roll_number:   roll_number   || null,
-        academic_year: academic_year || null,
-        status:        "active",
+        student_id: student.student_id,
+        class_id: class_id || null, section_id: section_id || null,
+        roll_number: roll_number || null, academic_year: academic_year || null,
+        status: "active",
       },
       { transaction }
     );
 
     await AdminSchool.increment("student_count", { by: 1, where: { school_id }, transaction });
-
     await transaction.commit();
 
     return res.status(201).json(new ApiResponse(201, student, "Student created successfully"));
@@ -172,13 +162,16 @@ const bulkStudentUpload = asyncHandler(async (req, res) => {
       if (!row.student_username || !row.student_password || !row.parent_username || !row.parent_password)
         throw new ApiError(400, `${rowLabel}: Missing required fields`);
 
-      if (row.relation && !VALID_RELATIONS.includes(row.relation))
-        throw new ApiError(400, `${rowLabel}: Invalid relation "${row.relation}"`);
+      // ── Normalize to lowercase so "Mother", "MOTHER", "mother" all work ──
+      const normalizedRelation = row.relation?.toLowerCase() || null;
+      const normalizedGender   = row.gender?.toLowerCase()   || null;
 
-      if (row.gender && !VALID_GENDERS.includes(row.gender))
-        throw new ApiError(400, `${rowLabel}: Invalid gender "${row.gender}"`);
+      if (normalizedRelation && !VALID_RELATIONS.includes(normalizedRelation))
+        throw new ApiError(400, `${rowLabel}: Invalid relation "${row.relation}". Must be one of: ${VALID_RELATIONS.join(", ")}`);
 
-      /* ── Resolve class & section IDs ── */
+      if (normalizedGender && !VALID_GENDERS.includes(normalizedGender))
+        throw new ApiError(400, `${rowLabel}: Invalid gender "${row.gender}". Must be one of: ${VALID_GENDERS.join(", ")}`);
+
       let resolvedClassId   = null;
       let resolvedSectionId = null;
 
@@ -196,55 +189,46 @@ const bulkStudentUpload = asyncHandler(async (req, res) => {
         }
       }
 
-      /* ── Parent ── */
       const parentHashed = await bcrypt.hash(String(row.parent_password), 10);
       const parentUser = await User.create(
         {
-          username:                   row.parent_username,
-          full_name:                  row.parent_full_name || null,
-          password:                   parentHashed,
-          phone_number:               row.parent_phone     || null,
-          email:                      row.parent_email     || null,
-          role_id:                    parentRole.role_id,
-          school_id,
-          status:                     "Active",
-          is_password_reset_required: true,  // ✅
+          username: row.parent_username, full_name: row.parent_full_name || null,
+          password: parentHashed, phone_number: row.parent_phone || null,
+          email: row.parent_email || null, role_id: parentRole.role_id,
+          school_id, status: "Active", is_password_reset_required: true,
         },
         { transaction }
       );
 
       const parent = await ParentProfile.create(
-        { user_id: parentUser.user_id, school_id, parent_name: row.parent_name || null, relation: row.relation || null },
+        {
+          user_id: parentUser.user_id, school_id,
+          parent_name: row.parent_name || null,
+          relation: normalizedRelation,   // ← normalized value
+        },
         { transaction }
       );
 
-      /* ── Student ── */
       const studentHashed = await bcrypt.hash(String(row.student_password), 10);
       const studentUser = await User.create(
         {
-          username:                   row.student_username,
-          full_name:                  row.student_full_name || null,
-          password:                   studentHashed,
-          phone_number:               row.student_phone     || null,
-          email:                      row.student_email     || null,
-          role_id:                    studentRole.role_id,
-          school_id,
-          status:                     "Active",
-          is_password_reset_required: true,  // ✅
+          username: row.student_username, full_name: row.student_full_name || null,
+          password: studentHashed, phone_number: row.student_phone || null,
+          email: row.student_email || null, role_id: studentRole.role_id,
+          school_id, status: "Active", is_password_reset_required: true,
         },
         { transaction }
       );
 
       const student = await StudentProfile.create(
         {
-          user_id:            studentUser.user_id,
-          school_id,
+          user_id: studentUser.user_id, school_id,
           preferred_language: row.preferred_language || null,
-          onboarding_date:    row.onboarding_date    || null,
-          cost_limit:         row.cost_limit         || null,
-          dob:                row.dob                || null,
-          gender:             row.gender             || null,
-          analytics_enabled:  row.analytics_enabled  ?? false,
+          onboarding_date: row.onboarding_date || null,
+          cost_limit: row.cost_limit || null,
+          dob: row.dob || null,
+          gender: normalizedGender,       // ← normalized value
+          analytics_enabled: row.analytics_enabled ?? false,
         },
         { transaction }
       );
@@ -253,12 +237,10 @@ const bulkStudentUpload = asyncHandler(async (req, res) => {
 
       await StudentClassSection.create(
         {
-          student_id:    student.student_id,
-          class_id:      resolvedClassId,
-          section_id:    resolvedSectionId,
-          roll_number:   row.roll_number   || null,
-          academic_year: row.academic_year || null,
-          status:        "active",
+          student_id: student.student_id,
+          class_id: resolvedClassId, section_id: resolvedSectionId,
+          roll_number: row.roll_number || null, academic_year: row.academic_year || null,
+          status: "active",
         },
         { transaction }
       );
@@ -297,7 +279,7 @@ const getAllStudents = asyncHandler(async (req, res) => {
         as: "classSection",
         attributes: ["class_id", "section_id", "academic_year", "roll_number", "status"],
         include: [
-          { model: AdminClass,   as: "class",   attributes: ["class_id",   "class_name"]   },
+          { model: AdminClass,   as: "class",   attributes: ["class_id", "class_name"]   },
           { model: AdminSection, as: "section", attributes: ["section_id", "section_name"] },
         ],
       },
@@ -325,7 +307,7 @@ const getStudentById = asyncHandler(async (req, res) => {
         as: "classSection",
         attributes: ["class_id", "section_id", "academic_year", "roll_number", "status"],
         include: [
-          { model: AdminClass,   as: "class",   attributes: ["class_id",   "class_name"]   },
+          { model: AdminClass,   as: "class",   attributes: ["class_id", "class_name"]   },
           { model: AdminSection, as: "section", attributes: ["section_id", "section_name"] },
         ],
       },
@@ -338,6 +320,64 @@ const getStudentById = asyncHandler(async (req, res) => {
 });
 
 /* =====================================================
+   GET STUDENT FULL PROFILE (with parents + analytics)
+   ===================================================== */
+const getStudentProfile = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const student = await StudentProfile.findByPk(id, {
+    include: [
+      {
+        model: User,
+        as: "user",
+        attributes: ["user_id", "username", "full_name", "email", "phone_number", "status", "avatar"],
+      },
+      {
+        model: StudentClassSection,
+        as: "classSection",
+        attributes: ["class_id", "section_id", "academic_year", "roll_number", "status"],
+        include: [
+          { model: AdminClass,   as: "class",   attributes: ["class_id", "class_name"]   },
+          { model: AdminSection, as: "section", attributes: ["section_id", "section_name"] },
+        ],
+      },
+      {
+        model: ParentProfile,
+        as: "parents",
+        through: { attributes: [] },
+        include: [
+          {
+            model: User,
+            as: "user",
+            attributes: ["user_id", "username", "full_name", "email", "phone_number", "avatar"],
+          },
+        ],
+      },
+    ],
+  });
+
+  if (!student) throw new ApiError(404, "Student not found");
+
+  return res.status(200).json(new ApiResponse(200, student, "Student profile fetched"));
+});
+
+/* =====================================================
+   GET STUDENT ANALYTICS
+   ===================================================== */
+const getStudentAnalytics = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const student = await StudentProfile.findByPk(id);
+  if (!student) throw new ApiError(404, "Student not found");
+
+  const analytics = await StudentAnalytics.findOne({
+    where: { student_id: id },
+  });
+
+  return res.status(200).json(new ApiResponse(200, analytics || null, "Student analytics fetched"));
+});
+
+/* =====================================================
    UPDATE STUDENT
    ===================================================== */
 const updateStudent = asyncHandler(async (req, res) => {
@@ -346,12 +386,15 @@ const updateStudent = asyncHandler(async (req, res) => {
   const student = await StudentProfile.findByPk(id);
   if (!student) throw new ApiError(404, "Student not found");
 
-  const { status, ...allowedUpdates } = req.body;
+  const { status, gender, ...rest } = req.body;
 
-  if (allowedUpdates.gender && !VALID_GENDERS.includes(allowedUpdates.gender))
+  // ── Normalize gender on update too ──
+  const normalizedGender = gender?.toLowerCase() || null;
+
+  if (normalizedGender && !VALID_GENDERS.includes(normalizedGender))
     throw new ApiError(400, `Invalid gender. Must be one of: ${VALID_GENDERS.join(", ")}`);
 
-  await student.update(allowedUpdates);
+  await student.update({ ...rest, ...(normalizedGender && { gender: normalizedGender }) });
 
   return res.status(200).json(new ApiResponse(200, student, "Student updated successfully"));
 });
@@ -392,6 +435,8 @@ export {
   bulkStudentUpload,
   getAllStudents,
   getStudentById,
+  getStudentProfile,
+  getStudentAnalytics,
   updateStudent,
   deleteStudent,
 };
