@@ -34,7 +34,7 @@ router.post(
   authMiddleware,
   upload.single("file"),
   chatbotLogs,
-  rateLimitWithToken,
+  // rateLimitWithToken,
   chatbotController,
 );
 

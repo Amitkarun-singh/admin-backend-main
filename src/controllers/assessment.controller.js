@@ -24,8 +24,8 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 let openai;
 try {
   openai = new OpenAI({
-    baseURL: "https://openrouter.ai/api/v1",
-    apiKey: process.env.OPENROUTER_API_KEY,
+   
+    apiKey: process.env.OPENAI_API_KEY,
   });
 } catch { console.warn("OPENROUTER_API_KEY missing"); }
 
@@ -155,7 +155,7 @@ Rules:
 
   try {
     const res = await openai.chat.completions.create({
-      model: "openai/gpt-oss-120b",
+      model: "gpt-4o-mini",
       messages: [
         { role: "system", content: "Output only a raw JSON array. No markdown, no wrapper object, no explanation." },
         { role: "user",   content: prompt },
