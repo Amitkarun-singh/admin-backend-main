@@ -5,34 +5,34 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import sequelize from "./config/db.js";
 import "./models/index.js";
-import authRoutes from "./routes/auth.routes.js";
-import adminRoutes from "./routes/admin.routes.js";
-import classRoutes from "./routes/class.routes.js";
-import sectionRoutes from "./routes/section.routes.js";
-import subjectRoutes from "./routes/subject.routes.js";
-import courseRoutes from "./routes/course.routes.js";
-import teacherRoutes from "./routes/teacher.routes.js";
-import studentRoutes from "./routes/student.routes.js";
-import parentRoutes from "./routes/parent.routes.js";
-import registerRoutes from "./routes/register.routes.js";
+import authRoutes from "./routes/V1/auth.routes.js";
+import adminRoutes from "./routes/V1/admin.routes.ts";
+import classRoutes from "./routes/V1/class.routes.js";
+import sectionRoutes from "./routes/V1/section.routes.js";
+import subjectRoutes from "./routes/V1/subject.routes.js";
+import courseRoutes from "./routes/V1/course.routes.js";
+import teacherRoutes from "./routes/V1/teacher.routes.js";
+import studentRoutes from "./routes/V1/student.routes.js";
+import parentRoutes from "./routes/V1/parent.routes.js";
+import registerRoutes from "./routes/V1/register.routes.js";
 
-import historyRoutes from "./routes/history.routes.js";
+import historyRoutes from "./routes/V1/history.routes.js";
 import { globalErrorHandler } from "./error/globalErrorHandler.ts";
 import { traceMiddleware } from "./middlewares/traceMiddleware,meiddleware.ts";
 
 // Imports for AI features
-import giniRouter from "./routes/giniRouter.routes.ts";
-import performanceRouter from "./routes/studentPerformance.Router.js";
-import previousPapersRouter from "./routes/previousPapers.router.js";
-import predictPapersRouter from "./routes/predictPapers.router.ts";
-import summarizeRoute from "./routes/summarize.routes.js";
-import ainoteRoute from "./routes/ainote.routes.js";
-import assessmentRoutes from "./routes/assessment.routes.js";
-import appFeedbackRouter from "./routes/appFeedback.route.ts";
-import featureRoutes from "./routes/feature.routes.js";
+import giniRouter from "./routes/V1/giniRouter.routes.ts";
+import performanceRouter from "./routes/V1/studentPerformance.Router.js";
+import previousPapersRouter from "./routes/V1/previousPapers.router.js";
+import predictPapersRouter from "./routes/V1/predictPapers.router.ts";
+import summarizeRoute from "./routes/V1/summarize.routes.js";
+import ainoteRoute from "./routes/V1/ainote.routes.js";
+import assessmentRoutes from "./routes/V1/assessment.routes.js";
+import appFeedbackRouter from "./routes/V1/appFeedback.route.ts";
+import featureRoutes from "./routes/V1/feature.routes.js";
 // import dotenv from "dotenv";
 // dotenv.config();
-import notificationRouter from "./routes/notification.routes.ts"
+import notificationRouter from "./routes/V1/notification.routes.ts"
 import UserRepository from "./repositories/user.repository.ts"
 import {ApiResponse} from "./utils/ApiResponse.js"
 const app = express();
@@ -50,29 +50,29 @@ app.use(
 );
 
 /* ---------------- ROUTES ---------------- */
-app.use("/api/auth", authRoutes);
-app.use("/api/admin", adminRoutes);
+app.use("/api/V1/auth", authRoutes);
+app.use("/api/V1/admin", adminRoutes);
 // app.use("/api", classRoutes);
-app.use("/api", classRoutes);
-app.use("/api", sectionRoutes);
-app.use("/api", subjectRoutes);
-app.use("/api", courseRoutes);
-app.use("/api/teachers", teacherRoutes);
-app.use("/api/students", studentRoutes);
-app.use("/api/parents", parentRoutes);
-app.use("/api/auth/register", registerRoutes);
+app.use("/api/V1", classRoutes);
+app.use("/api/V1", sectionRoutes);
+app.use("/api/V1", subjectRoutes);
+app.use("/api/V1", courseRoutes);
+app.use("/api/V1/teachers", teacherRoutes);
+app.use("/api/V1/students", studentRoutes);
+app.use("/api/V1/parents", parentRoutes);
+app.use("/api/V1/auth/register", registerRoutes);
 
 // AI Feature Routes
-app.use("/api", summarizeRoute);
-app.use("/api/ainote", ainoteRoute);
-app.use("/api/assessments", assessmentRoutes);
+app.use("/api/V1", summarizeRoute);
+app.use("/api/V1/ainote", ainoteRoute);
+app.use("/api/V1/assessments", assessmentRoutes);
 
 // History and Analytics Routes
-app.use("/api/history", historyRoutes);
-app.use("/api/features", featureRoutes);
+app.use("/api/V1/history", historyRoutes);
+app.use("/api/V1/features", featureRoutes);
 
 // Static serving for AI server's papers
-app.use("/api/ai/papers", express.static("papers"));
+app.use("/api/V1/ai/papers", express.static("papers"));
 
 // AI Server Routes
 app.use("/gini", giniRouter);

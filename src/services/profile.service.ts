@@ -1,9 +1,7 @@
-
-
 import userRepository from "../repositories/user.repository.js";
 import schoolRepository from "../repositories/school.repository.js";
 import profileRepository from "../repositories/profile.repository.js";
-import classRepository from "../repositories/class.repository.js";
+import { classRepository } from "../repositories/class.repository.js";
 import UserStreak from "../models/user_streak.model.js";
 import sequelize from "../config/db.js";
 import { getSignedPdfUrl } from "../utils/signedUrl.js";
@@ -154,28 +152,56 @@ class ProfileService {
   /* =====================================================
      ADMIN / SUBADMIN PROFILE
   ===================================================== */
-  async getAdminProfile(user_id: number, role: string) {
+async getAdminProfile(user_id: number, role: string) {
+  const [user, streak] = await Promise.all([
+    userRepository.findWithRoleAndPermissions(user_id),
+    this.getStreakData(user_id),
+  ]);
 
-    const [user, streak] = await Promise.all([
-      userRepository.findWithRoleAndPermissions(user_id),
-      this.getStreakData(user_id),
-    ]);
+  const school_id = (user as any)?.school_id;
 
-    const avatarUrl = await getSignedPdfUrl((user as any)?.avatar);
+  const school = school_id
+    ? await schoolRepository.findById(school_id)
+    : null;
 
-    return {
-      role,
-      avatar: avatarUrl,
+  const avatarUrl = await getSignedPdfUrl((user as any)?.avatar);
 
-      full_name: user?.full_name || null,
-      number: user?.phone_number || null,
-      email: user?.email || null,
+  return {
+    role,
+    avatar: avatarUrl,
 
-      current_streak: streak.current_streak,
-      longest_streak: streak.longest_streak,
-      last_active_date: streak.last_active_date,
-    };
-  }
+    // Basic user details
+    full_name: user?.full_name || null,
+    number: user?.phone_number || null,
+    email: user?.email || null,
+
+    // School details
+    school_id: school?.school_id || null,
+    school_name: school?.school_name || null,
+    board: school?.board || null,
+    country: school?.country || null,
+    state: school?.state || null,
+    city: school?.city || null,
+    pincode: school?.pincode || null,
+    timezone: school?.timezone || null,
+    language_preference: school?.language_preference || null,
+    website_enabled: school?.website_enabled ?? null,
+    allowed_domains: school?.allowed_domains || null,
+    onboard_date: school?.onboard_date || null,
+    status: school?.status || null,
+
+    // Number/count details
+    student_count: school?.student_count ?? 0,
+    teacher_count: school?.teacher_count ?? 0,
+    class_count: school?.class_count ?? 0,
+    cost: school?.cost ?? null,
+
+    // Streak
+    current_streak: streak.current_streak,
+    longest_streak: streak.longest_streak,
+    last_active_date: streak.last_active_date,
+  };
+}
 
   /* ─────────────────────────────────────────────────────────────
    HELPER: sign avatar S3 key → URL (null if no avatar yet)
