@@ -2,7 +2,7 @@ import StudentProfile from "../models/student_profile.model.js";
 import TeacherProfile from "../models/teacher_profile.model.js";
 import StudentClassSection from "../models/student_class_section.model.js";
 import ParentProfile from "../models/parent_profile.model.js";
-import ParentStudentMap from "../models/parent_student_map.model.js";
+import ParentStudentMap from "../models/parent_student_map.model.ts";
 import TeacherClassSectionSubject from "../models/teacher_class_section_subject.model.js";
 
 export class ProfileRepository {

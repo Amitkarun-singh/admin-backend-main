@@ -1,7 +1,7 @@
 import UserRepository from "../repositories/user.repository.ts";
 import RoleRepository from "../repositories/role.repository.ts";
 import ProfileRepository from "../repositories/profile.repository.ts";
-import ClassRepository from "../repositories/class.repository.ts";
+import {ClassRepository} from "../repositories/class.repository.ts";
 class TopicService {
     async createTopics(userId: number) {
 

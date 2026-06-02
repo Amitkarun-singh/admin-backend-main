@@ -3,7 +3,7 @@ import userRepository from "../repositories/user.repository.js";
 import roleRepository from "../repositories/role.repository.js";
 import schoolRepository from "../repositories/school.repository.js";
 import profileRepository from "../repositories/profile.repository.js";
-import classRepository from "../repositories/class.repository.js";
+import {classRepository} from "../repositories/class.repository.js";
 import authService from "./auth.service.ts";
 import { ApiError } from "../utils/ApiError.js";
 import { generateOTP, createOtpToken, verifyOtpToken } from "../utils/otp.util.js";

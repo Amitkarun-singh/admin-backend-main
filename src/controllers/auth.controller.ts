@@ -10,15 +10,11 @@ import userRepository from "../repositories/user.repository.js";
 import { recordSession, closeSession } from "./history.controller.js";
 import { generateAccessToken, generateRefreshToken } from "../utils/jwt.util.js";
 
-import { uploadAvatarToS3 } from "../utils/s3Upload.js";
-
 import { ValidationError } from "../error/subError.ts";
 
 interface AuthenticatedRequest extends Request {
   user: any;
 }
-
-
 
 /* =====================================================
    LOGIN
@@ -156,11 +152,6 @@ const refreshAccessToken = asyncHandler(async (req: Request, res: Response) => {
   }
 });
 
-
-
-
-
-
 async function verifyIdToken(req: Request, res: Response) {
   const { idToken } = req.body;
   const result = await authService.verifyIdToken(idToken);
@@ -189,9 +180,6 @@ export {
   resetFirstTimePassword,
   logout,
   refreshAccessToken,
-  
   verifyIdToken,
- 
-
   resetPassword,
 };

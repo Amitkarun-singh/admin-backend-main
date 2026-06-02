@@ -4,7 +4,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import registerService from "../services/register.service.ts";
 import schoolRepository from "../repositories/school.repository.ts";
 import AdminClass from "../models/admin_class.model.js";
-import AdminSubject from "../models/admin_subject_master.model.js";
+import AdminSubject from "../models/admin_subject_master.model.ts";
 
 // interface AuthenticatedRequest extends Request {
 //   user?: any;
