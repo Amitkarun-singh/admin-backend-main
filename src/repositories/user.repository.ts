@@ -1,6 +1,6 @@
 import User from "../models/user.model.js";
 import AdminRole from "../models/admin_role.model.js";
-import AdminPermission from "../models/admin_permission.model.js";
+import AdminPermission from "../models/admin_permission.model.ts";
 import { generateAccessToken } from "../utils/jwt.util.js";
 
 export class UserRepository {

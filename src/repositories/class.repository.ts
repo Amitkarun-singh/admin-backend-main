@@ -1,29 +1,51 @@
-import { Op } from "sequelize";
 import AdminClass from "../models/admin_class.model.js";
+import AdminSection from "../models/admin_section.model.js";
+import AdminSchool from "../models/admin_school.model.js";
+import AdminClassCourseMap from "../models/admin_class_course_map.model.js";
+import sequelize from "../config/db.js";
 
 export class ClassRepository {
-  async findByName(class_name: string) {
-    return await AdminClass.findOne({ where: { class_name } });
+
+  async create(class_name: string): Promise<AdminClass> {
+    return AdminClass.create({ class_name });
   }
 
-  async findByNames(class_names: string[]) {
-    return await AdminClass.findAll({
-      where: {
-        class_name: {
-          [Op.in]: class_names
-        }
-      }
-    });
+  async findByName(class_name: string): Promise<AdminClass | null> {
+    return AdminClass.findOne({ where: { class_name } });
   }
 
-  async findById(class_id: number | string) {
-    return await AdminClass.findByPk(class_id);
+  async findAll(): Promise<AdminClass[]> {
+    return AdminClass.findAll({ order: [["class_id", "ASC"]] });
   }
 
-  async findSectionById(section_id: number | string) {
-    const AdminSection = (await import("../models/admin_section.model.js")).default;
-    return await AdminSection.findByPk(section_id);
+  async findById(id: number | string): Promise<AdminClass | null> {
+    return AdminClass.findByPk(id);
+  }
+
+  async update(classData: AdminClass, body: Partial<AdminClass>): Promise<AdminClass> {
+    return classData.update(body);
+  }
+
+  async deleteWithRelated(id: number | string): Promise<void> {
+    const transaction = await sequelize.transaction();
+    try {
+      const classData = await AdminClass.findByPk(id, { transaction });
+      if (!classData) throw new Error("Class not found");
+
+      await AdminSection.destroy({ where: { class_id: id }, transaction });
+      await AdminClassCourseMap.destroy({ where: { class_id: id }, transaction });
+      await classData.destroy({ transaction });
+
+      await transaction.commit();
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+  }
+
+  async findSchoolById(school_id: number | string): Promise<AdminSchool | null> {
+    return AdminSchool.findOne({ where: { school_id } });
   }
 }
 
-export default new ClassRepository();
+export const classRepository = new ClassRepository();
