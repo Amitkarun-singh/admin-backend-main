@@ -35,6 +35,8 @@ import featureRoutes from "./routes/V1/feature.routes.js";
 import notificationRouter from "./routes/V1/notification.routes.ts"
 import UserRepository from "./repositories/user.repository.ts"
 import {ApiResponse} from "./utils/ApiResponse.js"
+import profileRouter from "./routes/V1/profile.routes.ts"
+import curriculamRouter from "./routes/V1/curriculum.routes.ts"
 const app = express();
 app.use(traceMiddleware);
 
@@ -75,13 +77,18 @@ app.use("/api/V1/features", featureRoutes);
 app.use("/api/V1/ai/papers", express.static("papers"));
 
 // AI Server Routes
-app.use("/gini", giniRouter);
-app.use("/feedback", appFeedbackRouter);
-app.use("/student", performanceRouter);
-app.use("/pyq", previousPapersRouter);
-app.use("/predict", predictPapersRouter);
+app.use("/api/v1/gini", giniRouter);
+app.use("/api/v1/feedback", appFeedbackRouter);
+app.use("/api/v1/student", performanceRouter);
+app.use("/api/v1/pyq", previousPapersRouter);
+app.use("/api/v1/predict", predictPapersRouter);
 
-app.use("/notification", notificationRouter)
+// profile
+app.use("/api/v1/profile", profileRouter)
+
+app.use("/api/v1/notification", notificationRouter)
+
+app.use("/api/v1/curriculum",curriculamRouter)
 
 app.get("/token", async (req, res)=>{
    const userId = String(req.user.user_id);
