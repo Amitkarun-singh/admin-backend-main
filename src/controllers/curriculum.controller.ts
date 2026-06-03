@@ -5,8 +5,9 @@ export async function classes(req: Request, res: Response) {
       const role = req?.user?.role 
   const userId = req?.user?.user_id 
   const schoolId = req?.user?.school_id 
+  
 
-  if (role === "student") {
+  if (role.toLowerCase() === "student") {
       const data = await CurriculumService.onlyAsignClass(userId, schoolId);
       return res.status(200).json(data);
     } else {
@@ -23,7 +24,7 @@ export async function subject(req :Request,res:Response) {
   const board = req.query.board
   const streamId = req.query.streamId
 
-  if (role === "student") {
+  if (role.toLowerCase() === "student") {
       const data = await CurriculumService.onlyAsignSubject(classId,board,streamId,userId,schoolId);
       return res.status(200).json(data);
     } else {
