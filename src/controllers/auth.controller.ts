@@ -9,8 +9,7 @@ import userRepository from "../repositories/user.repository.js";
 
 import { recordSession, closeSession } from "./history.controller.js";
 import { generateAccessToken, generateRefreshToken } from "../utils/jwt.util.js";
-
-import { ValidationError } from "../error/subError.js";
+import { ValidationError } from "../error/subError.ts";
 
 interface AuthenticatedRequest extends Request {
   user: any;
@@ -48,31 +47,43 @@ const login = asyncHandler(async (req: Request, res: Response) => {
 const resetFirstTimePassword = asyncHandler(async (req: Request, res: Response) => {
   const authHeader = req.headers.authorization;
   const tempToken = authHeader?.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
-  if (!tempToken) throw new ValidationError([{
-    field: "authorization",
-    message: "Temporary token required",
-    code: "TOKEN_REQUIRED"
-  }]);
+  
+  if (!tempToken) {
+    throw new ValidationError([{
+      field: "authorization",
+      message: "Temporary token required",
+      code: "TOKEN_REQUIRED"
+    }]);
+  }
 
   const { newPassword, confirmPassword } = req.body;
-  if (newPassword !== confirmPassword) throw new ValidationError([{
-    field: "confirmPassword",
-    message: "Passwords do not match",
-    code: "PASSWORD_MISMATCH"
-  }]);
+
+  if (newPassword !== confirmPassword) {
+    throw new ValidationError([{
+      field: "confirmPassword",
+      message: "Passwords do not match",
+      code: "PASSWORD_MISMATCH"
+    }]);
+  }
 
   let decoded: any;
-  try { decoded = jwt.verify(tempToken, process.env.ACCESS_TOKEN_SECRET!); }
-  catch { throw new ValidationError([{
-    field: "authorization",
-    message: "Invalid token",
-    code: "INVALID_TOKEN"
-  }]); }
-  if (decoded.purpose !== "password_reset") throw new ValidationError([{
-    field: "purpose",
-    message: "Invalid purpose",
-    code: "INVALID_PURPOSE"
-  }]);
+  try { 
+    decoded = jwt.verify(tempToken, process.env.ACCESS_TOKEN_SECRET!); 
+  } catch { 
+    throw new ValidationError([{
+      field: "authorization",
+      message: "Invalid token",
+      code: "INVALID_TOKEN"
+    }]); 
+  }
+
+  if (decoded.purpose !== "password_reset") {
+    throw new ValidationError([{
+      field: "purpose",
+      message: "Invalid purpose",
+      code: "INVALID_PURPOSE"
+    }]);
+  }
 
   const result = await authService.resetFirstTimePassword(decoded.user_id, newPassword);
 
@@ -93,6 +104,35 @@ const resetFirstTimePassword = asyncHandler(async (req: Request, res: Response) 
 });
 
 /* =====================================================
+   VERIFY ID TOKEN
+   ===================================================== */
+const verifyIdToken = asyncHandler(async (req: Request, res: Response) => {
+  const { idToken } = req.body;
+  const result = await authService.verifyIdToken(idToken);
+
+  return res.status(200).json(new ApiResponse(200, { idToken: result.idToken }, "user verified"));
+});
+
+/* =====================================================
+   RESET PASSWORD (GENERAL/OTP)
+   ===================================================== */
+const resetPassword = asyncHandler(async (req: Request, res: Response) => {
+  const { phoneNumber, newPassword, confirmPassword, idToken } = req.body;
+  
+  if (newPassword !== confirmPassword) {
+    throw new ValidationError([{
+      field: "confirmPassword",
+      message: "Passwords do not match",
+      code: "PASSWORD_MISMATCH"
+    }]);
+  }
+  
+  const phone_number = phoneNumber.trim().slice(-10);
+  const result = await authService.resetPassword(phone_number, newPassword, confirmPassword, idToken);
+  return res.status(200).json(new ApiResponse(200, result, "OTP verified"));
+});
+
+/* =====================================================
    LOGOUT
    ===================================================== */
 const logout = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
@@ -110,20 +150,24 @@ const logout = asyncHandler(async (req: AuthenticatedRequest, res: Response) => 
    ===================================================== */
 const refreshAccessToken = asyncHandler(async (req: Request, res: Response) => {
   const incomingRefreshToken = req.cookies.refreshToken;
-  if (!incomingRefreshToken) throw new ValidationError([{
-    field: "refreshToken",
-    message: "Refresh token missing",
-    code: "TOKEN_REQUIRED"
-  }]);
+  if (!incomingRefreshToken) {
+    throw new ValidationError([{
+      field: "refreshToken",
+      message: "Refresh token missing",
+      code: "TOKEN_REQUIRED"
+    }]);
+  }
 
   try {
     const decoded: any = jwt.verify(incomingRefreshToken, process.env.REFRESH_TOKEN_SECRET!);
     const user = await userRepository.findById(decoded.user_id);
-    if (!user) throw new ValidationError([{
-      field: "refreshToken",
-      message: "Invalid token",
-      code: "INVALID_TOKEN"
-    }]);
+    if (!user) {
+      throw new ValidationError([{
+        field: "refreshToken",
+        message: "Invalid token",
+        code: "INVALID_TOKEN"
+      }]);
+    }
 
     const payload = {
       user_id: (user as any).user_id,
@@ -151,29 +195,6 @@ const refreshAccessToken = asyncHandler(async (req: Request, res: Response) => {
     }]);
   }
 });
-
-async function verifyIdToken(req: Request, res: Response) {
-  const { idToken } = req.body;
-  const result = await authService.verifyIdToken(idToken);
-
-  return res.status(200).json(new ApiResponse(200, { idToken: result.idToken }, "user verified"));
-}
-
-async function resetPassword(req: Request, res: Response) {
-  const { phoneNumber, newPassword, confirmPassword, idToken } = req.body;
-  if (newPassword !== confirmPassword) {
-    throw new ValidationError([{
-      field: "confirmPassword",
-      message: "Passwords do not match",
-      code: "PASSWORD_MISMATCH"
-    }]);
-  }
-  const phone_number = phoneNumber.trim().slice(-10);
-  const result = await authService.resetPassword(phone_number, newPassword, confirmPassword, idToken);
-  return res.status(200).json(new ApiResponse(200, result, "OTP verified"));
-}
-
-
 
 export {
   login,

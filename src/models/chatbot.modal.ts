@@ -1,6 +1,6 @@
 import pool from "../configs/database/db.ts";
 
-export const ChatBotFeedbackSave = async (value) => {
+export const ChatBotFeedbackSave = async (value : Array<any>) => {
   console.log(value);
 
   const query = `

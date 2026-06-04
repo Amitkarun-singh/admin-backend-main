@@ -10,8 +10,7 @@ import {
 
 } from "../../controllers/auth.controller.ts";
 import { authMiddleware } from "../../middlewares/auth.middleware.ts";
-import { upload } from "../../middlewares/multer.middleware.ts";
-import { getUserProfile, updateAvatar } from "../../controllers/profile.controller.ts";
+
 import { activityMiddleware } from "../../middlewares/activity.middleware.ts";
 
 
@@ -37,8 +36,7 @@ router.post("/verify-id-token", verifyIdToken);
 router.post("/forgot-password/reset", resetPassword);
 
 // ── Protected ─────────────────────────────────────────────────────────────
-router.post("/update-avatar", upload.single("file"), authMiddleware, updateAvatar);
-router.get("/profile", authMiddleware, getUserProfile);
+
 router.post("/logout", authMiddleware, logout);
 
 export default router;
