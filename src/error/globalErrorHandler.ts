@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { AppError } from "./AppError.ts";
+import { ApiError } from "../utils/ApiError.js";
 import { StreamAdapter } from "../interface/adapter/StreamAdapter.ts";
 const error = new StreamAdapter();
 export const globalErrorHandler = (
@@ -10,6 +11,18 @@ export const globalErrorHandler = (
 ) => {
   console.error(err);
 
+  // ── ApiError (thrown by services/controllers) ─────────────────────────────
+  // ApiError uses `statuscode` (lowercase c) and is NOT an AppError instance.
+  // Return its message directly so the frontend gets the real validation text.
+  if (err instanceof ApiError) {
+    return res.status(err.statuscode).json({
+      type: "API_ERROR",
+      message: err.message,
+      errors: err.errors ?? [],
+    });
+  }
+
+  // ── Unknown errors → wrap as generic 500 ─────────────────────────────────
   if (!(err instanceof AppError)) {
     err = new AppError({
       statusCode: 500,
@@ -47,6 +60,6 @@ export const globalErrorHandler = (
     message: err.message,
     ...err.extra,
   };
-  // console.log("global ", err.extra);
   res.status(err.statusCode).json(response);
 };
+

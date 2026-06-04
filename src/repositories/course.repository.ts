@@ -12,7 +12,11 @@ interface CreateCourseData {
 export class CourseRepository {
 
   async create(data: CreateCourseData): Promise<AdminCourse> {
-    return AdminCourse.create(data);
+    return AdminCourse.create({
+      // ...data,
+      // school_id: BigInt(data.school_id),
+      // status: data.status as "active" | "inactive",
+    });
   }
 
   async findAllBySchool(school_id: number | bigint): Promise<AdminCourse[]> {

@@ -1,10 +1,10 @@
 import { Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import registerService from "../services/register.service.ts";
-import schoolRepository from "../repositories/school.repository.ts";
+import registerService from "../services/register.service.js";
+import schoolRepository from "../repositories/school.repository.js";
 import AdminClass from "../models/admin_class.model.js";
-import AdminSubject from "../models/admin_subject_master.model.ts";
+import AdminSubject from "../models/admin_subject_master.model.js";
 
 // interface AuthenticatedRequest extends Request {
 //   user?: any;
@@ -69,9 +69,9 @@ const completeProfile = asyncHandler(async (req: Request, res: Response) => {
   let profile: any;
 
   if (role === "STUDENT") {
-    profile = await registerService.completeStudentProfile(user_id, school_id, req.body);
+    profile = await registerService.completeStudentProfile(String(user_id), String(school_id), req.body);
   } else if (role === "TEACHER") {
-    profile = await registerService.completeTeacherProfile(user_id, school_id, req.body);
+    profile = await registerService.completeTeacherProfile(String(user_id), String(school_id), req.body);
   }
 
   return res.status(200).json(

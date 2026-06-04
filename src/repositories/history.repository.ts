@@ -1,4 +1,4 @@
-import { Op } from "sequelize";
+import { Op, QueryTypes } from "sequelize";
 import sequelize from "../config/db.js";
 
 import GiniLog          from "../models/gini_log.model.js";
@@ -18,7 +18,7 @@ export class HistoryRepository {
     device: string;
     ip_address: string | null;
   }): Promise<UserSession> {
-    return UserSession.create(data);
+    return UserSession.create({ ...data, user_id: BigInt(data.user_id) });
   }
 
   async findOpenSession(user_id: number): Promise<UserSession | null> {
@@ -62,7 +62,7 @@ export class HistoryRepository {
        WHERE conversation_id = :cid AND user_id = :uid
        ORDER BY created_at DESC, id DESC
        LIMIT 1`,
-      { replacements: { cid: conversation_id, uid: user_id }, type: sequelize.QueryTypes.SELECT }
+      { replacements: { cid: conversation_id, uid: user_id }, type: QueryTypes.SELECT }
     );
   }
 
@@ -74,7 +74,7 @@ export class HistoryRepository {
        GROUP BY session_id
        ORDER BY MAX(created_at) DESC
        LIMIT :lim`,
-      { replacements: { uid: user_id, lim: limit }, type: sequelize.QueryTypes.SELECT }
+      { replacements: { uid: user_id, lim: limit }, type: QueryTypes.SELECT }
     );
   }
 
@@ -84,7 +84,7 @@ export class HistoryRepository {
        FROM tutor_logs
        WHERE session_id = :sid AND ${tutorUserMatch}
        ORDER BY created_at DESC, id DESC LIMIT 1`,
-      { replacements: { sid: session_id, uid: user_id }, type: sequelize.QueryTypes.SELECT }
+      { replacements: { sid: session_id, uid: user_id }, type: QueryTypes.SELECT }
     );
   }
 
@@ -94,7 +94,7 @@ export class HistoryRepository {
        FROM   chatbot_logs
        WHERE  conversation_id = :cid AND user_id = :uid
        ORDER  BY created_at ASC`,
-      { replacements: { cid: conversation_id, uid: user_id }, type: sequelize.QueryTypes.SELECT }
+      { replacements: { cid: conversation_id, uid: user_id }, type: QueryTypes.SELECT }
     );
   }
 
@@ -104,7 +104,7 @@ export class HistoryRepository {
        FROM   tutor_logs
        WHERE  session_id = :sid AND ${tutorUserMatch}
        ORDER  BY created_at ASC, id ASC`,
-      { replacements: { sid: conversation_id, uid: user_id }, type: sequelize.QueryTypes.SELECT }
+      { replacements: { sid: conversation_id, uid: user_id }, type: QueryTypes.SELECT }
     );
   }
 
@@ -150,11 +150,11 @@ export class HistoryRepository {
     const [countRow]: any[] = await sequelize.query(
       `SELECT COUNT(DISTINCT session_id) AS cnt FROM tutor_logs
        WHERE ${tutorUserMatch} AND session_id IS NOT NULL AND session_id != ''`,
-      { replacements: { uid: user_id }, type: sequelize.QueryTypes.SELECT }
+      { replacements: { uid: user_id }, type: QueryTypes.SELECT }
     );
     const [lastRow]: any[] = await sequelize.query(
       `SELECT created_at FROM tutor_logs WHERE ${tutorUserMatch} ORDER BY created_at DESC LIMIT 1`,
-      { replacements: { uid: user_id }, type: sequelize.QueryTypes.SELECT }
+      { replacements: { uid: user_id }, type: QueryTypes.SELECT }
     );
     return {
       tutorCount:    parseInt(countRow?.cnt) || 0,
@@ -182,7 +182,7 @@ export class HistoryRepository {
   async getLoginDays(user_id: number): Promise<number> {
     const result: any[] = await sequelize.query(
       `SELECT COUNT(DISTINCT DATE(login_at)) AS cnt FROM user_sessions WHERE user_id = :user_id`,
-      { replacements: { user_id }, type: sequelize.QueryTypes.SELECT }
+      { replacements: { user_id }, type: QueryTypes.SELECT }
     );
     return parseInt(result[0]?.cnt) || 0;
   }
@@ -204,7 +204,7 @@ export class HistoryRepository {
        WHERE pt.student_id = :student_id
        GROUP BY pt.id
        ORDER BY pt.created_at DESC`,
-      { replacements: { student_id }, type: sequelize.QueryTypes.SELECT }
+      { replacements: { student_id }, type: QueryTypes.SELECT }
     );
   }
 }

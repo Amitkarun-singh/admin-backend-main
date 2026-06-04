@@ -25,7 +25,7 @@ Both class and section routes are handled by `course.controller.ts` and backed b
 | `POST` | `/class` | Bearer JWT | None (commented out) | Create a single class |
 | `POST` | `/classes/bulk` | Bearer JWT | None | Bulk-create classes (with sections) |
 | `GET` | `/classes` | Bearer JWT | None | List all classes for the school |
-| `GET` | `/class/student` | Bearer JWT | None | Get class of the logged-in student (or teacher) |
+| `GET` | `/class/student` | Bearer JWT | None | Get class of the logged-in student |
 | `GET` | `/class/:id` | Bearer JWT | None | Get a class by ID |
 | `PUT` | `/class/:id` | Bearer JWT | None | Update a class |
 | `DELETE` | `/class/:id` | Bearer JWT | None | Delete a class with cascade |

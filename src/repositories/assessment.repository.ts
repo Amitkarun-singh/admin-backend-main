@@ -34,8 +34,8 @@ export const assessmentRepo = {
     Assessment.findAll({ where, order }),
 
   create: (data: {
-    school_id: bigint;
-    created_by: bigint;
+    school_id: number;
+    created_by: number;
     title: string;
     subject_id: number;
     class_id: number;

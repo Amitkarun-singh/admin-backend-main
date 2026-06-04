@@ -19,6 +19,7 @@ class TeacherProfile extends Model {
     declare dob: Date;
     declare preferred_language: string;
     declare qualification: string;
+    declare status?: string;
 }
 
 TeacherProfile.init(

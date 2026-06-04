@@ -10,7 +10,7 @@ import userRepository from "../repositories/user.repository.js";
 import { recordSession, closeSession } from "./history.controller.js";
 import { generateAccessToken, generateRefreshToken } from "../utils/jwt.util.js";
 
-import { ValidationError } from "../error/subError.ts";
+import { ValidationError } from "../error/subError.js";
 
 interface AuthenticatedRequest extends Request {
   user: any;
@@ -36,7 +36,7 @@ const login = asyncHandler(async (req: Request, res: Response) => {
   await recordSession({
     user_id: result.profile.user_id,
     ua: req.headers["user-agent"],
-    ip: req.ip || req.headers["x-forwarded-for"],
+    ip: req.ip || (Array.isArray(req.headers["x-forwarded-for"]) ? req.headers["x-forwarded-for"][0] : req.headers["x-forwarded-for"]),
   });
 
   return res.status(200).json(new ApiResponse(200, result, "Login successful"));
@@ -86,7 +86,7 @@ const resetFirstTimePassword = asyncHandler(async (req: Request, res: Response) 
   await recordSession({
     user_id: result.profile.user_id,
     ua: req.headers["user-agent"],
-    ip: req.ip || req.headers["x-forwarded-for"],
+    ip: req.ip || (Array.isArray(req.headers["x-forwarded-for"]) ? req.headers["x-forwarded-for"][0] : req.headers["x-forwarded-for"]),
   });
 
   return res.status(200).json(new ApiResponse(200, result, "Password reset successful"));

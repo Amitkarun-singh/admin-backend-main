@@ -258,7 +258,7 @@ Rules:
   if (openai) {
     try {
       const res = await openai.chat.completions.create({
-        model: "openai/gpt-4o-mini",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
@@ -290,8 +290,8 @@ Rules:
    createAssessment
 ═══════════════════════════════════════════════════ */
 export const createAssessmentService = async (
-  userId: bigint,
-  schoolId: bigint,
+  userId: number,
+  schoolId: number,
   body: {
     title: string;
     subject_id: number;

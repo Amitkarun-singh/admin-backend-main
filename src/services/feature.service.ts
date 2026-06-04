@@ -92,16 +92,16 @@ export const setOverrideService = async (
   });
 
   if (!created) {
-    (record as Record<string, unknown>).is_enabled = is_enabled;
-    (record as Record<string, unknown>).granted_by = granted_by;
-    await (record as { save: () => Promise<void> }).save();
+    (record as unknown as Record<string, unknown>).is_enabled = is_enabled;
+    (record as unknown as Record<string, unknown>).granted_by = granted_by;
+    await (record as unknown as { save: () => Promise<void> }).save();
   }
 
   const feature = await featureRepo.findByPk(feature_id);
 
   return {
     record,
-    featureName: (feature as Record<string, unknown> | null)?.feature_name ?? null,
+    featureName: (feature as unknown as Record<string, unknown> | null)?.feature_name ?? null,
     is_enabled,
     target_type,
   };
@@ -159,9 +159,9 @@ export const bulkSetClassOverridesService = async (
       granted_by,
     });
     if (!created) {
-      (record as Record<string, unknown>).is_enabled = is_enabled;
-      (record as Record<string, unknown>).granted_by = granted_by;
-      await (record as { save: () => Promise<void> }).save();
+      (record as unknown as Record<string, unknown>).is_enabled = is_enabled;
+      (record as unknown as Record<string, unknown>).granted_by = granted_by;
+      await (record as unknown as { save: () => Promise<void> }).save();
     }
     results.push(record);
   }
@@ -208,9 +208,9 @@ export const bulkSetSectionOverridesService = async (
       granted_by,
     });
     if (!created) {
-      (record as Record<string, unknown>).is_enabled = is_enabled;
-      (record as Record<string, unknown>).granted_by = granted_by;
-      await (record as { save: () => Promise<void> }).save();
+      (record as unknown as Record<string, unknown>).is_enabled = is_enabled;
+      (record as unknown as Record<string, unknown>).granted_by = granted_by;
+      await (record as unknown as { save: () => Promise<void> }).save();
     }
     results.push(record);
   }

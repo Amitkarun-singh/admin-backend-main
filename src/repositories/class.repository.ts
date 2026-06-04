@@ -2,6 +2,7 @@ import AdminClass from "../models/admin_class.model.js";
 import AdminSection from "../models/admin_section.model.js";
 import AdminSchool from "../models/admin_school.model.js";
 import AdminClassCourseMap from "../models/admin_class_course_map.model.js";
+import { Op } from "sequelize";
 import sequelize from "../config/db.js";
 
 export class ClassRepository {
@@ -45,6 +46,14 @@ export class ClassRepository {
 
   async findSchoolById(school_id: number | string): Promise<AdminSchool | null> {
     return AdminSchool.findOne({ where: { school_id } });
+  }
+
+  async findSectionById(section_id: number | string): Promise<AdminSection | null> {
+    return AdminSection.findByPk(section_id);
+  }
+
+  async findByNames(names: string[]): Promise<AdminClass[]> {
+    return AdminClass.findAll({ where: { class_name: { [Op.in]: names } } });
   }
 }
 

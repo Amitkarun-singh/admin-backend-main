@@ -11,6 +11,7 @@ export default class StudentProfile extends Model {
     declare dob: Date;
     declare gender: string;
     declare analytics_enabled: boolean;
+    declare status?: string;
 }   
 
 StudentProfile.init(
