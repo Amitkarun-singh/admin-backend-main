@@ -5,8 +5,10 @@ import { classRepository } from "../repositories/class.repository.js";
 class TopicService {
     async createTopics(userId: number) {
 
-        const { school_id: schoolId, role_id: roleId } = await UserRepository.findById(userId);
-        const { role_name } = await RoleRepository.findById(roleId);
+        const user = await UserRepository.findById(userId);
+        const { school_id: schoolId, role_id: roleId } = user as NonNullable<typeof user>;
+        const role = await RoleRepository.findById(roleId);
+        const { role_name } = role as NonNullable<typeof role>;
         let profile;
         let classNames: string[] = [];
         let sectionNames: string[] = [];

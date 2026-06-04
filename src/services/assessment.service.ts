@@ -516,8 +516,8 @@ export const getAssessmentsByUserService = async (
     if (!classSection) throw new ApiError(404, "Class not assigned to this student");
 
     const [classRow, sectionRow] = await Promise.all([
-      adminRepo.findClassById(classSection.class_id),
-      adminRepo.findSectionById(classSection.section_id),
+      adminRepo.findClassById(classSection.class_id!),
+      adminRepo.findSectionById(classSection.section_id!),
     ]);
 
     const assignments = await assignmentRepo.findAll(
@@ -865,8 +865,8 @@ export const getStudentAssignedTestsService = async (userId: bigint) => {
   if (!classSection) throw new ApiError(404, "Class not assigned to this student");
 
   const [classRow, sectionRow] = await Promise.all([
-    adminRepo.findClassById(classSection.class_id),
-    adminRepo.findSectionById(classSection.section_id),
+    adminRepo.findClassById(classSection.class_id!),
+    adminRepo.findSectionById(classSection.section_id!),
   ]);
 
   console.log(
@@ -1127,8 +1127,8 @@ export const getAttemptResultService = async (
     : null;
 
   const [classRow, sectionRow] = await Promise.all([
-    classSection ? adminRepo.findClassById(classSection.class_id) : null,
-    classSection ? adminRepo.findSectionById(classSection.section_id) : null,
+    classSection ? adminRepo.findClassById(classSection.class_id!) : null,
+    classSection ? adminRepo.findSectionById(classSection.section_id!) : null,
   ]);
 
   const answers = await answerRepo.findAll({ attempt_id: attemptId });
@@ -1195,8 +1195,8 @@ export const getAssignmentResultsService = async (assignmentId: string) => {
     attempts.map(async (a) => {
       const classSection = await studentRepo.findClassSection({ student_id: a.student_id });
       const [attemptClassRow, attemptSectionRow] = await Promise.all([
-        classSection ? adminRepo.findClassById(classSection.class_id) : null,
-        classSection ? adminRepo.findSectionById(classSection.section_id) : null,
+        classSection ? adminRepo.findClassById(classSection.class_id!) : null,
+        classSection ? adminRepo.findSectionById(classSection.section_id!) : null,
       ]);
       return {
         ...a.toJSON(),
@@ -1321,8 +1321,8 @@ export const getAssessmentResultsService = async (assessmentId: string) => {
   );
 
   const userIds = [...new Set(profiles.map((p) => p.user_id).filter(Boolean))];
-  const classIds = [...new Set(classSections.map((cs) => cs.class_id).filter(Boolean))];
-  const sectionIds = [...new Set(classSections.map((cs) => cs.section_id).filter(Boolean))];
+  const classIds = [...new Set(classSections.map((cs) => cs.class_id).filter((id): id is number => id !== undefined))];
+  const sectionIds = [...new Set(classSections.map((cs) => cs.section_id).filter((id): id is number => id !== undefined))];
 
   const [users, classRows, sectionRows] = await Promise.all([
     studentRepo.findUsersByIds(userIds),

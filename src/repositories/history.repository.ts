@@ -33,7 +33,7 @@ export class HistoryRepository {
   }
 
   async createStreak(data: Record<string, any>): Promise<UserStreak> {
-    return UserStreak.create(data);
+    return UserStreak.create(data as any);
   }
 
   async updateStreak(streak: UserStreak, data: Record<string, any>): Promise<UserStreak> {

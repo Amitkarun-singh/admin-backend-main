@@ -67,7 +67,7 @@ export class RegisterService {
     }
 
     // Role and School
-    const roleRecord: AdminRole = await roleRepository.findByName(role);
+    const roleRecord: AdminRole | null = await roleRepository.findByName(role);
     if (!roleRecord) {
       validation.push({
         field: "role",
@@ -76,7 +76,7 @@ export class RegisterService {
       });
     }
 
-    const cbseSchool: AdminSchool = await schoolRepository.findActiveCbseSchool();
+    const cbseSchool: AdminSchool | null = await schoolRepository.findActiveCbseSchool();
     if (!cbseSchool) {
       validation.push({
         field: "school",
@@ -130,8 +130,8 @@ export class RegisterService {
       password: hashed,
       phone_number: contact_number,
       email: email?.trim() || null,
-      role_id: roleRecord.role_id,
-      school_id: cbseSchool.school_id,
+      role_id: roleRecord!.role_id,
+      school_id: cbseSchool!.school_id,
       status: "Active",
       is_password_reset_required: false,
       self_register
@@ -143,7 +143,7 @@ export class RegisterService {
     if (role.toUpperCase() === "TEACHER") {
       const teacherProfile: TeacherProfile = await profileRepository.createTeacherProfile({
         user_id: (user as any).user_id,
-        school_id: cbseSchool.school_id,
+        school_id: cbseSchool!.school_id,
         onboarding_date: new Date(),
       });
 
@@ -156,11 +156,11 @@ export class RegisterService {
         });
       }
       
-      await schoolRepository.incrementCount(cbseSchool.school_id, "teacher_count");
+      await schoolRepository.incrementCount(cbseSchool!.school_id, "teacher_count");
     } else if (role.toUpperCase() === "STUDENT") {
       const studentProfile: StudentProfile = await profileRepository.createStudentProfile({
         user_id: (user as any).user_id,
-        school_id: cbseSchool.school_id,
+        school_id: cbseSchool!.school_id,
         onboarding_date: new Date(),
       });
 
@@ -174,7 +174,7 @@ export class RegisterService {
         });
       }
 
-      await schoolRepository.incrementCount(cbseSchool.school_id, "student_count");
+      await schoolRepository.incrementCount(cbseSchool!.school_id, "student_count");
     }
 
     // Login after registration

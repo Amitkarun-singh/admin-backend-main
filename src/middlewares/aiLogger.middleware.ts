@@ -19,7 +19,7 @@ export const aiLogger = (feature: string, action: string): RequestHandler => {
         const requestPayload = { body: req.body };
 
         await AiUsageLog.create({
-          user_id: req.user?.user_id ? BigInt(req.user.user_id) : null,
+          user_id: req.user?.user_id ? BigInt(req.user.user_id) : undefined,
           feature: feature as "summarizer" | "ai_notes",
           action,
           endpoint: req.originalUrl,

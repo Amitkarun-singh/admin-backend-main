@@ -74,7 +74,7 @@ export class StudentRepository {
   }
 
   async createClassSection(data: Record<string, any>, transaction?: any): Promise<StudentClassSection> {
-    return StudentClassSection.create(data, { transaction });
+    return StudentClassSection.create(data as any, { transaction });
   }
 
   /**

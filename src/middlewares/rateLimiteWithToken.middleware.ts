@@ -31,7 +31,7 @@ export default async function tokenCounter(
   if (!tokens) {
     tokens = await  UserRepository.getToken(userId)
     console.log("Tokens 2:", tokens);
-    await redisClient.set(userId, tokens);
+    await redisClient.set(userId, tokens ?? "0");
     
   }
 
@@ -63,7 +63,7 @@ export default async function tokenCounter(
 
     responseTokens += countTokens(responseBody);
 
-    return originalWrite.apply(res, [chunk, ...args]);
+    return originalWrite.call(res, chunk, ...(args as [BufferEncoding]));
   };
 
   // Count normal responses

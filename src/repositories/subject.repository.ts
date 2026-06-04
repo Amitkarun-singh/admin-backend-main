@@ -34,7 +34,7 @@ export class SubjectRepository {
   }
 
   async bulkCreateChapters(payload: Record<string, any>[], transaction?: any): Promise<void> {
-    await AdminChapterMaster.bulkCreate(payload, { transaction });
+    await AdminChapterMaster.bulkCreate(payload as any, { transaction });
   }
 
   async findAllSubjects(where: SubjectWhereClause): Promise<AdminSubject[]> {

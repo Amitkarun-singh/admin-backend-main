@@ -41,7 +41,7 @@ export class AuthService {
         ? await userRepository.findByUsername(username)
         : await userRepository.findByEmail(email!);
 
-      if (!user) throw new NotFoundError("User", username || email);
+      if (!user) throw new NotFoundError("User", username ?? email ?? "unknown");
 
       const valid = await bcrypt.compare(password, user.password);
       if (!valid) throw new ValidationError([{
