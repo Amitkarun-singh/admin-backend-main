@@ -10,11 +10,12 @@ export default class User extends Model {
   declare password: string;
   declare phone_number: string;
   declare email: string;
+  declare address: string;
   declare status: string;
   declare avatar: string;
   declare is_password_reset_required: boolean;
   declare self_register: boolean;
-  declare token : string
+  declare token: string;
 }
 
 User.init(
@@ -25,21 +26,27 @@ User.init(
 
     role_id: { type: DataTypes.INTEGER },
 
-    username: { type: DataTypes.STRING, unique: true },
+    /** Auto-generated unique login handle — never entered by the user */
+    username: { type: DataTypes.STRING, allowNull: false, unique: true },
 
-    full_name: { type: DataTypes.STRING },
+    full_name: { type: DataTypes.STRING, allowNull: true },
 
-    password: { type: DataTypes.STRING },
+    password: { type: DataTypes.STRING, allowNull: false },
 
-    phone_number: { type: DataTypes.STRING, unique: true },
+    /** Multiple accounts can share a phone number (e.g. parent + child) */
+    phone_number: { type: DataTypes.STRING, allowNull: true, unique: false },
 
-    email: { type: DataTypes.STRING, unique: true },
+    /** Optional — unique only when provided (NULL is not considered a duplicate) */
+    email: { type: DataTypes.STRING, allowNull: true, unique: true },
 
-    status: { type: DataTypes.ENUM("Active", "Suspended", "Blocked") },
+    /** Optional home / shipping address */
+    address: { type: DataTypes.TEXT, allowNull: true },
 
-    avatar: { type: DataTypes.STRING },
+    status: { type: DataTypes.ENUM("Active", "Suspended", "Blocked"), allowNull: true },
 
-    token: { type: DataTypes.STRING },
+    avatar: { type: DataTypes.STRING, allowNull: true },
+
+    token: { type: DataTypes.STRING, allowNull: true },
 
     is_password_reset_required: {
       type: DataTypes.BOOLEAN,
@@ -51,7 +58,7 @@ User.init(
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: false,
-    }
+    },
   },
   {
     sequelize,

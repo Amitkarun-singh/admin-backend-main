@@ -1,12 +1,14 @@
-import UserRepository from "../repositories/user.repository.ts";
-import RoleRepository from "../repositories/role.repository.ts";
-import ProfileRepository from "../repositories/profile.repository.ts";
-import {ClassRepository} from "../repositories/class.repository.ts";
+import UserRepository from "../repositories/user.repository.js";
+import RoleRepository from "../repositories/role.repository.js";
+import ProfileRepository from "../repositories/profile.repository.js";
+import { classRepository } from "../repositories/class.repository.js";
 class TopicService {
     async createTopics(userId: number) {
 
-        const { school_id: schoolId, role_id: roleId } = await UserRepository.findById(userId);
-        const { role_name } = await RoleRepository.findById(roleId);
+        const user = await UserRepository.findById(userId);
+        const { school_id: schoolId, role_id: roleId } = user as NonNullable<typeof user>;
+        const role = await RoleRepository.findById(roleId);
+        const { role_name } = role as NonNullable<typeof role>;
         let profile;
         let classNames: string[] = [];
         let sectionNames: string[] = [];
@@ -16,8 +18,8 @@ class TopicService {
             if (profile) {
                 const studentMap = await ProfileRepository.findStudentClassSection((profile as any).student_id);
                 if (studentMap) {
-                    const classObj = await ClassRepository.findById((studentMap as any).class_id);
-                    const sectionObj = await ClassRepository.findSectionById((studentMap as any).section_id);
+                    const classObj = await classRepository.findById((studentMap as any).class_id);
+                    const sectionObj = await classRepository.findSectionById((studentMap as any).section_id);
                     if (classObj) classNames.push((classObj as any).class_name);
                     if (sectionObj) sectionNames.push((sectionObj as any).section_name);
                 }
@@ -29,8 +31,8 @@ class TopicService {
                 const teacherMaps = await ProfileRepository.findTeacherClassSections((profile as any).teacher_id);
                 if (teacherMaps) {
                     for (const map of teacherMaps) {
-                        const classObj = await ClassRepository.findById((map as any).class_id);
-                        const sectionObj = await ClassRepository.findSectionById((map as any).section_id);
+                        const classObj = await classRepository.findById((map as any).class_id);
+                        const sectionObj = await classRepository.findSectionById((map as any).section_id);
                         if (classObj && !classNames.includes((classObj as any).class_name)) classNames.push((classObj as any).class_name);
                         if (sectionObj && !sectionNames.includes((sectionObj as any).section_name)) sectionNames.push((sectionObj as any).section_name);
                     }

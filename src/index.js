@@ -1,3 +1,10 @@
+// ─── Global BigInt serializer (must be before any imports that use BigInt) ───
+// Express's res.json() uses JSON.stringify internally, which cannot handle
+// native BigInt. This patch converts BigInt to a Number-safe string globally.
+BigInt.prototype.toJSON = function () {
+  return this.toString();
+};
+
 // 🚨 dotenv MUST be first
 import "./bootstrap.js";
 import cors from "cors";

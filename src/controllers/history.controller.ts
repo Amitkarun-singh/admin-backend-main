@@ -3,8 +3,8 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { historyService } from "../services/history.service.js";
 
-export const recordSession = async ({ user_id, ua, ip }: { user_id: number; ua: string; ip: string }): Promise<void> => {
-  return historyService.recordSession({ user_id, ua, ip });
+export const recordSession = async ({ user_id, ua, ip }: { user_id: number | bigint; ua?: string; ip?: string }): Promise<void> => {
+  return historyService.recordSession({ user_id: Number(user_id), ua: ua || "", ip: ip || "" });
 };
 
 export const closeSession = async (user_id: number): Promise<void> => {
@@ -50,7 +50,7 @@ export const getConversation = asyncHandler(async (req: Request, res: Response) 
   const { conversation_id } = req.params;
   const source              = (req.query.source as string || "gini").toLowerCase();
 
-  const result = await historyService.getConversation(user_id, conversation_id, source);
+  const result = await historyService.getConversation(user_id, String(conversation_id), source);
   return res.status(200).json(new ApiResponse(200, result, "Conversation fetched"));
 });
 

@@ -53,7 +53,7 @@ export class UserRepository {
 
   async getToken(userId: string){
      const user =  await User.findOne({ where: { user_id: userId } });
-     return user.token
+     return user?.token ?? null
   }
 
   async updateToken(userId: string, token: string){

@@ -27,31 +27,31 @@ export const getAllStudents = asyncHandler(async (req: Request, res: Response) =
 });
 
 export const getStudentById = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const student = await studentService.getStudentById(id);
   return res.status(200).json(new ApiResponse(200, student, "Student fetched"));
 });
 
 export const getStudentProfile = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const student = await studentService.getStudentProfile(id);
   return res.status(200).json(new ApiResponse(200, student, "Student profile fetched"));
 });
 
 export const getStudentAnalytics = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const analytics = await studentService.getStudentAnalytics(id);
   return res.status(200).json(new ApiResponse(200, analytics || null, "Student analytics fetched"));
 });
 
 export const updateStudent = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const student = await studentService.updateStudent(id, req.body);
   return res.status(200).json(new ApiResponse(200, student, "Student updated successfully"));
 });
 
 export const deleteStudent = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   await studentService.deleteStudent(id);
   return res.status(200).json(new ApiResponse(200, null, "Student deleted successfully"));
 });

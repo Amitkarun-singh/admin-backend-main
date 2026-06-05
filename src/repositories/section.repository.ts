@@ -8,7 +8,7 @@ export class SectionRepository {
     section_name: string;
     school_id: number | bigint;
   }): Promise<AdminSection> {
-    return AdminSection.create(data);
+    return AdminSection.create({ ...data, school_id: BigInt(data.school_id) });
   }
 
   async findDuplicate(class_id: number, school_id: number | bigint, section_name: string): Promise<AdminSection | null> {

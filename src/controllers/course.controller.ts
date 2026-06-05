@@ -89,19 +89,19 @@ export const getStudentClass = asyncHandler(async (req: Request, res: Response) 
 });
 
 export const getClassById = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const classData = await classService.getClassById(id);
   return res.status(200).json(new ApiResponse(200, classData, "Class fetched"));
 });
 
 export const updateClass = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const classData = await classService.updateClass(id, req.body);
   return res.status(200).json(new ApiResponse(200, classData, "Class updated"));
 });
 
 export const deleteClass = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   await classService.deleteClass(id);
   return res.status(200).json(new ApiResponse(200, {}, "Class and related data deleted"));
 });
@@ -127,7 +127,7 @@ export const bulkCreateSections = asyncHandler(async (req: Request, res: Respons
 });
 
 export const getSectionsByClass = asyncHandler(async (req: Request, res: Response) => {
-  const { class_id } = req.params;
+  const class_id = String(req.params.class_id);
   const { school_id } = (req as any).user;
 
   const sections = await sectionService.getSectionsByClass(class_id, school_id);
@@ -135,7 +135,7 @@ export const getSectionsByClass = asyncHandler(async (req: Request, res: Respons
 });
 
 export const updateSection = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const { school_id } = (req as any).user;
 
   const section = await sectionService.updateSection(id, school_id, req.body);
@@ -143,7 +143,7 @@ export const updateSection = asyncHandler(async (req: Request, res: Response) =>
 });
 
 export const deleteSection = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const { school_id } = (req as any).user;
 
   await sectionService.deleteSection(id, school_id);
@@ -169,19 +169,19 @@ export const getAllCourses = asyncHandler(async (req: Request, res: Response) =>
 });
 
 export const getCourseById = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const course = await courseService.getCourseById(id);
   return res.status(200).json(new ApiResponse(200, course, "Course fetched"));
 });
 
 export const updateCourse = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const course = await courseService.updateCourse(id, req.body);
   return res.status(200).json(new ApiResponse(200, course, "Course updated"));
 });
 
 export const deleteCourse = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   await courseService.deleteCourse(id);
   return res.status(200).json(new ApiResponse(200, {}, "Course deleted"));
 });

@@ -16,25 +16,25 @@ export const getAllParents = asyncHandler(async (req: Request, res: Response) =>
 });
 
 export const getParentById = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const parent = await parentService.getParentById(id);
   return res.status(200).json(new ApiResponse(200, parent, "Parent fetched"));
 });
 
 export const getParentProfile = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const parent = await parentService.getParentProfile(id);
   return res.status(200).json(new ApiResponse(200, parent, "Parent profile fetched"));
 });
 
 export const updateParent = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const parent = await parentService.updateParent(id, req.body);
   return res.status(200).json(new ApiResponse(200, parent, "Parent updated successfully"));
 });
 
 export const deleteParent = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   await parentService.deleteParent(id);
   return res.status(200).json(new ApiResponse(200, null, "Parent deleted successfully"));
 });

@@ -30,7 +30,7 @@ import {
 export const createAssessment = asyncHandler(async (req: Request, res: Response) => {
   const { user_id, school_id } = req.user;
 
-  const result = await createAssessmentService(user_id, school_id, req.body);
+  const result = await createAssessmentService(Number(user_id), Number(school_id), req.body);
 
   if (result.aiFailed) {
     return res.status(207).json(
@@ -62,10 +62,10 @@ export const createAssessment = asyncHandler(async (req: Request, res: Response)
    DELETE /api/assessments/:assessment_id
 ═══════════════════════════════════════════════════ */
 export const deleteAssessment = asyncHandler(async (req: Request, res: Response) => {
-  const { assessment_id } = req.params;
+  const assessment_id = String(req.params.assessment_id);
   const { user_id } = req.user;
 
-  const result = await deleteAssessmentService(assessment_id, user_id);
+  const result = await deleteAssessmentService(assessment_id, BigInt(user_id));
 
   if (result.archived) {
     return res.status(200).json(
@@ -90,7 +90,7 @@ export const getTeacherAssessments = asyncHandler(async (req: Request, res: Resp
   const { user_id } = req.user;
   const { status, class_id, subject_id } = req.query as Record<string, string | undefined>;
 
-  const data = await getTeacherAssessmentsService(user_id, { status, class_id, subject_id });
+  const data = await getTeacherAssessmentsService(BigInt(user_id), { status, class_id, subject_id });
 
   return res.status(200).json(new ApiResponse(200, data, "Teacher assessments fetched"));
 });
@@ -103,7 +103,7 @@ export const getAssessmentsByUser = asyncHandler(async (req: Request, res: Respo
   const { user_id, role } = req.user;
   const { status, class_id, subject_id } = req.query as Record<string, string | undefined>;
 
-  const data = await getAssessmentsByUserService(user_id, role, { status, class_id, subject_id });
+  const data = await getAssessmentsByUserService(BigInt(user_id), role, { status, class_id, subject_id });
 
   return res.status(200).json(new ApiResponse(200, data, "Assessments fetched"));
 });
@@ -113,7 +113,7 @@ export const getAssessmentsByUser = asyncHandler(async (req: Request, res: Respo
    GET /api/assessments/:assessment_id
 ═══════════════════════════════════════════════════ */
 export const getAssessment = asyncHandler(async (req: Request, res: Response) => {
-  const { assessment_id } = req.params;
+  const assessment_id = String(req.params.assessment_id);
 
   const data = await getAssessmentService(assessment_id);
 
@@ -126,7 +126,7 @@ export const getAssessment = asyncHandler(async (req: Request, res: Response) =>
    action: approve | edit | delete | regenerate
 ═══════════════════════════════════════════════════ */
 export const reviewQuestion = asyncHandler(async (req: Request, res: Response) => {
-  const { question_id } = req.params;
+  const question_id = String(req.params.question_id);
 
   const result = await reviewQuestionService(question_id, req.body);
 
@@ -150,7 +150,7 @@ export const reviewQuestion = asyncHandler(async (req: Request, res: Response) =
    PATCH /api/assessments/:assessment_id/questions/approve-all
 ═══════════════════════════════════════════════════ */
 export const approveAllQuestions = asyncHandler(async (req: Request, res: Response) => {
-  const { assessment_id } = req.params;
+  const assessment_id = String(req.params.assessment_id);
 
   const updatedCount = await approveAllQuestionsService(assessment_id);
 
@@ -170,7 +170,7 @@ export const approveAllQuestions = asyncHandler(async (req: Request, res: Respon
    POST /api/assessments/:assessment_id/questions
 ═══════════════════════════════════════════════════ */
 export const addQuestion = asyncHandler(async (req: Request, res: Response) => {
-  const { assessment_id } = req.params;
+  const assessment_id = String(req.params.assessment_id);
 
   const question = await addQuestionService(assessment_id, req.body);
 
@@ -184,7 +184,7 @@ export const addQuestion = asyncHandler(async (req: Request, res: Response) => {
    PATCH /api/assessments/:assessment_id/publish
 ═══════════════════════════════════════════════════ */
 export const publishAssessment = asyncHandler(async (req: Request, res: Response) => {
-  const { assessment_id } = req.params;
+  const assessment_id = String(req.params.assessment_id);
 
   const assessment = await publishAssessmentService(assessment_id);
 
@@ -197,9 +197,9 @@ export const publishAssessment = asyncHandler(async (req: Request, res: Response
 ═══════════════════════════════════════════════════ */
 export const assignAssessment = asyncHandler(async (req: Request, res: Response) => {
   const { user_id } = req.user;
-  const { assessment_id } = req.params;
+  const assessment_id = String(req.params.assessment_id);
 
-  const result = await assignAssessmentService(user_id, assessment_id, req.body);
+  const result = await assignAssessmentService(BigInt(user_id), assessment_id, req.body);
 
   return res.status(201).json(new ApiResponse(201, result, "Assessment assigned"));
 });
@@ -211,7 +211,7 @@ export const assignAssessment = asyncHandler(async (req: Request, res: Response)
 export const getStudentAssignedTests = asyncHandler(async (req: Request, res: Response) => {
   const { user_id } = req.user;
 
-  const data = await getStudentAssignedTestsService(user_id);
+  const data = await getStudentAssignedTestsService(BigInt(user_id));
 
   return res.status(200).json(new ApiResponse(200, data, "Assigned tests fetched"));
 });
@@ -224,7 +224,7 @@ export const startAttempt = asyncHandler(async (req: Request, res: Response) => 
   const { user_id } = req.user;
   const { assignment_id } = req.body;
 
-  const result = await startAttemptService(user_id, assignment_id);
+  const result = await startAttemptService(BigInt(user_id), assignment_id);
 
   return res.status(200).json(
     new ApiResponse(200, result, "Attempt started")
@@ -239,7 +239,7 @@ export const submitAttempt = asyncHandler(async (req: Request, res: Response) =>
   const { user_id } = req.user;
 
   const { attempt, assignment, answerRows, totalObtained } = await submitAttemptService(
-    user_id,
+    BigInt(user_id),
     req.body
   );
 
@@ -263,10 +263,10 @@ export const submitAttempt = asyncHandler(async (req: Request, res: Response) =>
    GET /api/assessments/attempt/:attempt_id/result
 ═══════════════════════════════════════════════════ */
 export const getAttemptResult = asyncHandler(async (req: Request, res: Response) => {
-  const { attempt_id } = req.params;
+  const attempt_id = String(req.params.attempt_id);
   const { user_id, role } = req.user;
 
-  const data = await getAttemptResultService(attempt_id, user_id, role);
+  const data = await getAttemptResultService(attempt_id, BigInt(user_id), role);
 
   return res.status(200).json(new ApiResponse(200, data, "Result fetched"));
 });
@@ -276,7 +276,7 @@ export const getAttemptResult = asyncHandler(async (req: Request, res: Response)
    GET /api/assessments/assignment/:assignment_id/results
 ═══════════════════════════════════════════════════ */
 export const getAssignmentResults = asyncHandler(async (req: Request, res: Response) => {
-  const { assignment_id } = req.params;
+  const assignment_id = String(req.params.assignment_id);
 
   const data = await getAssignmentResultsService(assignment_id);
 
@@ -288,10 +288,10 @@ export const getAssignmentResults = asyncHandler(async (req: Request, res: Respo
    GET /api/assessments/attempt/:attempt_id/questions
 ═══════════════════════════════════════════════════ */
 export const getAttemptQuestions = asyncHandler(async (req: Request, res: Response) => {
-  const { attempt_id } = req.params;
+  const attempt_id = String(req.params.attempt_id);
   const { user_id } = req.user;
 
-  const data = await getAttemptQuestionsService(attempt_id, user_id);
+  const data = await getAttemptQuestionsService(attempt_id, BigInt(user_id));
 
   return res.status(200).json(new ApiResponse(200, data, "Questions fetched"));
 });
@@ -301,7 +301,7 @@ export const getAttemptQuestions = asyncHandler(async (req: Request, res: Respon
    GET /api/assessments/:assessment_id/all-results
 ═══════════════════════════════════════════════════ */
 export const getAssessmentResults = asyncHandler(async (req: Request, res: Response) => {
-  const { assessment_id } = req.params;
+  const assessment_id = String(req.params.assessment_id);
 
   const data = await getAssessmentResultsService(assessment_id);
 

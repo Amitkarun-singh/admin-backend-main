@@ -7,8 +7,9 @@ interface ParentProfileAttributes {
   parent_id: bigint;
   user_id?: bigint;
   school_id?: bigint;
-  parent_name?: string;
   relation?: Relation;
+  parent_name?: string;
+  status?: string;
 }
 
 interface ParentProfileCreationAttributes
@@ -21,8 +22,9 @@ class ParentProfile
   public parent_id!: bigint;
   public user_id?: bigint;
   public school_id?: bigint;
-  public parent_name?: string;
   public relation?: Relation;
+  public parent_name?: string;
+  public status?: string;
 }
 
 ParentProfile.init(
@@ -30,8 +32,9 @@ ParentProfile.init(
     parent_id: { type: DataTypes.BIGINT, primaryKey: true, autoIncrement: true },
     user_id: { type: DataTypes.BIGINT },
     school_id: { type: DataTypes.BIGINT },
-    parent_name: { type: DataTypes.STRING },
     relation: { type: DataTypes.ENUM("Father", "Mother", "Guardian") },
+    parent_name: { type: DataTypes.STRING, allowNull: true },
+    status: { type: DataTypes.STRING, allowNull: true },
   },
   {
     sequelize,

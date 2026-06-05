@@ -29,19 +29,19 @@ export const getAllTeachers = asyncHandler(async (req: Request, res: Response) =
 });
 
 export const getTeacherById = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const teacher = await teacherService.getTeacherById(id);
   return res.status(200).json(new ApiResponse(200, teacher, "Teacher fetched"));
 });
 
 export const updateTeacher = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const teacher = await teacherService.updateTeacher(id, req.body);
   return res.status(200).json(new ApiResponse(200, teacher, "Teacher updated successfully"));
 });
 
 export const deleteTeacher = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   await teacherService.deleteTeacher(id);
   return res.status(200).json(new ApiResponse(200, null, "Teacher deleted successfully"));
 });

@@ -1,11 +1,11 @@
-import { AppError } from "../error/AppError.ts";
+import { AppError } from "../error/AppError.js";
 import {
     NotFoundError,
     ValidationError,
     AuthenticationError,
-} from "../error/subError.ts";
+} from "../error/subError.js";
 
-import * as AdminRepo from "../repositories/admin.repository.ts";
+import * as AdminRepo from "../repositories/admin.repository.js";
 
 // ─────────────────────────────────────────────
 // SCHOOL

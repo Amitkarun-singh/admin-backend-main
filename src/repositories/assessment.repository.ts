@@ -34,8 +34,8 @@ export const assessmentRepo = {
     Assessment.findAll({ where, order }),
 
   create: (data: {
-    school_id: bigint;
-    created_by: bigint;
+    school_id: number;
+    created_by: number;
     title: string;
     subject_id: number;
     class_id: number;
@@ -47,7 +47,7 @@ export const assessmentRepo = {
     generated_by: GeneratedBy;
     start_datetime?: Date | null;
     end_datetime?: Date | null;
-  }) => Assessment.create(data as Parameters<typeof Assessment.create>[0]),
+  }) => Assessment.create(data as any),
 
   updateStatus: (assessment_id: bigint | string | number, status: AssessmentStatus) =>
     Assessment.update({ status }, { where: { assessment_id } }),
@@ -100,7 +100,7 @@ export const questionRepo = {
       status: QuestionStatus;
       order: number;
     }>
-  ) => AssessmentQuestion.bulkCreate(rows as Parameters<typeof AssessmentQuestion.bulkCreate>[0]),
+  ) => AssessmentQuestion.bulkCreate(rows as any),
 
   create: (data: {
     assessment_id: bigint | string | number;
@@ -112,7 +112,7 @@ export const questionRepo = {
     marks: number;
     status: QuestionStatus;
     order: number;
-  }) => AssessmentQuestion.create(data as Parameters<typeof AssessmentQuestion.create>[0]),
+  }) => AssessmentQuestion.create(data as any),
 
   updateStatus: (question_id: bigint | string | number, status: QuestionStatus) =>
     AssessmentQuestion.update({ status }, { where: { question_id } }),
@@ -149,7 +149,7 @@ export const assignmentRepo = {
     shuffle_options: boolean;
     show_result_immediately: boolean;
     assigned_by: bigint;
-  }) => AssessmentAssignment.create(data as Parameters<typeof AssessmentAssignment.create>[0]),
+  }) => AssessmentAssignment.create(data as any),
 
   destroy: (where: Record<string, unknown>) =>
     AssessmentAssignment.destroy({ where }),
@@ -175,7 +175,7 @@ export const attemptRepo = {
     student_id: bigint | string | number;
     total_marks_possible?: number | null;
     status: AttemptStatus;
-  }) => StudentAttempt.create(data as Parameters<typeof StudentAttempt.create>[0]),
+  }) => StudentAttempt.create(data as any),
 };
 
 // ─── StudentAnswer ────────────────────────────────────────────────────────────
@@ -192,7 +192,7 @@ export const answerRepo = {
       is_correct: boolean | null;
       marks_obtained: number;
     }>
-  ) => StudentAnswer.bulkCreate(rows as Parameters<typeof StudentAnswer.bulkCreate>[0]),
+  ) => StudentAnswer.bulkCreate(rows as any),
 };
 
 // ─── Admin lookups ────────────────────────────────────────────────────────────

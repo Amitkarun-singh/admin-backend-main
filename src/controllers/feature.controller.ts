@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
-import { ApiResponse } from "../utils/ApiResponse.ts";
-import { asyncHandler } from "../utils/asyncHandler.ts";
+import { ApiResponse } from "../utils/ApiResponse.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 
 import {
   getMySchoolFeaturesService,
@@ -10,7 +10,7 @@ import {
   bulkSetClassOverridesService,
   bulkSetSectionOverridesService,
   getMyAccessService,
-} from "../services/feature.service.ts";
+} from "../services/feature.service.js";
 
 /* ═══════════════════════════════════════════════════
    5. GET MY SCHOOL'S FEATURES  (school admin)
@@ -67,7 +67,7 @@ export const deleteOverride = asyncHandler(async (req: Request, res: Response) =
   const { school_id } = req.user;
   const { id } = req.params;
 
-  await deleteOverrideService(id, school_id);
+  await deleteOverrideService(String(id), school_id);
 
   return res
     .status(200)

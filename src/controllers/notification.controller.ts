@@ -1,8 +1,8 @@
 import type { Request, Response } from "express";
-import NotificationService from "../services/notification.service.ts";
+import NotificationService from "../services/notification.service.js";
 export async function notificationRegister(req: Request, res: Response) {
     const { token, deviceId } = req.body;
-    const userId = req.user.user_id;
+    const userId = Number(req.user.user_id);
 
     console.log("notificationRegister")
     //console.log("token, deviceId, userId", token, deviceId, userId)
@@ -20,7 +20,7 @@ export async function notificationRegister(req: Request, res: Response) {
 
 export async function notificationSend(req: Request, res: Response) {
     const { title, body } = req.body;
-    const userId = req.user.user_id;
+    const userId = Number(req.user.user_id);
     if (!title || typeof title !== "string") {
         return res.status(400).json({ message: "Title is required or not a string", title })
     }
@@ -47,7 +47,7 @@ export async function notificationTopicSend(req: Request, res: Response) {
     if (!body || typeof body !== "string") {
         return res.status(400).json({ message: "Body is required or not a string", body })
     }
-    const userId = req.user.user_id;
+    const userId = Number(req.user.user_id);
     try {
         const result = await NotificationService.topicSend(topic, title, body);
         res.status(201).json({ message: "Topic send successful", result })
@@ -62,7 +62,7 @@ export async function notificationTopicUnsubscribe(req: Request, res: Response) 
     if (!topic || typeof topic !== "string") {
         return res.status(400).json({ message: "Topic is required or not a string", topic })
     }
-    const userId = req.user.user_id;
+    const userId = Number(req.user.user_id);
     try {
         const result = await NotificationService.topicUnsubscribe(topic, userId);
         res.status(201).json({ message: "Unsubscription successful", result })
@@ -77,7 +77,7 @@ export async function notificationTopicSubscribe(req: Request, res: Response) {
     if (!topics || !Array.isArray(topics)) {
         return res.status(400).json({ message: "Topics is required", topics })
     }
-    const userId = req.user.user_id;
+    const userId = Number(req.user.user_id);
     try {
         const result = await NotificationService.topicSubscribe(topics, userId);
         res.status(201).json({ message: "Registration successful", result })

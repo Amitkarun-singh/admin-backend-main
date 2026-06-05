@@ -59,7 +59,7 @@ export class TeacherService {
 
     if (subject_name) {
       const subjectRecord = await teacherRepository.findSubjectByParams({
-        class_id:     resolvedClassId,
+        class_id:     resolvedClassId!,
         subject_name,
         board:        school.board,
         language:     school.language_preference,
@@ -68,7 +68,7 @@ export class TeacherService {
     }
 
     if (section_name) {
-      const sectionRecord = await teacherRepository.findSectionByName(resolvedClassId, section_name, transaction);
+      const sectionRecord = await teacherRepository.findSectionByName(resolvedClassId!, section_name, transaction);
       resolvedSectionId = (sectionRecord as any)?.section_id ?? null;
     }
 

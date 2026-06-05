@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { subjectService } from "../services/subject.service.ts";
+import { subjectService } from "../services/subject.service.js";
 
 export const addSubjectsWithChapters = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -33,7 +33,7 @@ export const getSubjects = async (req: Request, res: Response): Promise<void> =>
 export const getChapters = async (req: Request, res: Response): Promise<void> => {
   try {
     const { class_id, subject_id } = req.params;
-    const chapters = await subjectService.getChapters(class_id, subject_id);
+    const chapters = await subjectService.getChapters(String(class_id), String(subject_id));
     res.status(200).json({ success: true, data: chapters });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
@@ -42,7 +42,7 @@ export const getChapters = async (req: Request, res: Response): Promise<void> =>
 
 export const updateSubjectName = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { subject_id } = req.params;
+    const subject_id = String(req.params.subject_id);
     const { subject_name } = req.body;
     await subjectService.updateSubjectName(subject_id, subject_name);
     res.status(200).json({ success: true, message: "Subject updated successfully" });
@@ -54,7 +54,7 @@ export const updateSubjectName = async (req: Request, res: Response): Promise<vo
 
 export const deleteSubject = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { subject_id } = req.params;
+    const subject_id = String(req.params.subject_id);
     await subjectService.deleteSubject(subject_id);
     res.status(200).json({ success: true, message: "Subject deleted successfully" });
   } catch (error: any) {
@@ -64,7 +64,7 @@ export const deleteSubject = async (req: Request, res: Response): Promise<void> 
 
 export const addChaptersToSubject = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { subject_id } = req.params;
+    const subject_id = String(req.params.subject_id);
     const { chapters } = req.body;
     await subjectService.addChaptersToSubject(subject_id, chapters);
     res.status(201).json({ success: true, message: "Chapters added successfully" });
@@ -76,7 +76,7 @@ export const addChaptersToSubject = async (req: Request, res: Response): Promise
 
 export const updateChapter = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { chapter_id } = req.params;
+    const chapter_id = String(req.params.chapter_id);
     const { chapter_name } = req.body;
     await subjectService.updateChapter(chapter_id, chapter_name);
     res.status(200).json({ success: true, message: "Chapter updated successfully" });
@@ -88,7 +88,7 @@ export const updateChapter = async (req: Request, res: Response): Promise<void> 
 
 export const deleteChapter = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { chapter_id } = req.params;
+    const chapter_id = String(req.params.chapter_id);
     await subjectService.deleteChapter(chapter_id);
     res.status(200).json({ success: true, message: "Chapter deleted successfully" });
   } catch (error: any) {

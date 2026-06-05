@@ -14,7 +14,7 @@ declare global {
 type File = Express.Multer.File;
 
 interface UserTokenPayload extends JwtPayload {
-  user_id: number;
+  user_id: number | bigint;
   role: string;
   permissions: string[];
   school_id: number;

@@ -43,7 +43,7 @@ export const featureOverrideRepo = {
     FeatureOverride.findAll({ where, order: [["created_at", "DESC"]] }),
 
   findOrCreate: (findWhere: Record<string, unknown>, defaults: Record<string, unknown>) =>
-    FeatureOverride.findOrCreate({ where: findWhere, defaults }),
+    FeatureOverride.findOrCreate({ where: findWhere, defaults: defaults as any }),
 
   destroy: (instance: FeatureOverride) => instance.destroy(),
 };

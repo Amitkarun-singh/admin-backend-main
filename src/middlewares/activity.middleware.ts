@@ -20,7 +20,7 @@ export const activityMiddleware = (
   if (_seenToday.has(cacheKey)) return next();
 
   // Fire-and-forget: don't await, don't block the response
-  _updateStreakBackground(user_id, today, cacheKey).catch(() => {
+  _updateStreakBackground(Number(user_id), today, cacheKey).catch(() => {
     /* silently ignore */
   });
 
