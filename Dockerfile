@@ -14,7 +14,6 @@ RUN npm install
 COPY . .
 
 # Build TypeScript project
-RUN export NODE_OPTIONS="--max-old-space-size=4096"
 RUN npm run build
 
 

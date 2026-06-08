@@ -15,8 +15,8 @@
 				"--network",
 				"dev-net",
 				"-p",
-				"3000:3000",
-				"--memory=512m"
+				"3000:3000"
+				
 			]
 
 	// Use 'postCreateCommand' to run commands after the container is created.
