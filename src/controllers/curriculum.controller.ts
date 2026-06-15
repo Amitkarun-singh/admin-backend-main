@@ -7,21 +7,11 @@ export async function classes(req: Request, res: Response) {
   const role = req?.user?.role
   const userId = String(req?.user?.user_id)
   const schoolId = String(req?.user?.school_id)
-<<<<<<< HEAD
-  const type = String(req?.query?.type)
-=======
->>>>>>> 5b90bef3527b441845b2ef62c2b0135631d6c029
 
 
   if (role.toLowerCase() === "student") {
     const data = await CurriculumService.onlyAsignClass(userId, schoolId);
     return res.status(200).json(data);
-<<<<<<< HEAD
-  } else if (type.toLowerCase() === "ai-notes") {
-    const data = await CurriculumService.onlyAiNotesClass(AiNote)
-    return res.status(200).json(data);
-=======
->>>>>>> 5b90bef3527b441845b2ef62c2b0135631d6c029
   } else {
     const data = await CurriculumService.allClass();
     return res.status(200).json(data);
