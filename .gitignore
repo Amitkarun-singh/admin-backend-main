@@ -17,3 +17,5 @@ registration_service.md
 
 .idea
 .antigravitycli
+*.tar
+deploy.sh

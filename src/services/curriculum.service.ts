@@ -39,6 +39,18 @@ class CurriculumService {
         return res.json()
     }
 
+    async board() {
+        const res = await fetch(`${curriculamServer}/api/v1/board`)
+
+        return res.json()
+    }
+
+    async lang() {
+        const res = await fetch(`${curriculamServer}/api/v1/lang`)
+
+        return res.json()
+    }
+
     async allChapter({ classId, board, streamId, subjectId, lang }: { classId: string | number; board: string; streamId: string | number; subjectId: string | number; lang: string }) {
         console.log("classId ", classId)
         const res = await fetch(`${curriculamServer}/api/v1/class/${classId}/subject/${subjectId}/chapter/all?board=${board}&streamId=${streamId}&lang=${lang}`)
@@ -85,7 +97,7 @@ class CurriculumService {
         return res.json();
     }
 
-    async removeClass(userId: string | number) {
+    async removeAsignClass(userId: string | number) {
         const res = await fetch(
             `${curriculamServer}/api/v1/users/remove-class`,
             {
@@ -112,7 +124,7 @@ class CurriculumService {
         subjectName: string;
         board: string;
         streamId: string | number;
-        classIds?: number[];
+        classIds: number[];
     }) {
         const res = await fetch(
             `${curriculamServer}/api/v1/subject`,
@@ -187,6 +199,32 @@ class CurriculumService {
 
         return res.json();
     }
+
+    async onlyAiNotesClass(aiNotes:any) {
+    const allClass = await this.allClass();
+
+    const notes = await aiNotes.findAll({
+        attributes: ["class"],
+        raw: true,
+    });
+
+    // Unique class values present in notes
+    const noteClasses = new Set(
+        notes.map((note: any) => note.class)
+    );
+
+
+    // Return only classes that exist in notes
+    const availableClasses = allClass.data.filter(
+        (cls: any) => noteClasses.has(cls.slug)
+    );
+
+
+    return {
+        success: true,
+        data: availableClasses,
+    };
+}
 
 }
 
