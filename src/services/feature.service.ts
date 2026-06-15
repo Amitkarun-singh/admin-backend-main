@@ -4,6 +4,7 @@ import {
   featureOverrideRepo,
   featureQueryRepo,
 } from "../repositories/feature.repository.js";
+import userRepository from "../repositories/user.repository.js";
 import { ApiError } from "../utils/ApiError.js";
 
 // ─── Inline types (derived from models) ──────────────────────────────────────
@@ -11,11 +12,11 @@ import { ApiError } from "../utils/ApiError.js";
 type TargetType = "class" | "section" | "role" | "user";
 
 interface RawFeatureRow {
-  feature_id:      number;
-  feature_name:    string;
-  description:     string | null;
-  is_ai:           number | boolean;
-  school_enabled:  number | boolean;
+  feature_id: number;
+  feature_name: string;
+  description: string | null;
+  is_ai: number | boolean;
+  school_enabled: number | boolean;
   override_enabled: number | boolean | null;
 }
 
@@ -34,7 +35,7 @@ export const getOverridesService = async (
   query: { feature_id?: string; target_type?: string }
 ) => {
   const where: Record<string, unknown> = { school_id };
-  if (query.feature_id)  where.feature_id  = query.feature_id;
+  if (query.feature_id) where.feature_id = query.feature_id;
   if (query.target_type) where.target_type = query.target_type;
 
   return featureOverrideRepo.findAll(where);
@@ -51,10 +52,12 @@ export const setOverrideService = async (
     target_type?: string;
     target_id?: bigint | number | null;
     target_role?: string | null;
+    username?: string | null;
     is_enabled?: boolean;
   }
 ) => {
-  const { feature_id, target_type, target_id, target_role, is_enabled } = body;
+  const { feature_id, target_type, target_role, is_enabled, username } = body;
+  let { target_id } = body;
 
   if (!feature_id || !target_type || is_enabled === undefined)
     throw new ApiError(400, "feature_id, target_type and is_enabled are required");
@@ -65,6 +68,19 @@ export const setOverrideService = async (
 
   if (target_type === "role" && !target_role)
     throw new ApiError(400, "target_role is required when target_type is 'role'");
+
+  // ── Resolve username → user_id for user overrides ──────────────────────────
+  if (target_type === "user") {
+    if (!username)
+      throw new ApiError(400, "username is required when target_type is 'user'");
+
+    const user = await userRepository.findByUsername(username);
+    if (!user)
+      throw new ApiError(404, `No user found with username '${username}'`);
+
+    target_id = user.user_id;
+  }
+  // ───────────────────────────────────────────────────────────────────────────
 
   if (target_type !== "role" && !target_id)
     throw new ApiError(400, "target_id is required for class / section / user overrides");
@@ -81,7 +97,7 @@ export const setOverrideService = async (
     school_id,
     feature_id,
     target_type,
-    target_id:   target_type !== "role" ? (target_id   ?? null) : null,
+    target_id: target_type !== "role" ? (target_id ?? null) : null,
     target_role: target_type === "role" ? (target_role ?? null) : null,
   };
 
@@ -150,7 +166,7 @@ export const bulkSetClassOverridesService = async (
       school_id,
       feature_id,
       target_type: "class",
-      target_id:   class_id,
+      target_id: class_id,
       target_role: null,
     };
     const [record, created] = await featureOverrideRepo.findOrCreate(findWhere, {
@@ -199,7 +215,7 @@ export const bulkSetSectionOverridesService = async (
       school_id,
       feature_id,
       target_type: "section",
-      target_id:   section_id,
+      target_id: section_id,
       target_role: null,
     };
     const [record, created] = await featureOverrideRepo.findOrCreate(findWhere, {
@@ -226,13 +242,13 @@ export const getMyAccessService = async (
   school_id: bigint | number,
   role: string
 ) => {
-  let class_id   = 0;
+  let class_id = 0;
   let section_id = 0;
 
   try {
     const rows = await featureQueryRepo.getStudentClassSection(user_id);
     const cs = rows[0];
-    class_id   = cs?.class_id   ?? 0;
+    class_id = cs?.class_id ?? 0;
     section_id = cs?.section_id ?? 0;
   } catch { /* non-student — skip */ }
 
@@ -245,11 +261,11 @@ export const getMyAccessService = async (
   });
 
   return (features as RawFeatureRow[]).map((f) => ({
-    feature_id:   f.feature_id,
+    feature_id: f.feature_id,
     feature_name: f.feature_name,
-    description:  f.description,
-    is_ai:        !!f.is_ai,
-    is_enabled:   !f.school_enabled
+    description: f.description,
+    is_ai: !!f.is_ai,
+    is_enabled: !f.school_enabled
       ? false
       : f.override_enabled !== null
         ? !!f.override_enabled

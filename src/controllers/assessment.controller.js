@@ -7,9 +7,52 @@ import AssessmentQuestion   from "../models/assessment_question.model.js";
 import AssessmentAssignment from "../models/assessment_assignment.model.js";
 import { StudentAttempt, StudentAnswer } from "../models/student_attempt.model.js";
 
-import AdminClass          from "../models/admin_class.model.js";
-import AdminSection        from "../models/admin_section.model.js";
-import AdminSubject        from "../models/admin_subject_master.model.js";
+import curriculumService from "../services/curriculum.service.js";
+
+/* ─────────────────────────────────────────
+   Curriculum lookup helper
+   Fetches all classes, sections, and subjects
+   from the curriculum microservice and returns
+   plain lookup maps keyed by numeric ID.
+   Subject lookup scans all classes.
+───────────────────────────────────────── */
+async function getCurriculumMaps() {
+  try {
+    const [classesRaw, sectionsRaw] = await Promise.all([
+      curriculumService.allClass(),
+      curriculumService.section(),
+    ]);
+    const classes  = classesRaw?.data  ?? classesRaw  ?? [];
+    const sections = sectionsRaw?.data ?? sectionsRaw ?? [];
+
+    const classMap   = Object.fromEntries(classes.map(c  => [Number(c.id ?? c.class_id),   { class_id: Number(c.id ?? c.class_id),   class_name: c.class_name }]));
+    const sectionMap = Object.fromEntries(sections.map(s => [Number(s.id ?? s.section_id), { section_id: Number(s.id ?? s.section_id), section_name: s.section_name }]));
+
+    // Build subjectMap lazily — scan subjects per class on demand
+    async function getSubjectMap(classId) {
+      try {
+        const raw  = await curriculumService.allSubject(classId, "", 4);
+        const list = raw?.data ?? raw ?? [];
+        return Object.fromEntries(list.map(s => [Number(s.id ?? s.subject_id), { subject_id: Number(s.id ?? s.subject_id), subject_name: s.subject_name ?? s.name }]));
+      } catch { return {}; }
+    }
+
+    // findSubjectById scans all classes until found
+    async function findSubjectById(subject_id) {
+      const sid = Number(subject_id);
+      for (const cls of classes) {
+        const cid = Number(cls.id ?? cls.class_id);
+        const map = await getSubjectMap(cid);
+        if (map[sid]) return map[sid];
+      }
+      return null;
+    }
+
+    return { classMap, sectionMap, findSubjectById, classes };
+  } catch {
+    return { classMap: {}, sectionMap: {}, findSubjectById: async () => null, classes: [] };
+  }
+}
 import StudentClassSection from "../models/student_class_section.model.js";
 import StudentProfile      from "../models/student_profile.model.js";
 import User from "../models/user.model.js";
@@ -106,16 +149,14 @@ async function getStudentUserIdsForSections(classId, sectionIds) {
 
 
 /* ─────────────────────────────────────────
-   Helper: enrich assessment with class &
-   section names from admin tables.
+   Helper: enrich assessment with class name
+   from curriculum service.
 ───────────────────────────────────────── */
 async function enrichWithClassSection(assessment) {
-  const classRow = await AdminClass.findByPk(assessment.class_id);
-
-  // An assessment is tied to a class; sections come from assignments
+  const { classMap } = await getCurriculumMaps();
   return {
     ...assessment.toJSON(),
-    class_name: classRow?.class_name ?? null,
+    class_name: classMap[Number(assessment.class_id)]?.class_name ?? null,
   };
 }
 
@@ -250,10 +291,11 @@ export const createAssessment = asyncHandler(async (req, res) => {
   }
   // ───────────────────────────────────────────────────────────────────────
 
-  const subjectRow = await AdminSubject.findByPk(subject_id);
+  const { classMap, findSubjectById } = await getCurriculumMaps();
+  const subjectRow = await findSubjectById(subject_id);
   if (!subjectRow) throw new ApiError(404, "Subject not found");
 
-  const classRow = await AdminClass.findByPk(class_id);
+  const classRow = classMap[Number(class_id)] ?? null;
   if (!classRow) throw new ApiError(404, "Class not found");
 
   const assessment = await Assessment.create({
@@ -314,7 +356,7 @@ export const createAssessment = asyncHandler(async (req, res) => {
 
   return res.status(201).json(
     new ApiResponse(201, {
-      assessment: { ...assessment.toJSON(), class_name: classRow.class_name },
+      assessment: { ...assessment.toJSON(), class_name: classRow?.class_name ?? null },
       questions,
     }, "Assessment created with AI questions")
   );
@@ -386,19 +428,20 @@ export const getTeacherAssessments = asyncHandler(async (req, res) => {
     order: [["created_at", "DESC"]],
   });
 
+  const { classMap, findSubjectById } = await getCurriculumMaps();
+
   const data = await Promise.all(assessments.map(async (a) => {
-    const [total, pending, approved, assignmentCount, classRow, subjectRow] = await Promise.all([
+    const [total, pending, approved, assignmentCount, subjectRow] = await Promise.all([
       AssessmentQuestion.count({ where: { assessment_id: a.assessment_id } }),
       AssessmentQuestion.count({ where: { assessment_id: a.assessment_id, status: "pending"  } }),
       AssessmentQuestion.count({ where: { assessment_id: a.assessment_id, status: "approved" } }),
       AssessmentAssignment.count({ where: { assessment_id: a.assessment_id } }),
-      AdminClass.findByPk(a.class_id),
-      AdminSubject.findByPk(a.subject_id)
+      findSubjectById(a.subject_id),
     ]);
 
     return {
       ...a.toJSON(),
-      class_name:       classRow?.class_name ?? null,
+      class_name:       classMap[Number(a.class_id)]?.class_name ?? null,
       subject_name:     subjectRow?.subject_name ?? null,
       question_summary: { total, pending, approved },
       assignment_count: assignmentCount,
@@ -432,18 +475,19 @@ export const getAssessmentsByUser = asyncHandler(async (req, res) => {
       order: [["created_at", "DESC"]],
     });
 
+    const { classMap: teacherClassMap } = await getCurriculumMaps();
+
     const data = await Promise.all(assessments.map(async (a) => {
-      const [total, pending, approved, assignmentCount, classRow] = await Promise.all([
+      const [total, pending, approved, assignmentCount] = await Promise.all([
         AssessmentQuestion.count({ where: { assessment_id: a.assessment_id } }),
         AssessmentQuestion.count({ where: { assessment_id: a.assessment_id, status: "pending"  } }),
         AssessmentQuestion.count({ where: { assessment_id: a.assessment_id, status: "approved" } }),
         AssessmentAssignment.count({ where: { assessment_id: a.assessment_id } }),
-        AdminClass.findByPk(a.class_id),
       ]);
 
       return {
         ...a.toJSON(),
-        class_name:       classRow?.class_name ?? null,
+        class_name:       teacherClassMap[Number(a.class_id)]?.class_name ?? null,
         question_summary: { total, pending, approved },
         assignment_count: assignmentCount,
       };
@@ -462,10 +506,9 @@ export const getAssessmentsByUser = asyncHandler(async (req, res) => {
     });
     if (!classSection) throw new ApiError(404, "Class not assigned to this student");
 
-    const [classRow, sectionRow] = await Promise.all([
-      AdminClass.findByPk(classSection.class_id),
-      AdminSection.findByPk(classSection.section_id),
-    ]);
+    const { classMap: studentClassMap, sectionMap: studentSectionMap } = await getCurriculumMaps();
+    const classRow   = studentClassMap[Number(classSection.class_id)]   ?? null;
+    const sectionRow = studentSectionMap[Number(classSection.section_id)] ?? null;
 
     const assignments = await AssessmentAssignment.findAll({
       where: { class_id: classSection.class_id },
@@ -541,13 +584,13 @@ export const getAssessment = asyncHandler(async (req, res) => {
   const assessment = await Assessment.findByPk(assessment_id);
   if (!assessment) throw new ApiError(404, "Assessment not found");
 
-  const [questions, classRow] = await Promise.all([
-    AssessmentQuestion.findAll({
-      where: { assessment_id },
-      order: [["order", "ASC"]],
-    }),
-    AdminClass.findByPk(assessment.class_id),
-  ]);
+  const { classMap: getAssessmentClassMap } = await getCurriculumMaps();
+  const classRow = getAssessmentClassMap[Number(assessment.class_id)] ?? null;
+
+  const questions = await AssessmentQuestion.findAll({
+    where: { assessment_id },
+    order: [["order", "ASC"]],
+  });
 
   return res.status(200).json(
     new ApiResponse(200, {
@@ -603,7 +646,8 @@ export const reviewQuestion = asyncHandler(async (req, res) => {
 
   if (action === "regenerate") {
     const assessment = await Assessment.findByPk(question.assessment_id);
-    const subjectRow = await AdminSubject.findByPk(assessment.subject_id);
+    const { findSubjectById: regenFindSubject } = await getCurriculumMaps();
+    const subjectRow = await regenFindSubject(assessment.subject_id);
 
     const [newQ] = await generateQuestionsAI({
       subject:    subjectRow.subject_name,
@@ -783,11 +827,10 @@ export const assignAssessment = asyncHandler(async (req, res) => {
 
   const normalizedSectionIds = section_ids.map(Number);
 
-  // Fetch class + section names for the response
-  const [classRow, sectionRows] = await Promise.all([
-    AdminClass.findByPk(class_id),
-    AdminSection.findAll({ where: { section_id: { [Op.in]: normalizedSectionIds } } }),
-  ]);
+  // Fetch class + section names via curriculum service
+  const { classMap: assignClassMap, sectionMap: assignSectionMap } = await getCurriculumMaps();
+  const classRow   = assignClassMap[Number(class_id)] ?? null;
+  const sectionRows = normalizedSectionIds.map(id => assignSectionMap[id]).filter(Boolean);
 
   const assignment = await AssessmentAssignment.create({
     assessment_id,
@@ -829,10 +872,9 @@ export const getStudentAssignedTests = asyncHandler(async (req, res) => {
   });
   if (!classSection) throw new ApiError(404, "Class not assigned to this student");
 
-  const [classRow, sectionRow] = await Promise.all([
-    AdminClass.findByPk(classSection.class_id),
-    AdminSection.findByPk(classSection.section_id),
-  ]);
+  const { classMap: assignedClassMap, sectionMap: assignedSectionMap } = await getCurriculumMaps();
+  const classRow   = assignedClassMap[Number(classSection.class_id)]     ?? null;
+  const sectionRow = assignedSectionMap[Number(classSection.section_id)] ?? null;
 
   console.log("[getStudentAssignedTests] student:", studentProfile.student_id,
     "class_id:", classSection.class_id,
@@ -1087,10 +1129,9 @@ export const getAttemptResult = asyncHandler(async (req, res) => {
     ? await StudentClassSection.findOne({ where: { student_id: attempt.student_id } })
     : null;
 
-  const [classRow, sectionRow] = await Promise.all([
-    classSection ? AdminClass.findByPk(classSection.class_id) : null,
-    classSection ? AdminSection.findByPk(classSection.section_id) : null,
-  ]);
+  const { classMap: resultClassMap, sectionMap: resultSectionMap } = await getCurriculumMaps();
+  const classRow   = classSection ? (resultClassMap[Number(classSection.class_id)]     ?? null) : null;
+  const sectionRow = classSection ? (resultSectionMap[Number(classSection.section_id)] ?? null) : null;
 
   const answers = await StudentAnswer.findAll({ where: { attempt_id } });
 
@@ -1153,17 +1194,16 @@ export const getAssignmentResults = asyncHandler(async (req, res) => {
   const assignment = await AssessmentAssignment.findByPk(assignment_id);
   if (!assignment) throw new ApiError(404, "Assignment not found");
 
-  const [attempts, classRow, assessment, sectionRows] = await Promise.all([
+  const { classMap: arClassMap, sectionMap: arSectionMap } = await getCurriculumMaps();
+  const [attempts, assessment] = await Promise.all([
     StudentAttempt.findAll({
       where: { assignment_id, status: "submitted" },
       order: [["submitted_at", "ASC"]],
     }),
-    AdminClass.findByPk(assignment.class_id),
     Assessment.findByPk(assignment.assessment_id),
-    AdminSection.findAll({
-      where: { section_id: { [Op.in]: parseSectionIds(assignment.section_ids) } },
-    }),
   ]);
+  const classRow   = arClassMap[Number(assignment.class_id)] ?? null;
+  const sectionRows = parseSectionIds(assignment.section_ids).map(id => arSectionMap[Number(id)]).filter(Boolean);
 
   const scores = attempts.map(a => Number(a.total_marks_obtained ?? 0));
   const avg    = scores.length ? scores.reduce((s, v) => s + v, 0) / scores.length : 0;
@@ -1173,10 +1213,8 @@ export const getAssignmentResults = asyncHandler(async (req, res) => {
     const classSection = await StudentClassSection.findOne({
       where: { student_id: a.student_id },
     });
-    const [attemptClassRow, attemptSectionRow] = await Promise.all([
-      classSection ? AdminClass.findByPk(classSection.class_id) : null,
-      classSection ? AdminSection.findByPk(classSection.section_id) : null,
-    ]);
+    const attemptClassRow   = classSection ? (arClassMap[Number(classSection.class_id)]     ?? null) : null;
+    const attemptSectionRow = classSection ? (arSectionMap[Number(classSection.section_id)] ?? null) : null;
 
     return {
       ...a.toJSON(),
@@ -1329,15 +1367,12 @@ export const getAssessmentResults = asyncHandler(async (req, res) => {
   const classIds   = [...new Set(classSections.map(cs => cs.class_id).filter(Boolean))];
   const sectionIds = [...new Set(classSections.map(cs => cs.section_id).filter(Boolean))];
 
-  const [users, classRows, sectionRows] = await Promise.all([
-    User.findAll({ where: { user_id: { [Op.in]: userIds } } }),
-    AdminClass.findAll({ where: { class_id: { [Op.in]: classIds } } }),
-    AdminSection.findAll({ where: { section_id: { [Op.in]: sectionIds } } }),
-  ]);
+  const { classMap: arAllClassMap, sectionMap: arAllSectionMap } = await getCurriculumMaps();
+  const users = await User.findAll({ where: { user_id: { [Op.in]: userIds } } });
 
-  const userByUserId   = Object.fromEntries(users.map(u => [Number(u.user_id), u]));
-  const classById      = Object.fromEntries(classRows.map(c => [Number(c.class_id), c]));
-  const sectionById    = Object.fromEntries(sectionRows.map(s => [Number(s.section_id), s]));
+  const userByUserId = Object.fromEntries(users.map(u => [Number(u.user_id), u]));
+  const classById    = arAllClassMap;
+  const sectionById  = arAllSectionMap;
 
   // Enrich attempts
   const enrichedAttempts = attempts.map((a) => {

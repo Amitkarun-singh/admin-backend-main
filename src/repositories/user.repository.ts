@@ -16,6 +16,29 @@ export class UserRepository {
     return await User.findOne({ where: { phone_number } });
   }
 
+  // Returns ALL accounts registered under this phone number
+  async findAllByPhoneNumber(phone_number: string) {
+    return await User.findAll({
+      where: { phone_number },
+      attributes: [
+        "user_id",
+        "full_name",
+        "email",
+        "status",
+        "avatar",
+        "school_id",
+        "is_password_reset_required",
+      ],
+      include: [
+        {
+          model: AdminRole,
+          as: "role",
+          attributes: ["role_name"],
+        },
+      ],
+    });
+  }
+
   async findById(user_id: number | string) {
     return await User.findByPk(user_id);
   }
@@ -50,13 +73,12 @@ export class UserRepository {
     });
   }
 
-
-  async getToken(userId: string){
-     const user =  await User.findOne({ where: { user_id: userId } });
-     return user?.token ?? null
+  async getToken(userId: string) {
+    const user = await User.findOne({ where: { user_id: userId } });
+    return user?.token ?? null;
   }
 
-  async updateToken(userId: string, token: string){
+  async updateToken(userId: string, token: string) {
     return await User.update({ token }, { where: { user_id: userId } });
   }
 }

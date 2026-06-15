@@ -5,10 +5,16 @@ import StudentClassSection from "../models/student_class_section.model.js";
 import StudentAnalytics from "../models/student_analytics.model.js";
 import ParentProfile from "../models/parent_profile.model.js";
 import ParentStudentMap from "../models/parent_student_map.model.js";
-import AdminClass from "../models/admin_class.model.js";
-import AdminSection from "../models/admin_section.model.js";
 import AdminSchool from "../models/admin_school.model.js";
 import AdminRole from "../models/admin_role.model.js";
+
+// ─── NOTE ──────────────────────────────────────────────────────────────────────
+// AdminClass and AdminSection are intentionally NOT imported.
+// Class / section / stream data is owned by the curriculum microservice.
+// class_id, section_id, stream_id are stored as plain integers in
+// student_class_section. The frontend resolves names via the
+// /api/v1/curriculum/proxy/* routes.
+// ──────────────────────────────────────────────────────────────────────────────
 
 export class StudentRepository {
 
@@ -23,15 +29,23 @@ export class StudentRepository {
   // ─── User lookups ─────────────────────────────────────────────────────────
 
   /**
-   * Primary deduplication lookup for both students and parents.
-   * Unique key = full_name (title-cased) + phone_number.
+   * Deduplication lookup for students and parents in bulk upload.
+   *
+   * Unique key = full_name + phone_number + role_id
+   *
+   * Why all three:
+   *   phone alone          → siblings sharing a family phone would false-match
+   *   name + phone         → correctly identifies a parent across two sibling rows
+   *   + role_id            → a person who is both parent & student (adult ed)
+   *                          has two separate accounts; role_id keeps them apart
    */
-  async findUserByNameAndPhone(
+  async findUserByNamePhoneAndRole(
     full_name: string,
     phone_number: string,
+    role_id: number,
     transaction?: any,
   ): Promise<User | null> {
-    return User.findOne({ where: { full_name, phone_number }, transaction });
+    return User.findOne({ where: { full_name, phone_number, role_id }, transaction });
   }
 
   // ─── Profile lookups ──────────────────────────────────────────────────────
@@ -79,24 +93,18 @@ export class StudentRepository {
 
   /**
    * Find the enrolment row for a student by student_id alone.
-   *
-   * student_class_section has student_id as its sole PRIMARY KEY, so a student
-   * can only have one row at a time. Looking up by class+section as well would
-   * miss the row when a student is changing class — causing a duplicate PK insert.
+   * student_class_section has student_id as its sole PRIMARY KEY so a student
+   * can only have one row at a time.
    */
   async findClassSectionEnrolmentByStudent(
     student_id: bigint | number,
     transaction?: any,
   ): Promise<StudentClassSection | null> {
-    return StudentClassSection.findOne({
-      where: { student_id },
-      transaction,
-    });
+    return StudentClassSection.findOne({ where: { student_id }, transaction });
   }
 
   /**
-   * Patch any fields (class_id, section_id, roll_number, academic_year, status)
-   * on the enrolment row identified by student_id.
+   * Patch fields on the enrolment row identified by student_id.
    * Only called with a non-empty diff — never does a full replace.
    */
   async updateClassSectionEnrolmentByStudent(
@@ -104,22 +112,15 @@ export class StudentRepository {
     updates: Record<string, any>,
     transaction?: any,
   ): Promise<void> {
-    await StudentClassSection.update(updates, {
-      where: { student_id },
-      transaction,
-    });
+    await StudentClassSection.update(updates, { where: { student_id }, transaction });
   }
 
   async incrementSchoolStudentCount(school_id: number | bigint, by: number, transaction?: any): Promise<void> {
     await AdminSchool.increment("student_count", { by, where: { school_id }, transaction });
   }
 
-  // ─── Update helpers (upsert path) ─────────────────────────────────────────
+  // ─── Update helpers ────────────────────────────────────────────────────────
 
-  /**
-   * Patch specific fields on an existing User row.
-   * Only called with a non-empty diff object — never does a full replace.
-   */
   async updateUser(
     user_id: number | bigint,
     updates: Record<string, any>,
@@ -128,9 +129,6 @@ export class StudentRepository {
     await User.update(updates, { where: { user_id }, transaction });
   }
 
-  /**
-   * Patch specific fields on an existing StudentProfile row.
-   */
   async updateStudentProfile(
     student_id: number | bigint,
     updates: Record<string, any>,
@@ -139,9 +137,6 @@ export class StudentRepository {
     await StudentProfile.update(updates, { where: { student_id }, transaction });
   }
 
-  /**
-   * Patch specific fields on an existing ParentProfile row.
-   */
   async updateParentProfile(
     parent_id: number | bigint,
     updates: Record<string, any>,
@@ -151,21 +146,41 @@ export class StudentRepository {
   }
 
   // ─── Standard queries ─────────────────────────────────────────────────────
+  //
+  // All three queries include the parents association so the UI receives
+  // parent_id (and basic parent info) alongside every student record.
+  // The frontend uses parent_id to build the "linked parent" section.
+  //
+  // AdminClass / AdminSection joins removed — IDs are returned as plain
+  // integers and resolved to names by the frontend via the proxy routes.
 
   async findAllStudents(school_id: number | bigint): Promise<StudentProfile[]> {
     return StudentProfile.findAll({
       where: { school_id },
       include: [
         {
-          model: User, as: "user",
+          model: User,
+          as: "user",
           attributes: ["user_id", "username", "full_name", "email", "phone_number", "address", "status", "avatar"],
         },
         {
-          model: StudentClassSection, as: "classSection",
-          attributes: ["class_id", "section_id", "academic_year", "roll_number", "status"],
+          model: StudentClassSection,
+          as: "classSection",
+          attributes: ["class_id", "section_id", "stream_id", "academic_year", "roll_number", "status"],
+        },
+        {
+          // parent_id + basic info so the list view can show "has linked parent"
+          // and the UI can navigate to the parent detail page
+          model: ParentProfile,
+          as: "parents",
+          attributes: ["parent_id", "relation"],
+          through: { attributes: [] } as any,
           include: [
-            { model: AdminClass,   as: "class",   attributes: ["class_id",   "class_name"]   },
-            { model: AdminSection, as: "section", attributes: ["section_id", "section_name"] },
+            {
+              model: User,
+              as: "user",
+              attributes: ["user_id", "full_name", "phone_number", "avatar"],
+            },
           ],
         },
       ],
@@ -176,15 +191,26 @@ export class StudentRepository {
     return StudentProfile.findByPk(id, {
       include: [
         {
-          model: User, as: "user",
+          model: User,
+          as: "user",
           attributes: ["user_id", "username", "full_name", "email", "phone_number", "address", "status", "avatar"],
         },
         {
-          model: StudentClassSection, as: "classSection",
-          attributes: ["class_id", "section_id", "academic_year", "roll_number", "status"],
+          model: StudentClassSection,
+          as: "classSection",
+          attributes: ["class_id", "section_id", "stream_id", "academic_year", "roll_number", "status"],
+        },
+        {
+          model: ParentProfile,
+          as: "parents",
+          attributes: ["parent_id", "relation"],
+          through: { attributes: [] } as any,
           include: [
-            { model: AdminClass,   as: "class",   attributes: ["class_id",   "class_name"]   },
-            { model: AdminSection, as: "section", attributes: ["section_id", "section_name"] },
+            {
+              model: User,
+              as: "user",
+              attributes: ["user_id", "full_name", "phone_number", "avatar"],
+            },
           ],
         },
       ],
@@ -195,23 +221,25 @@ export class StudentRepository {
     return StudentProfile.findByPk(id, {
       include: [
         {
-          model: User, as: "user",
+          model: User,
+          as: "user",
           attributes: ["user_id", "username", "full_name", "email", "phone_number", "address", "status", "avatar"],
         },
         {
-          model: StudentClassSection, as: "classSection",
-          attributes: ["class_id", "section_id", "academic_year", "roll_number", "status"],
-          include: [
-            { model: AdminClass,   as: "class",   attributes: ["class_id",   "class_name"]   },
-            { model: AdminSection, as: "section", attributes: ["section_id", "section_name"] },
-          ],
+          model: StudentClassSection,
+          as: "classSection",
+          attributes: ["class_id", "section_id", "stream_id", "academic_year", "roll_number", "status"],
         },
         {
-          model: ParentProfile, as: "parents",
+          // Full parent detail for the student profile / linked-parent section
+          model: ParentProfile,
+          as: "parents",
+          attributes: ["parent_id", "relation"],
           through: { attributes: [] } as any,
           include: [
             {
-              model: User, as: "user",
+              model: User,
+              as: "user",
               attributes: ["user_id", "username", "full_name", "email", "phone_number", "address", "avatar"],
             },
           ],
@@ -224,14 +252,6 @@ export class StudentRepository {
     return StudentAnalytics.findOne({ where: { student_id } });
   }
 
-  async findClassByName(class_name: string, transaction?: any): Promise<AdminClass | null> {
-    return AdminClass.findOne({ where: { class_name }, transaction });
-  }
-
-  async findSectionByName(class_id: number, section_name: string, transaction?: any): Promise<AdminSection | null> {
-    return AdminSection.findOne({ where: { class_id, section_name }, transaction });
-  }
-
   // ─── Delete ───────────────────────────────────────────────────────────────
 
   async deleteStudentWithRelated(
@@ -241,12 +261,12 @@ export class StudentRepository {
   ): Promise<void> {
     const transaction = await sequelize.transaction();
     try {
-      await StudentClassSection.destroy({ where: { student_id: id },  transaction });
-      await ParentStudentMap.destroy({ where: { student_id: id },      transaction });
-      await StudentAnalytics.destroy({ where: { student_id: id },      transaction });
+      await StudentClassSection.destroy({ where: { student_id: id }, transaction });
+      await ParentStudentMap.destroy({ where: { student_id: id },    transaction });
+      await StudentAnalytics.destroy({ where: { student_id: id },    transaction });
       const student = await StudentProfile.findByPk(id, { transaction });
       await student?.destroy({ transaction });
-      await User.destroy({ where: { user_id },                          transaction });
+      await User.destroy({ where: { user_id },                        transaction });
       await AdminSchool.increment("student_count", { by: -1, where: { school_id }, transaction });
       await transaction.commit();
     } catch (error) {

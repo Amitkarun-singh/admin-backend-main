@@ -1,7 +1,7 @@
 import UserRepository from "../repositories/user.repository.js";
 import RoleRepository from "../repositories/role.repository.js";
 import ProfileRepository from "../repositories/profile.repository.js";
-import { classRepository } from "../repositories/class.repository.js";
+import curriculumService from "./curriculum.service.js";
 class TopicService {
     async createTopics(userId: number) {
 
@@ -18,10 +18,16 @@ class TopicService {
             if (profile) {
                 const studentMap = await ProfileRepository.findStudentClassSection((profile as any).student_id);
                 if (studentMap) {
-                    const classObj = await classRepository.findById((studentMap as any).class_id);
-                    const sectionObj = await classRepository.findSectionById((studentMap as any).section_id);
-                    if (classObj) classNames.push((classObj as any).class_name);
-                    if (sectionObj) sectionNames.push((sectionObj as any).section_name);
+                    const [classesRaw, sectionsRaw] = await Promise.all([
+                        curriculumService.allClass(),
+                        curriculumService.section(),
+                    ]);
+                    const allClasses  = classesRaw?.data  ?? classesRaw  ?? [];
+                    const allSections = sectionsRaw?.data ?? sectionsRaw ?? [];
+                    const classObj   = allClasses.find((c: any)  => Number(c.id ?? c.class_id)   === Number((studentMap as any).class_id));
+                    const sectionObj = allSections.find((s: any) => Number(s.id ?? s.section_id) === Number((studentMap as any).section_id));
+                    if (classObj)   classNames.push(classObj.class_name);
+                    if (sectionObj) sectionNames.push(sectionObj.section_name);
                 }
             }
         }
@@ -30,11 +36,17 @@ class TopicService {
             if (profile) {
                 const teacherMaps = await ProfileRepository.findTeacherClassSections((profile as any).teacher_id);
                 if (teacherMaps) {
+                    const [classesRaw, sectionsRaw] = await Promise.all([
+                        curriculumService.allClass(),
+                        curriculumService.section(),
+                    ]);
+                    const allClasses  = classesRaw?.data  ?? classesRaw  ?? [];
+                    const allSections = sectionsRaw?.data ?? sectionsRaw ?? [];
                     for (const map of teacherMaps) {
-                        const classObj = await classRepository.findById((map as any).class_id);
-                        const sectionObj = await classRepository.findSectionById((map as any).section_id);
-                        if (classObj && !classNames.includes((classObj as any).class_name)) classNames.push((classObj as any).class_name);
-                        if (sectionObj && !sectionNames.includes((sectionObj as any).section_name)) sectionNames.push((sectionObj as any).section_name);
+                        const classObj   = allClasses.find((c: any)  => Number(c.id ?? c.class_id)   === Number((map as any).class_id));
+                        const sectionObj = allSections.find((s: any) => Number(s.id ?? s.section_id) === Number((map as any).section_id));
+                        if (classObj   && !classNames.includes(classObj.class_name))     classNames.push(classObj.class_name);
+                        if (sectionObj && !sectionNames.includes(sectionObj.section_name)) sectionNames.push(sectionObj.section_name);
                     }
                 }
             }

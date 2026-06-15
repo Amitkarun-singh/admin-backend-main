@@ -10,11 +10,16 @@ export async function classes(req: Request, res: Response) {
   const type = String(req?.query?.type)
 
 
+
   if (role.toLowerCase() === "student") {
     const data = await CurriculumService.onlyAsignClass(userId, schoolId);
     return res.status(200).json(data);
   } else if (type.toLowerCase() === "ai-notes") {
     const data = await CurriculumService.onlyAiNotesClass(AiNote)
+    return res.status(200).json(data);
+  } else {
+    const data = await CurriculumService.allClass();
+    const data = await CurriculumService.onlyAsignClass(userId, schoolId);
     return res.status(200).json(data);
   } else {
     const data = await CurriculumService.allClass();

@@ -5,8 +5,6 @@ import ParentProfile from "../models/parent_profile.model.js";
 import ParentStudentMap from "../models/parent_student_map.model.js";
 import StudentProfile from "../models/student_profile.model.js";
 import StudentClassSection from "../models/student_class_section.model.js";
-import AdminClass from "../models/admin_class.model.js";
-import AdminSection from "../models/admin_section.model.js";
 
 export class ParentRepository {
 
@@ -93,13 +91,10 @@ export class ParentRepository {
               attributes: ["user_id", "username", "full_name", "email", "phone_number", "avatar", "status"],
             },
             {
+              // class_id and section_id are curriculum-service IDs — enriched in parent.service.ts
               model: StudentClassSection,
               as: "classSection",
               attributes: ["class_id", "section_id", "roll_number", "academic_year", "status"],
-              include: [
-                { model: AdminClass,   as: "class",   attributes: ["class_id", "class_name"]     },
-                { model: AdminSection, as: "section", attributes: ["section_id", "section_name"] },
-              ],
             },
           ],
         },
@@ -109,6 +104,10 @@ export class ParentRepository {
 
   async updateParent(parent: ParentProfile, data: Record<string, any>): Promise<ParentProfile> {
     return parent.update(data);
+  }
+
+  async updateUserById(user_id: number | bigint, data: Record<string, any>): Promise<void> {
+    await User.update(data, { where: { user_id } });
   }
 
   async deleteParentWithRelated(id: number | string | bigint, user_id: number | bigint): Promise<void> {
