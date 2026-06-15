@@ -188,9 +188,7 @@ export const editProfileService = async (
         if (!parent) throw new NotFoundError("Parent", String(user_id));
 
         return parent.update({
-            parent_name: updates.parent_name    ?? parent.parent_name,
-            relation:    updates.relation       ?? parent.relation,
-            status:      updates.profile_status ?? parent.status,
+            relation: updates.relation ?? parent.relation,
         });
     }
 
@@ -243,7 +241,7 @@ export const changeStatusService = async (
         if (teacher) await teacher.update({ status });
     } else if (userRole === "PARENT") {
         const parent = await AdminRepo.findParentByUserId(user_id);
-        if (parent) await parent.update({ status });
+        if (parent) await parent.update({});  // ParentProfile has no status column
     }
     // ADMIN / SUBADMIN → user table already updated
 

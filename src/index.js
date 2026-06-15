@@ -14,10 +14,6 @@ import sequelize from "./config/db.js";
 import "./models/index.js";
 import authRoutes from "./routes/V1/auth.routes.js";
 import adminRoutes from "./routes/V1/admin.routes.ts";
-import classRoutes from "./routes/V1/class.routes.js";
-import sectionRoutes from "./routes/V1/section.routes.js";
-import subjectRoutes from "./routes/V1/subject.routes.js";
-import courseRoutes from "./routes/V1/course.routes.js";
 import teacherRoutes from "./routes/V1/teacher.routes.js";
 import studentRoutes from "./routes/V1/student.routes.js";
 import parentRoutes from "./routes/V1/parent.routes.js";
@@ -61,11 +57,6 @@ app.use(
 /* ---------------- ROUTES ---------------- */
 app.use("/api/V1/auth", authRoutes);
 app.use("/api/V1/admin", adminRoutes);
-// app.use("/api", classRoutes);
-app.use("/api/V1", classRoutes);
-app.use("/api/V1", sectionRoutes);
-app.use("/api/V1", subjectRoutes);
-app.use("/api/V1", courseRoutes);
 app.use("/api/V1/teachers", teacherRoutes);
 app.use("/api/V1/students", studentRoutes);
 app.use("/api/V1/parents", parentRoutes);

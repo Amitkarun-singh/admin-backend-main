@@ -3,8 +3,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import registerService from "../services/register.service.js";
 import schoolRepository from "../repositories/school.repository.js";
-import AdminClass from "../models/admin_class.model.js";
-import AdminSubject from "../models/admin_subject_master.model.js";
+import curriculumService from "../services/curriculum.service.js";
 
 // interface AuthenticatedRequest extends Request {
 //   user?: any;
@@ -30,21 +29,35 @@ async function register (req: Request, res: Response) {
 const getOnboardingData = asyncHandler(async (req: Request, res: Response) => {
   const { role, school_id } = req.user;
 
-  const [classes, school]: any = await Promise.all([
-    AdminClass.findAll({
-      order: [["class_id", "ASC"]],
-      attributes: ["class_id", "class_name"],
-    }),
+  const [classesRaw, school]: any = await Promise.all([
+    curriculumService.allClass(),
     schoolRepository.findById(school_id, ["school_name", "board", "language_preference"]),
   ]);
+  const classes = (classesRaw?.data ?? classesRaw ?? []).map((c: any) => ({
+    class_id:   c.id ?? c.class_id,
+    class_name: c.class_name,
+  }));
 
-  let subjects:any = [];
+  let subjects: any[] = [];
   if (role === "TEACHER") {
-    subjects = await AdminSubject.findAll({
-      where: { board: school?.board || "CBSE" },
-      attributes: ["subject_id", "subject_name", "class_id", "board", "language"],
-      order: [["subject_name", "ASC"]],
-    });
+    // Fetch subjects for every class and flatten — curriculum service has no global subject endpoint
+    try {
+      const allSubjects: any[] = [];
+      for (const cls of classes) {
+        const raw = await curriculumService.allSubject(cls.class_id, school?.board || "CBSE", 4);
+        const list: any[] = raw?.data ?? raw ?? [];
+        list.forEach((s: any) => allSubjects.push({
+          subject_id:   s.id ?? s.subject_id,
+          subject_name: s.subject_name ?? s.name,
+          class_id:     cls.class_id,
+          board:        s.board,
+          language:     s.language,
+        }));
+      }
+      subjects = allSubjects;
+    } catch {
+      subjects = [];
+    }
   }
 
   const languages = [
