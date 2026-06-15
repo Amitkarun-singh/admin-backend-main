@@ -3,7 +3,7 @@ import userRepository from "../repositories/user.repository.js";
 import roleRepository from "../repositories/role.repository.js";
 import schoolRepository from "../repositories/school.repository.js";
 import profileRepository from "../repositories/profile.repository.js";
-import {classRepository} from "../repositories/class.repository.js";
+import curriculumService from "./curriculum.service.js";
 import authService from "./auth.service.ts";
 import { ApiError } from "../utils/ApiError.js";
 import { generateOTP, createOtpToken, verifyOtpToken } from "../utils/otp.util.js";
@@ -89,36 +89,55 @@ export class RegisterService {
       throw new ValidationError(validation);
     }
 
-    // Class mapping
+    // Class mapping — resolved via curriculum microservice
     const inputClasses: string[] = registerData.class ? registerData.class.split(',').map((c: string) => c.trim()) : [];
-    const searchPatterns: string[] = [];
-    inputClasses.forEach((c: string) => {
-      if (c.toLowerCase().startsWith("grade")) {
-        searchPatterns.push(c);
-      } else {
-        searchPatterns.push(`Grade ${c}`);
-        searchPatterns.push(`Grade${c}`);
+
+    let classRecords: Array<{ class_id: number; class_name: string }> = [];
+    if (inputClasses.length > 0) {
+      try {
+        const raw = await curriculumService.allClass();
+        const allClasses: any[] = raw?.data ?? raw ?? [];
+        const normalized = allClasses.map((c: any) => ({
+          class_id:   Number(c.id ?? c.class_id),
+          class_name: String(c.class_name),
+        }));
+
+        const patterns: string[] = [];
+        inputClasses.forEach((c: string) => {
+          if (c.toLowerCase().startsWith("grade")) {
+            patterns.push(c.toLowerCase());
+          } else {
+            patterns.push(`grade ${c.toLowerCase()}`);
+            patterns.push(`grade${c.toLowerCase()}`);
+          }
+        });
+
+        classRecords = normalized.filter((r) =>
+          patterns.some((p) => r.class_name.toLowerCase() === p)
+        );
+
+        // Validate all requested classes were found
+        const foundNames = classRecords.map((r) => r.class_name.toLowerCase());
+        const missingClasses = inputClasses.filter((input: string) => {
+          const pats = input.toLowerCase().startsWith("grade")
+            ? [input.toLowerCase()]
+            : [`grade ${input.toLowerCase()}`, `grade${input.toLowerCase()}`];
+          return !pats.some((p: string) => foundNames.includes(p));
+        });
+
+        if (missingClasses.length > 0) {
+          validation.push({
+            field: "class",
+            message: `Classes not found: ${missingClasses.join(', ')}`,
+            code: "CLASS_NOT_FOUND",
+          });
+          throw new ValidationError(validation);
+        }
+      } catch (e: any) {
+        if (e?.name === "ValidationError" || e instanceof ValidationError) throw e;
+        // curriculum service unavailable — skip class validation
+        classRecords = [];
       }
-    });
-
-    const classRecords = searchPatterns.length > 0 ? await classRepository.findByNames(searchPatterns) : [];
-
-    // Check if we found at least one record for each input class
-    const foundClassNames = classRecords.map((r: any) => r.class_name.toLowerCase());
-    const missingClasses = inputClasses.filter((input: string) => {
-      const patterns = input.toLowerCase().startsWith("grade") 
-        ? [input.toLowerCase()] 
-        : [`grade ${input.toLowerCase()}`, `grade${input.toLowerCase()}`];
-      return !patterns.some((p: string) => foundClassNames.includes(p));
-    });
-
-    if (inputClasses.length > 0 && missingClasses.length > 0) {
-      validation.push({
-        field: "class",
-        message: `Classes not found: ${missingClasses.join(', ')}`,
-        code: "CLASS_NOT_FOUND",
-      });
-      throw new ValidationError(validation);
     }
 
     

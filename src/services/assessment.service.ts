@@ -331,7 +331,7 @@ export const createAssessmentService = async (
     if (end <= start) throw new ApiError(400, "end_datetime must be after start_datetime");
   }
 
-  const subjectRow = await adminRepo.findSubjectById(subject_id);
+  const subjectRow = await adminRepo.findSubjectById(subject_id, class_id);
   if (!subjectRow) throw new ApiError(404, "Subject not found");
 
   const classRow = await adminRepo.findClassById(class_id);
@@ -456,7 +456,7 @@ export const getTeacherAssessmentsService = async (
         questionRepo.count({ assessment_id: a.assessment_id, status: "approved" }),
         assignmentRepo.count({ assessment_id: a.assessment_id }),
         adminRepo.findClassById(a.class_id),
-        adminRepo.findSubjectById(a.subject_id),
+        adminRepo.findSubjectById(a.subject_id, a.class_id),
       ]);
       return {
         ...a.toJSON(),
@@ -659,7 +659,7 @@ export const reviewQuestionService = async (
     const assessment = await assessmentRepo.findById(question.assessment_id);
     if (!assessment) throw new ApiError(404, "Assessment not found");
 
-    const subjectRow = await adminRepo.findSubjectById(assessment.subject_id);
+    const subjectRow = await adminRepo.findSubjectById(assessment.subject_id, assessment.class_id);
     if (!subjectRow) throw new ApiError(404, "Subject not found");
 
     const [newQ] = await generateQuestionsAI({
@@ -844,7 +844,7 @@ export const assignAssessmentService = async (
     assignment,
     class_name: classRow?.class_name ?? null,
     section_names: sectionRows.map((s) => ({
-      section_id: s.section_id,
+      section_id: s.id,
       section_name: s.section_name,
     })),
   };
@@ -1213,7 +1213,7 @@ export const getAssignmentResultsService = async (assignmentId: string) => {
     assessment_title: assessment.title,
     class_name: classRow?.class_name ?? null,
     sections: sectionRows.map((s) => ({
-      section_id: s.section_id,
+      section_id: s.id,
       section_name: s.section_name,
     })),
     total_marks: assessment.total_marks,
@@ -1331,8 +1331,8 @@ export const getAssessmentResultsService = async (assessmentId: string) => {
   ]);
 
   const userByUserId = Object.fromEntries(users.map((u) => [Number(u.user_id), u]));
-  const classById = Object.fromEntries(classRows.map((c) => [Number(c.class_id), c]));
-  const sectionById = Object.fromEntries(sectionRows.map((s) => [Number(s.section_id), s]));
+  const classById   = Object.fromEntries(classRows.map(  (c) => [Number(c.id), c]));
+  const sectionById  = Object.fromEntries(sectionRows.map((s) => [Number(s.id), s]));
 
   const enrichedAttempts: EnrichedAttempt[] = attempts.map((a) => {
     const profile = profileByStudentId[Number(a.student_id)];

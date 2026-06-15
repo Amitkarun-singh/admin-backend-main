@@ -21,12 +21,7 @@ import AdminRole from "./admin_role.model.ts";
 import AdminPermission from "./admin_permission.model.ts";
 import AdminRolePermission from "./admin_role_permission.model.js";
 
-import AdminClass from "./admin_class.model.js";
-import AdminSection from "./admin_section.model.js";
 import AdminCourse from "./admin_course.model.ts";
-import AdminClassCourseMap from "./admin_class_course_map.model.js";
-
-import AdminSubject from "./admin_subject_master.model.ts";
 
 import GiniLog from "./gini_log.model.js";
 import TutorLog from "./Tutor_log.model.js";
@@ -105,35 +100,9 @@ StudentProfile.belongsToMany(ParentProfile, {
 });
 
 /* =====================================================
-   CLASS ↔ SECTION
-   ===================================================== */
-AdminClass.hasMany(AdminSection, { foreignKey: "class_id", as: "sections" });
-AdminSection.belongsTo(AdminClass, { foreignKey: "class_id", as: "class" });
-
-/* =====================================================
-   CLASS ↔ COURSE  (Many-to-Many via AdminClassCourseMap)
-   ===================================================== */
-AdminClass.belongsToMany(AdminCourse, {
-  through: AdminClassCourseMap,
-  foreignKey: "class_id",
-  otherKey: "course_id",
-  as: "courses",
-});
-AdminCourse.belongsToMany(AdminClass, {
-  through: AdminClassCourseMap,
-  foreignKey: "course_id",
-  otherKey: "class_id",
-  as: "classes",
-});
-
-/* =====================================================
-   COURSE ↔ SUBJECT MASTER
-   ===================================================== */
-AdminCourse.hasMany(AdminSubject, { foreignKey: "course_id", as: "subjects" });
-AdminSubject.belongsTo(AdminCourse, { foreignKey: "course_id", as: "course" });
-
-/* =====================================================
    STUDENT ↔ CLASS-SECTION
+   class_id and section_id in student_class_section are curriculum-service IDs.
+   No local FK associations to AdminClass/AdminSection (those models are removed).
    ===================================================== */
 StudentProfile.hasOne(StudentClassSection, {
   foreignKey: "student_id",
@@ -142,19 +111,6 @@ StudentProfile.hasOne(StudentClassSection, {
 StudentClassSection.belongsTo(StudentProfile, {
   foreignKey: "student_id",
   as: "student",
-});
-AdminClass.hasMany(StudentClassSection, {
-  foreignKey: "class_id",
-  as: "studentAssignments",
-});
-StudentClassSection.belongsTo(AdminClass, { foreignKey: "class_id", as: "class" });
-AdminSection.hasMany(StudentClassSection, {
-  foreignKey: "section_id",
-  as: "studentAssignments",
-});
-StudentClassSection.belongsTo(AdminSection, {
-  foreignKey: "section_id",
-  as: "section",
 });
 
 /* =====================================================
@@ -171,6 +127,8 @@ StudentAnalytics.belongsTo(StudentProfile, {
 
 /* =====================================================
    TEACHER ↔ CLASS-SECTION-SUBJECT
+   class_id, section_id, class_subject_id are curriculum-service IDs.
+   Only the teacher_id FK to TeacherProfile is a local association.
    ===================================================== */
 TeacherProfile.hasMany(TeacherClassSectionSubject, {
   foreignKey: "teacher_id",
@@ -179,42 +137,6 @@ TeacherProfile.hasMany(TeacherClassSectionSubject, {
 TeacherClassSectionSubject.belongsTo(TeacherProfile, {
   foreignKey: "teacher_id",
   as: "teacher",
-});
-AdminClass.hasMany(TeacherClassSectionSubject, {
-  foreignKey: "class_id",
-  as: "teacherAssignments",
-});
-TeacherClassSectionSubject.belongsTo(AdminClass, {
-  foreignKey: "class_id",
-  as: "class",
-});
-AdminSection.hasMany(TeacherClassSectionSubject, {
-  foreignKey: "section_id",
-  as: "teacherAssignments",
-});
-TeacherClassSectionSubject.belongsTo(AdminSection, {
-  foreignKey: "section_id",
-  as: "section",
-});
-AdminSubject.hasMany(TeacherClassSectionSubject, {
-  foreignKey: "class_subject_id",
-  as: "teacherAssignments",
-});
-TeacherClassSectionSubject.belongsTo(AdminSubject, {
-  foreignKey: "class_subject_id",
-  as: "subject",
-});
-
-/* =====================================================
-   TEACHER PROFILE ↔ PRIMARY SUBJECT
-   ===================================================== */
-TeacherProfile.belongsTo(AdminSubject, {
-  foreignKey: "primary_subject_id",
-  as: "primarySubject",
-});
-AdminSubject.hasMany(TeacherProfile, {
-  foreignKey: "primary_subject_id",
-  as: "teachers",
 });
 
 /* =====================================================
@@ -229,11 +151,6 @@ TeacherAnalytics.belongsTo(TeacherProfile, {
   as: "teacher",
 });
 
-/* =====================================================
-   SUBJECT ↔ CLASS
-   ===================================================== */
-AdminSubject.belongsTo(AdminClass, { foreignKey: "class_id", as: "class" });
-AdminClass.hasMany(AdminSubject, { foreignKey: "class_id", as: "subjects" });
 
 /* =====================================================
    USER ↔ USER SESSIONS
@@ -344,11 +261,7 @@ export {
   AdminRole,
   AdminPermission,
   AdminRolePermission,
-  AdminClass,
-  AdminSection,
   AdminCourse,
-  AdminClassCourseMap,
-  AdminSubject,
   GiniLog,
   PracticeLog,
   UserSession,

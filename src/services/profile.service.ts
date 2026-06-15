@@ -1,7 +1,8 @@
 import userRepository from "../repositories/user.repository.js";
 import schoolRepository from "../repositories/school.repository.js";
 import profileRepository from "../repositories/profile.repository.js";
-import { classRepository } from "../repositories/class.repository.js";
+import curriculumService from "./curriculum.service.js";
+import { fetchCurriculumMapsSafe } from "../utils/curriculumEnrich.js";
 import UserStreak from "../models/user_streak.model.js";
 import sequelize from "../config/db.js";
 import { getSignedPdfUrl } from "../utils/signedUrl.js";
@@ -49,15 +50,10 @@ class ProfileService {
       this.getOverallScore(user_id),
     ]);
 
-    const [studentClass, studentSection] = await Promise.all([
-      classSection?.class_id
-        ? classRepository.findById(classSection.class_id)
-        : Promise.resolve(null),
-
-      classSection?.section_id
-        ? classRepository.findSectionById(classSection.section_id)
-        : Promise.resolve(null),
-    ]);
+    const [studentClass, studentSection] = await this._resolveClassSection(
+      classSection?.class_id,
+      classSection?.section_id,
+    );
 
     const avatarUrl = await getSignedPdfUrl((user as any)?.avatar);
 
@@ -113,15 +109,10 @@ class ProfileService {
 
     const classSection = teacherClasses?.[0] || null;
 
-    const [teacherClass, teacherSection] = await Promise.all([
-      classSection?.class_id
-        ? classRepository.findById(classSection.class_id)
-        : Promise.resolve(null),
-
-      classSection?.section_id
-        ? classRepository.findSectionById(classSection.section_id)
-        : Promise.resolve(null),
-    ]);
+    const [teacherClass, teacherSection] = await this._resolveClassSection(
+      classSection?.class_id,
+      classSection?.section_id,
+    );
 
     const avatarUrl = await getSignedPdfUrl((user as any)?.avatar);
 
@@ -203,9 +194,31 @@ async getAdminProfile(user_id: number, role: string) {
   };
 }
 
-  /* ─────────────────────────────────────────────────────────────
-   HELPER: sign avatar S3 key → URL (null if no avatar yet)
-───────────────────────────────────────────────────────────── */
+  /* ──────────────────────────────────────────────────────────
+   HELPER: resolve class_id + section_id to names via
+   curriculum microservice. Returns [classObj, sectionObj] where
+   each has a .class_name / .section_name property (or null).
+  ────────────────────────────────────────────────────────── */
+  async _resolveClassSection(class_id: any, section_id: any) {
+    try {
+      const [classesRaw, sectionsRaw] = await Promise.all([
+        curriculumService.allClass(),
+        curriculumService.section(),
+      ]);
+      const classes  = classesRaw?.data  ?? classesRaw  ?? [];
+      const sections = sectionsRaw?.data ?? sectionsRaw ?? [];
+      const classObj   = class_id   ? classes.find((c: any)  => Number(c.id ?? c.class_id)   === Number(class_id))   ?? null : null;
+      const sectionObj = section_id ? sections.find((s: any) => Number(s.id ?? s.section_id) === Number(section_id)) ?? null : null;
+      return [
+        classObj   ? { class_name:   classObj.class_name }   : null,
+        sectionObj ? { section_name: sectionObj.section_name } : null,
+      ];
+    } catch {
+      return [null, null];
+    }
+  }
+
+  /* ───────────────────────────────────────────────────────────── */
 
 
   async getMyAvatar(user_id: number) {
