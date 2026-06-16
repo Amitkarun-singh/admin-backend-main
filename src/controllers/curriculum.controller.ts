@@ -1,7 +1,6 @@
 import type { Request, Response } from "express"
 import CurriculumService from "../services/curriculum.service.ts"
 
-import AiNote from "../models/ainote_new.model.ts"
 
 export async function classes(req: Request, res: Response) {
   const role = req?.user?.role
@@ -61,5 +60,11 @@ export async function chapter(req: Request, res: Response) {
     return res.status(200).json(data);
   }
 
+}
+
+
+export async function section(req: Request, res: Response) {
+    const data = CurriculumService.section()
+    return res.status(200).json(data);
 }
 
