@@ -14,6 +14,6 @@ router.get("/stream", authMiddleware, stream)
 //get chapter
 router.get("/class/:classId/subject/:subjectId/chapter", authMiddleware, chapter)
 //get section
-router.get("section",authMiddleware, section)
+router.get("/section",authMiddleware, section)
 
 export default router

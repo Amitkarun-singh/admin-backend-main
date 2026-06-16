@@ -3,7 +3,7 @@ import userRepository from "../repositories/user.repository.js";
 import roleRepository from "../repositories/role.repository.js";
 import schoolRepository from "../repositories/school.repository.js";
 import profileRepository from "../repositories/profile.repository.js";
-import curriculumService from "./curriculum.service.js";
+import CurriculumService from "./curriculum.service.js";
 import authService from "./auth.service.ts";
 import { ApiError } from "../utils/ApiError.js";
 import { generateOTP, createOtpToken, verifyOtpToken } from "../utils/otp.util.js";
@@ -95,7 +95,7 @@ export class RegisterService {
     let classRecords: Array<{ class_id: number; class_name: string }> = [];
     if (inputClasses.length > 0) {
       try {
-        const raw = await curriculumService.allClass();
+        const raw = await CurriculumService.allClass();
         const allClasses: any[] = raw?.data ?? raw ?? [];
         const normalized = allClasses.map((c: any) => ({
           class_id:   Number(c.id ?? c.class_id),
@@ -153,8 +153,11 @@ export class RegisterService {
       school_id: cbseSchool!.school_id,
       status: "Active",
       is_password_reset_required: false,
-      self_register
+      self_register,
+      token : 10000
     });
+
+
 
     const currentYear = new Date().getFullYear().toString();
 
