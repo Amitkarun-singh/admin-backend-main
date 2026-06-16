@@ -97,9 +97,9 @@ export class RegisterService {
 
     try {
       const [classesRes, sectionsRes, streamsRes] = await Promise.all([
-        curriculumService.allClass(),
-        curriculumService.section(),
-        curriculumService.stream(),
+        CurriculumService.allClass(),
+        CurriculumService.section(),
+        CurriculumService.stream(),
       ]);
       allClasses  = classesRes?.data  ?? classesRes  ?? [];
       allSections = sectionsRes?.data ?? sectionsRes ?? [];
@@ -135,6 +135,8 @@ export class RegisterService {
             patterns.push(`grade${c.toLowerCase()}`);
           }
         });
+       
+      }catch (error:any){
         throw new ValidationError(validation);
       }
 
@@ -257,7 +259,7 @@ export class RegisterService {
       // ── Assign class in curriculum microservice ──────────────────────────
       if (resolvedClassId !== null) {
         try {
-          await curriculumService.assignClass({
+          await CurriculumService.assignClass({
             userId:    Number((user as any).user_id),
             schoolId:  Number(cbseSchool!.school_id),
             classId:   resolvedClassId,

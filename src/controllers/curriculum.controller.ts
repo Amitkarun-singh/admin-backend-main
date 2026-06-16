@@ -1,15 +1,19 @@
 import type { Request, Response } from "express"
 import CurriculumService from "../services/curriculum.service.ts"
-
+import AiNote from "../models/ainote_new.model.ts"
 
 export async function classes(req: Request, res: Response) {
-  const role = req?.user?.role
+  const role = req?.user?.role 
   const userId = String(req?.user?.user_id)
   const schoolId = String(req?.user?.school_id)
+    const type = String(req?.query?.type)
 
 
   if (role.toLowerCase() === "student") {
     const data = await CurriculumService.onlyAsignClass(userId, schoolId);
+    return res.status(200).json(data);
+  }   else if (type.toLowerCase() === "ai-notes") {
+    const data = await CurriculumService.onlyAiNotesClass(AiNote)
     return res.status(200).json(data);
   } else {
     const data = await CurriculumService.allClass();
