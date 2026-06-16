@@ -55,17 +55,17 @@ app.use(
 );
 
 /* ---------------- ROUTES ---------------- */
-app.use("/api/V1/auth", authRoutes);
-app.use("/api/V1/admin", adminRoutes);
-app.use("/api/V1/teachers", teacherRoutes);
-app.use("/api/V1/students", studentRoutes);
-app.use("/api/V1/parents", parentRoutes);
-app.use("/api/V1/auth/register", registerRoutes);
+app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/admin", adminRoutes);
+app.use("/api/v1/teachers", teacherRoutes);
+app.use("/api/v1/students", studentRoutes);
+app.use("/api/v1/parents", parentRoutes);
+app.use("/api/v1/auth/register", registerRoutes);
 
 // AI Feature Routes
-app.use("/api/V1", summarizeRoute);
-app.use("/api/V1/ainote", ainoteRoute);
-app.use("/api/V1/assessments", assessmentRoutes);
+app.use("/api/v1", summarizeRoute);
+app.use("/api/v1/ainote", ainoteRoute);
+app.use("/api/v1/assessments", assessmentRoutes);
 
 // History and Analytics Routes
 app.use("/api/V1/history", historyRoutes);
