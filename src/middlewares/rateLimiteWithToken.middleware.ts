@@ -31,7 +31,9 @@ export default async function tokenCounter(
   if (!tokens) {
     tokens = await  UserRepository.getToken(userId)
     console.log("Tokens 2:", tokens);
-    await redisClient.set(userId, tokens ?? "0");
+    await redisClient.set(userId, tokens ?? "0", {
+  EX: 3600, // expires in 1 hour (seconds)
+});
     
   }
 
