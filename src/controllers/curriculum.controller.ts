@@ -64,7 +64,7 @@ export async function chapter(req: Request, res: Response) {
 
 
 export async function section(req: Request, res: Response) {
-    const data = CurriculumService.section()
+    const data = await CurriculumService.section()
     return res.status(200).json(data);
 }
 
