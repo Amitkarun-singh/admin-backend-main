@@ -310,6 +310,7 @@ export class RegisterService {
       classId
     } = registerData;
 
+    console.log("Register Data:", registerData);
     const validation = [];
 
     // Firebase verification
@@ -422,6 +423,7 @@ export class RegisterService {
 
     // ── Assign class in curriculum microservice ──────────────────────────
     try {
+      console.log("assign class")
       await CurriculumService.assignClass({
         userId: Number((user as any).user_id),
         schoolId: Number(cbseSchool!.school_id),
@@ -441,7 +443,7 @@ export class RegisterService {
 
     // Login after registration
     return await authService.loginWithUserId((user as any).user_id);
-  }
+  }// reslf register close
 
 
   /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
