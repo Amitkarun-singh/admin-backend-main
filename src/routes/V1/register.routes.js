@@ -6,6 +6,7 @@
 import express from "express";
 import {
   register,
+  selfRegister,
   resendOtp,
   verifyRegistrationOtp,
   getOnboardingData,
@@ -22,7 +23,8 @@ const router = express.Router();
 router.use(activityMiddleware);
 
 /* ── PUBLIC ─────────────────────────────────────────── */
-router.post("/", register);           // Step 1
+// router.post("/", register);           // Step 1
+router.post("/", selfRegister);
 router.post("/resend-otp", resendOtp);          // Step 2a                                          
 router.post("/verify-otp", verifyRegistrationOtp); // Step 2b
 router.get("/classes", getClasses)

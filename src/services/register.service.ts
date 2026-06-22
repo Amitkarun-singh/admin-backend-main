@@ -9,6 +9,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { generateOTP, createOtpToken, verifyOtpToken } from "../utils/otp.util.js";
 import { ValidationError } from "../error/subError.ts";
 import { AdminRole, AdminSchool, StudentProfile, TeacherProfile, User } from "../models/index.js";
+import { generateUsername } from "../utils/username.util.js";
 
 const GENERAL_STREAM_ID = 4;
 const STREAM_REQUIRED_FROM_GRADE = 11;
@@ -103,7 +104,7 @@ export class RegisterService {
     }
 
     // ── Curriculum data fetch ─────────────────────────────────────────────────
-    let: any[] = [];
+    let allClasses: any[] = [];
     let allSections: any[] = [];
     let allStreams: any[] = [];
 
@@ -293,6 +294,155 @@ export class RegisterService {
     // Login after registration
     return await authService.loginWithUserId((user as any).user_id);
   }
+
+  async selfRegister(registerData: any) {
+    const {
+      role,
+      full_name,
+      username,
+      password,
+      phone_number,
+      email,
+      board,
+      idToken,
+      self_register,
+      streamId,
+      classId
+    } = registerData;
+
+    const validation = [];
+
+    // Firebase verification
+    //await authService.verifyIdToken(idToken);
+
+    // Board check
+    if (board?.toUpperCase() !== "CBSE") {
+      validation.push({
+        field: "board",
+        message: "Self-registration is only for CBSE",
+        code: "BOARD_NOT_SUPPORTED",
+      });
+    }
+
+    // Uniqueness checks
+    const contact_number = phone_number.trim().slice(-10);
+    const takenPhone = await userRepository.findByPhoneNumber(contact_number);
+
+    if (takenPhone) {
+      validation.push({
+        field: "phone_number",
+        message: "Phone number already registered",
+        code: "DUPLICATE_PHONE",
+      });
+    }
+
+    if (email?.trim()) {
+      const takenEmail = await userRepository.findByEmail(email.trim());
+      if (takenEmail) {
+        validation.push({
+          field: "email",
+          message: "Email already registered",
+          code: "DUPLICATE_EMAIL",
+        });
+      }
+    }
+
+    let finalUsername = username;
+    if (finalUsername) {
+      const takenUsername = await userRepository.findByUsername(finalUsername);
+      if (takenUsername) {
+        validation.push({
+          field: "username",
+          message: "Username already registered",
+          code: "DUPLICATE_USERNAME",
+        });
+      }
+    } else {
+      finalUsername = generateUsername(full_name);
+      let attempts = 0;
+      while (attempts < 5) {
+        const taken = await userRepository.findByUsername(finalUsername);
+        if (!taken) break;
+        finalUsername = generateUsername(full_name);
+        attempts++;
+      }
+    }
+
+    // Role and School
+    const roleRecord: AdminRole | null = await roleRepository.findByName(role);
+    if (!roleRecord) {
+      validation.push({
+        field: "role",
+        message: "Role not found",
+        code: "ROLE_NOT_FOUND",
+      });
+    }
+
+    const cbseSchool: AdminSchool | null = await schoolRepository.findActiveCbseSchool();
+    if (!cbseSchool) {
+      validation.push({
+        field: "school",
+        message: "Active CBSE school not found",
+        code: "SCHOOL_NOT_FOUND",
+      });
+    }
+
+    if (validation.length > 0) {
+      throw new ValidationError(validation);
+    }
+
+
+
+    // ── Section resolution (STUDENT only, defaults to section ID 1) ────────────
+    const sectionId: number = 1;
+
+
+
+
+
+    // ── Create User ───────────────────────────────────────────────────────────
+    const hashed = await bcrypt.hash(password, 10);
+    const user: User = await userRepository.create({
+      full_name: full_name.trim(),
+      password: hashed,
+      username: username,
+      phone_number: contact_number,
+      email: email?.trim() || null,
+      role_id: roleRecord!.role_id,
+      school_id: cbseSchool!.school_id,
+      status: "Active",
+      is_password_reset_required: false,
+      self_register,
+      token: 10000
+    });
+
+    const currentYear = new Date().getFullYear().toString();
+
+
+
+    // ── Assign class in curriculum microservice ──────────────────────────
+    try {
+      await CurriculumService.assignClass({
+        userId: Number((user as any).user_id),
+        schoolId: Number(cbseSchool!.school_id),
+        classId: classId,
+        streamId: streamId,
+        sectionId: sectionId,
+      });
+    } catch (e: any) {
+      throw new ApiError(
+        503,
+        `Failed to assign class in curriculum service: ${e?.message ?? "unknown error"}`,
+      );
+    }
+
+    await schoolRepository.incrementCount(cbseSchool!.school_id, "student_count");
+
+
+    // Login after registration
+    return await authService.loginWithUserId((user as any).user_id);
+  }
+
 
   /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

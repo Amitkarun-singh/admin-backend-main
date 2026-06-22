@@ -26,6 +26,21 @@ async function register(req: Request, res: Response) {
   );
 }
 
+async function selfRegister(req: Request, res: Response) {
+  const result = await registerService.selfRegister(req.body);
+
+  res.cookie("refreshToken", result.refreshToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "none",
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  });
+
+  return res.status(201).json(
+    new ApiResponse(201, result, "Self registered successfully")
+  );
+}
+
 const getOnboardingData = asyncHandler(async (req: Request, res: Response) => {
   const { role, school_id } = req.user;
 
@@ -94,6 +109,7 @@ const completeProfile = asyncHandler(async (req: Request, res: Response) => {
 
 export {
   register,
+  selfRegister,
   getOnboardingData,
   completeProfile,
   resendOtp,
