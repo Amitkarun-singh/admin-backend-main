@@ -556,7 +556,8 @@ export class RegisterService {
   }
 
   async verifyPhoneNumber(phone_number: string) {
-    const user = await userRepository.findByPhoneNumber(phone_number);
+    const contact_number = phone_number.trim().slice(-10);
+    const user = await userRepository.findByPhoneNumber(contact_number);
     if (user) throw new ApiError(400, "Phone number already taken");
     return { available: true };
   }

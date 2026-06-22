@@ -29,8 +29,8 @@ router.post("/resend-otp", resendOtp);          // Step 2a
 router.post("/verify-otp", verifyRegistrationOtp); // Step 2b
 router.get("/classes", getClasses)
 router.get("/stream", getStream)
-router.post("/verify/username", verifyUsername)
-router.post("/verify/phone-number", verifyPhoneNumber)
+router.post("/exist/username", verifyUsername)
+router.post("/exist/phone-number", verifyPhoneNumber)
 
 /* ── AUTHENTICATED ──────────────────────────────────── */
 router.get("/onboarding", authMiddleware, getOnboardingData);  // Step 3
