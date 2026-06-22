@@ -3,13 +3,13 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import registerService from "../services/register.service.js";
 import schoolRepository from "../repositories/school.repository.js";
-import curriculumService from "../services/curriculum.service.js";
+import CurriculumService from "../services/curriculum.service.js";
 
 // interface AuthenticatedRequest extends Request {
 //   user?: any;
 // }
 
-async function register (req: Request, res: Response) {
+async function register(req: Request, res: Response) {
   const result = await registerService.register(req.body);
 
   res.cookie("refreshToken", result.refreshToken, {
@@ -21,7 +21,7 @@ async function register (req: Request, res: Response) {
 
   return res.status(201).json(
 
-  
+
     new ApiResponse(201, result, "Account created and verified")
   );
 }
@@ -30,11 +30,11 @@ const getOnboardingData = asyncHandler(async (req: Request, res: Response) => {
   const { role, school_id } = req.user;
 
   const [classesRaw, school]: any = await Promise.all([
-    curriculumService.allClass(),
+    CurriculumService.allClass(),
     schoolRepository.findById(school_id, ["school_name", "board", "language_preference"]),
   ]);
   const classes = (classesRaw?.data ?? classesRaw ?? []).map((c: any) => ({
-    class_id:   c.id ?? c.class_id,
+    class_id: c.id ?? c.class_id,
     class_name: c.class_name,
   }));
 
@@ -44,14 +44,14 @@ const getOnboardingData = asyncHandler(async (req: Request, res: Response) => {
     try {
       const allSubjects: any[] = [];
       for (const cls of classes) {
-        const raw = await curriculumService.allSubject(cls.class_id, school?.board || "CBSE", 4);
+        const raw = await CurriculumService.allSubject(cls.class_id, school?.board || "CBSE", 4);
         const list: any[] = raw?.data ?? raw ?? [];
         list.forEach((s: any) => allSubjects.push({
-          subject_id:   s.id ?? s.subject_id,
+          subject_id: s.id ?? s.subject_id,
           subject_name: s.subject_name ?? s.name,
-          class_id:     cls.class_id,
-          board:        s.board,
-          language:     s.language,
+          class_id: cls.class_id,
+          board: s.board,
+          language: s.language,
         }));
       }
       subjects = allSubjects;
@@ -119,4 +119,29 @@ async function verifyRegistrationOtp(req: Request, res: Response) {
   });
 
   return res.status(200).json(new ApiResponse(200, result, "Phone verified"));
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export async function getClasses(req: Request, res: Response) {
+  const result = await CurriculumService.allClass();
+  return res.status(200).json(new ApiResponse(200, result, "Classes fetched successfully"));
+}
+
+export async function getStream(req: Request, res: Response) {
+  const result = await CurriculumService.stream();
+  return res.status(200).json(new ApiResponse(200, result, "Stream fetched successfully"));
+}
+
+export async function verifyUsername(req: Request, res: Response) {
+  const { username } = req.body;
+  const result = await registerService.verifyUsername(username);
+  return res.status(200).json(new ApiResponse(200, result, "Username verified successfully"));
+}
+
+export async function verifyPhoneNumber(req: Request, res: Response) {
+  const { phone_number } = req.body;
+  const result = await registerService.verifyPhoneNumber(phone_number);
+  return res.status(200).json(new ApiResponse(200, result, "Phone number verified successfully"));
 }

@@ -10,6 +10,10 @@ import {
   verifyRegistrationOtp,
   getOnboardingData,
   completeProfile,
+  getClasses,
+  getStream,
+  verifyUsername,
+  verifyPhoneNumber
 } from "../../controllers/register.controller.js";
 import { authMiddleware } from "../../middlewares/auth.middleware.js";
 import { activityMiddleware } from "../../middlewares/activity.middleware.js";
@@ -18,12 +22,16 @@ const router = express.Router();
 router.use(activityMiddleware);
 
 /* ── PUBLIC ─────────────────────────────────────────── */
-router.post("/",            register);           // Step 1
-router.post("/resend-otp",  resendOtp);          // Step 2a
-router.post("/verify-otp",  verifyRegistrationOtp); // Step 2b
+router.post("/", register);           // Step 1
+router.post("/resend-otp", resendOtp);          // Step 2a                                          
+router.post("/verify-otp", verifyRegistrationOtp); // Step 2b
+router.get("/classes", getClasses)
+router.get("/stream", getStream)
+router.post("/verify/username", verifyUsername)
+router.post("/verify/phone-number", verifyPhoneNumber)
 
 /* ── AUTHENTICATED ──────────────────────────────────── */
-router.get( "/onboarding",       authMiddleware, getOnboardingData);  // Step 3
+router.get("/onboarding", authMiddleware, getOnboardingData);  // Step 3
 router.post("/complete-profile", authMiddleware, completeProfile);    // Step 4
 
 export default router;

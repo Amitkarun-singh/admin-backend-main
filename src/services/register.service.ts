@@ -19,6 +19,7 @@ export class RegisterService {
     const {
       role,
       full_name,
+      username,
       password,
       phone_number,
       email,
@@ -28,7 +29,7 @@ export class RegisterService {
       section_name,
       stream,
     } = registerData;
-    console.log(registerData);
+
 
     const validation = [];
 
@@ -67,6 +68,17 @@ export class RegisterService {
       }
     }
 
+    if (username) {
+      const takenUsername = await userRepository.findByUsername(username);
+      if (takenUsername) {
+        validation.push({
+          field: "username",
+          message: "Username already registered",
+          code: "DUPLICATE_USERNAME",
+        });
+      }
+    }
+
     // Role and School
     const roleRecord: AdminRole | null = await roleRepository.findByName(role);
     if (!roleRecord) {
@@ -91,7 +103,7 @@ export class RegisterService {
     }
 
     // ── Curriculum data fetch ─────────────────────────────────────────────────
-    let allClasses: any[] = [];
+    let: any[] = [];
     let allSections: any[] = [];
     let allStreams: any[] = [];
 
@@ -101,9 +113,9 @@ export class RegisterService {
         CurriculumService.section(),
         CurriculumService.stream(),
       ]);
-      allClasses  = classesRes?.data  ?? classesRes  ?? [];
+      allClasses = classesRes?.data ?? classesRes ?? [];
       allSections = sectionsRes?.data ?? sectionsRes ?? [];
-      allStreams  = streamsRes?.data  ?? streamsRes  ?? [];
+      allStreams = streamsRes?.data ?? streamsRes ?? [];
     } catch {
       throw new ApiError(503, "Curriculum service unavailable");
     }
@@ -122,7 +134,7 @@ export class RegisterService {
         const raw = await CurriculumService.allClass();
         const allClasses: any[] = raw?.data ?? raw ?? [];
         const normalized = allClasses.map((c: any) => ({
-          class_id:   Number(c.id ?? c.class_id),
+          class_id: Number(c.id ?? c.class_id),
           class_name: String(c.class_name),
         }));
 
@@ -135,8 +147,8 @@ export class RegisterService {
             patterns.push(`grade${c.toLowerCase()}`);
           }
         });
-       
-      }catch (error:any){
+
+      } catch (error: any) {
         throw new ValidationError(validation);
       }
 
@@ -207,6 +219,7 @@ export class RegisterService {
     const user: User = await userRepository.create({
       full_name: full_name.trim(),
       password: hashed,
+      username: username,
       phone_number: contact_number,
       email: email?.trim() || null,
       role_id: roleRecord!.role_id,
@@ -214,7 +227,7 @@ export class RegisterService {
       status: "Active",
       is_password_reset_required: false,
       self_register,
-      token : 10000
+      token: 10000
     });
 
 
@@ -260,10 +273,10 @@ export class RegisterService {
       if (resolvedClassId !== null) {
         try {
           await CurriculumService.assignClass({
-            userId:    Number((user as any).user_id),
-            schoolId:  Number(cbseSchool!.school_id),
-            classId:   resolvedClassId,
-            streamId:  resolvedStreamId,
+            userId: Number((user as any).user_id),
+            schoolId: Number(cbseSchool!.school_id),
+            classId: resolvedClassId,
+            streamId: resolvedStreamId,
             sectionId: resolvedSectionId ?? 0,
           });
         } catch (e: any) {
@@ -385,6 +398,20 @@ export class RegisterService {
     await userRepository.update((user as any).user_id, { status: "Active" });
     return await authService.loginWithUserId((user as any).user_id);
   }
+
+  async verifyUsername(username: string) {
+    const user = await userRepository.findByUsername(username);
+    if (user) throw new ApiError(400, "Username already taken");
+    return { available: true };
+  }
+
+  async verifyPhoneNumber(phone_number: string) {
+    const user = await userRepository.findByPhoneNumber(phone_number);
+    if (user) throw new ApiError(400, "Phone number already taken");
+    return { available: true };
+  }
 }
 
 export default new RegisterService();
+
+
