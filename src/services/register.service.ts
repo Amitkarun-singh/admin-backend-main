@@ -3,7 +3,7 @@ import userRepository from "../repositories/user.repository.js";
 import roleRepository from "../repositories/role.repository.js";
 import schoolRepository from "../repositories/school.repository.js";
 import profileRepository from "../repositories/profile.repository.js";
-import curriculumService from "./curriculum.service.js";
+import CurriculumService from "./curriculum.service.js";
 import authService from "./auth.service.ts";
 import { ApiError } from "../utils/ApiError.js";
 import { generateOTP, createOtpToken, verifyOtpToken } from "../utils/otp.util.js";
@@ -97,9 +97,9 @@ export class RegisterService {
 
     try {
       const [classesRes, sectionsRes, streamsRes] = await Promise.all([
-        curriculumService.allClass(),
-        curriculumService.section(),
-        curriculumService.stream(),
+        CurriculumService.allClass(),
+        CurriculumService.section(),
+        CurriculumService.stream(),
       ]);
       allClasses  = classesRes?.data  ?? classesRes  ?? [];
       allSections = sectionsRes?.data ?? sectionsRes ?? [];
@@ -118,40 +118,25 @@ export class RegisterService {
     let gradeNumber: number | null = null;
 
     if (inputClasses.length > 0) {
-      const normalized = allClasses.map((c: any) => ({
-        class_id: Number(c.id ?? c.class_id),
-        class_name: String(c.class_name),
-      }));
+      try {
+        const raw = await CurriculumService.allClass();
+        const allClasses: any[] = raw?.data ?? raw ?? [];
+        const normalized = allClasses.map((c: any) => ({
+          class_id:   Number(c.id ?? c.class_id),
+          class_name: String(c.class_name),
+        }));
 
-      const patterns: string[] = [];
-      inputClasses.forEach((c: string) => {
-        if (c.toLowerCase().startsWith("grade")) {
-          patterns.push(c.toLowerCase());
-        } else {
-          patterns.push(`grade ${c.toLowerCase()}`);
-          patterns.push(`grade${c.toLowerCase()}`);
-        }
-      });
-
-      classRecords = normalized.filter((r) =>
-        patterns.some((p) => r.class_name.toLowerCase() === p),
-      );
-
-      // Validate all requested classes were found
-      const foundNames = classRecords.map((r) => r.class_name.toLowerCase());
-      const missingClasses = inputClasses.filter((input: string) => {
-        const pats = input.toLowerCase().startsWith("grade")
-          ? [input.toLowerCase()]
-          : [`grade ${input.toLowerCase()}`, `grade${input.toLowerCase()}`];
-        return !pats.some((p: string) => foundNames.includes(p));
-      });
-
-      if (missingClasses.length > 0) {
-        validation.push({
-          field: "class",
-          message: `Classes not found: ${missingClasses.join(", ")}`,
-          code: "CLASS_NOT_FOUND",
+        const patterns: string[] = [];
+        inputClasses.forEach((c: string) => {
+          if (c.toLowerCase().startsWith("grade")) {
+            patterns.push(c.toLowerCase());
+          } else {
+            patterns.push(`grade ${c.toLowerCase()}`);
+            patterns.push(`grade${c.toLowerCase()}`);
+          }
         });
+       
+      }catch (error:any){
         throw new ValidationError(validation);
       }
 
@@ -229,7 +214,10 @@ export class RegisterService {
       status: "Active",
       is_password_reset_required: false,
       self_register,
+      token : 10000
     });
+
+
 
     const currentYear = new Date().getFullYear().toString();
 
@@ -271,7 +259,7 @@ export class RegisterService {
       // ── Assign class in curriculum microservice ──────────────────────────
       if (resolvedClassId !== null) {
         try {
-          await curriculumService.assignClass({
+          await CurriculumService.assignClass({
             userId:    Number((user as any).user_id),
             schoolId:  Number(cbseSchool!.school_id),
             classId:   resolvedClassId,

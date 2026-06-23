@@ -1,7 +1,7 @@
 import { createClient } from 'redis';
 
 const client = createClient({
-  url: 'redis://localhost:32768'
+  url: 'redis://host.docker.internal:6374'
 });
 
 client.on('error', err => console.log('Redis Client Error', err));
