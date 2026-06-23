@@ -1,4 +1,5 @@
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import path from "path";
 import fs from "fs";
 
 const s3 = new S3Client({
@@ -30,7 +31,8 @@ export const uploadToS3 = async (
 ): Promise<S3UploadResult> => {
   const fileStream = fs.createReadStream(file.path);
 
-  const key = `${type}/${board}/${language}/Class${className}/${subject}/${topic}-${Date.now()}.pdf`;
+  const ext = file.extension ?? path.extname(file.path).replace(".", "") ?? "bin";
+  const key = `${type}/${board}/${language}/Class${className}/${subject}/${topic}-${Date.now()}.${ext}`;
 
   const command = new PutObjectCommand({
     Bucket: process.env.AWS_BUCKET_NAME,

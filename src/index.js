@@ -30,6 +30,7 @@ import previousPapersRouter from "./routes/V1/previousPapers.router.js";
 import predictPapersRouter from "./routes/V1/predictPapers.router.ts";
 import summarizeRoute from "./routes/V1/summarize.routes.js";
 import ainoteRoute from "./routes/V1/ainote.routes.js";
+import aipptRoute from "./routes/V1/aippt.routes.js";
 import assessmentRoutes from "./routes/V1/assessment.routes.js";
 import appFeedbackRouter from "./routes/V1/appFeedback.route.ts";
 import featureRoutes from "./routes/V1/feature.routes.js";
@@ -65,6 +66,7 @@ app.use("/api/v1/auth/register", registerRoutes);
 // AI Feature Routes
 app.use("/api/v1", summarizeRoute);
 app.use("/api/v1/ainote", ainoteRoute);
+app.use("/api/v1/aippt", aipptRoute);
 app.use("/api/v1/assessments", assessmentRoutes);
 
 // History and Analytics Routes

@@ -44,12 +44,10 @@ interface CreateStudentInput {
 }
 
 interface UpdateStudentInput {
-  // User-level fields
   full_name?: string;
   phone_number?: string;
   email?: string;
   address?: string;
-  // Profile-level fields
   gender?: string;
   status?: string;
   preferred_language?: string;
@@ -105,7 +103,7 @@ function validateStream(
   if (!rawStreamName || !String(rawStreamName).trim()) {
     throw new Error(
       `stream is required for "${className}". ` +
-      `Please provide the stream for this class. Valid options: ${validNames}`
+      `Please provide the stream for this class. Valid options: ${validNames}`,
     );
   }
 
@@ -115,18 +113,17 @@ function validateStream(
   if (generalStream && normalised === String(generalStream.stream_name).trim().toLowerCase()) {
     throw new Error(
       `"${rawStreamName}" stream is only for classes below Grade ${STREAM_REQUIRED_FROM_GRADE}. ` +
-      `Valid options for ${className}: ${validNames}`
+      `Valid options for ${className}: ${validNames}`,
     );
   }
 
   const streamRecord = allStreams.find(
     (s: any) => String(s.stream_name).trim().toLowerCase() === normalised,
   );
-
   if (!streamRecord) {
     throw new Error(
       `Stream "${rawStreamName}" not found. You entered "${rawStreamName}" — ` +
-      `valid streams for ${className}: ${validNames}`
+      `valid streams for ${className}: ${validNames}`,
     );
   }
 
@@ -210,6 +207,8 @@ function parseFlexibleDate(value: any, fieldName: string): string | null {
 }
 
 // ─── Curriculum pre-fetch helper ───────────────────────────────────────────────
+// Used for name→id resolution only (allClasses, allSections, allStreams).
+// These are fetched ONCE before the loop — no per-row HTTP calls.
 
 async function fetchCurriculumData(): Promise<{
   allClasses: any[];
@@ -250,38 +249,44 @@ export class StudentService {
     // ── 1. Mandatory field check ──────────────────────────────────────────────
     const missing: string[] = [];
     if (!student_full_name) missing.push("student_full_name");
-    if (!student_phone) missing.push("student_phone");
-    if (!class_name) missing.push("class_name");
-    if (!section_name) missing.push("section_name");
-    if (!parent_full_name) missing.push("parent_full_name");
-    if (!parent_phone) missing.push("parent_phone");
+    if (!student_phone)     missing.push("student_phone");
+    if (!class_name)        missing.push("class_name");
+    if (!section_name)      missing.push("section_name");
+    if (!parent_full_name)  missing.push("parent_full_name");
+    if (!parent_phone)      missing.push("parent_phone");
     if (missing.length) throw new ApiError(400, `Missing required fields: ${missing.join(", ")}`);
 
     // ── 2. Normalise names ────────────────────────────────────────────────────
     const normStudentName = toNameCase(student_full_name);
-    const normParentName = toNameCase(parent_full_name);
+    const normParentName  = toNameCase(parent_full_name);
+
+    // ── 3. Validate phone ─────────────────────────────────────────────────────
+    if (!isValidPhone(student_phone))
+      throw new ApiError(400, `student_phone "${student_phone}" must be exactly 10 digits.`);
+    if (parent_phone && !isValidPhone(parent_phone))
+      throw new ApiError(400, `parent_phone "${parent_phone}" must be exactly 10 digits.`);
 
     const school = await studentRepository.findSchoolById(school_id);
     if (!school) throw new ApiError(404, "School not found");
 
-    // ── 3. Fetch curriculum data ──────────────────────────────────────────────
+    // ── 4. Fetch curriculum data (name→id mapping only) ───────────────────────
     const { allClasses, allSections, allStreams } = await fetchCurriculumData();
 
-    // ── 4. Resolve class ──────────────────────────────────────────────────────
+    // ── 5. Resolve class ──────────────────────────────────────────────────────
     const { normalised: normalizedClassName, gradeNumber } = validateClassName(class_name);
     const classRecord = allClasses.find((c: any) => c.class_name === normalizedClassName);
     if (!classRecord)
       throw new ApiError(400, `Class "${normalizedClassName}" does not exist. Please create it first.`);
     const resolvedClassId: number = classRecord.id;
 
-    // ── 5. Resolve section ────────────────────────────────────────────────────
+    // ── 6. Resolve section ────────────────────────────────────────────────────
     const normalizedSectionName = section_name.trim().toUpperCase();
     const sectionRecord = allSections.find((s: any) => s.section_name === normalizedSectionName);
     if (!sectionRecord)
       throw new ApiError(400, `Section "${normalizedSectionName}" does not exist. Please create it first.`);
     const resolvedSectionId: number = sectionRecord.id;
 
-    // ── 6. Resolve stream ─────────────────────────────────────────────────────
+    // ── 7. Resolve stream ─────────────────────────────────────────────────────
     let resolvedStreamId: number;
     try {
       const rawStream = stream?.trim() || (stream_id != null ? String(stream_id) : null);
@@ -291,18 +296,18 @@ export class StudentService {
       throw new ApiError(400, e.message);
     }
 
-    // ── 7. Enum validations ───────────────────────────────────────────────────
+    // ── 8. Enum validations ───────────────────────────────────────────────────
     const normalizedRelation = relation?.toLowerCase() || null;
-    const normalizedGender = gender?.toLowerCase() || null;
+    const normalizedGender   = gender?.toLowerCase()   || null;
     if (normalizedRelation && !VALID_RELATIONS.includes(normalizedRelation))
       throw new ApiError(400, `Invalid relation. Must be one of: ${VALID_RELATIONS.join(", ")}`);
     if (normalizedGender && !VALID_GENDERS.includes(normalizedGender))
       throw new ApiError(400, `Invalid gender. Must be one of: ${VALID_GENDERS.join(", ")}`);
 
     const plainStudentPassword = "Student@123";
-    const plainParentPassword = "Parent@123";
-    const studentUsername = generateUsername(normStudentName);
-    const parentUsername = generateUsername(normParentName);
+    const plainParentPassword  = "Parent@123";
+    const studentUsername      = generateUsername(normStudentName);
+    const parentUsername       = generateUsername(normParentName);
 
     const transaction = await sequelize.transaction();
     try {
@@ -312,20 +317,21 @@ export class StudentService {
       ]);
       if (!studentRole || !parentRole) throw new ApiError(400, "Student or Parent role missing");
 
-      const resolvedParentPhone = parent_phone || student_phone;
+      const resolvedParentPhone   = parent_phone || student_phone;
       const resolvedParentAddress = parent_address || student_address || null;
 
       // ── Parent ───────────────────────────────────────────────────────────────
       const parentHashed = await bcrypt.hash(plainParentPassword, 10);
-      const parentUser = await studentRepository.createUser({
-        username: parentUsername,
-        full_name: normParentName,
-        password: parentHashed,
-        phone_number: resolvedParentPhone,
-        email: parent_email || null,
-        address: resolvedParentAddress,
-        role_id: parentRole.role_id,
-        school_id, status: "Active",
+      const parentUser   = await studentRepository.createUser({
+        username:                  parentUsername,
+        full_name:                 normParentName,
+        password:                  parentHashed,
+        phone_number:              resolvedParentPhone,
+        email:                     parent_email || null,
+        address:                   resolvedParentAddress,
+        role_id:                   parentRole.role_id,
+        school_id,
+        status:                    "Active",
         is_password_reset_required: true,
       }, transaction);
 
@@ -335,67 +341,74 @@ export class StudentService {
 
       // ── Student ──────────────────────────────────────────────────────────────
       const studentHashed = await bcrypt.hash(plainStudentPassword, 10);
-      const studentUser = await studentRepository.createUser({
-        username: studentUsername,
-        full_name: normStudentName,
-        password: studentHashed,
-        phone_number: student_phone,
-        email: student_email || null,
-        address: student_address || null,
-        role_id: studentRole.role_id,
-        school_id, status: "Active",
+      const studentUser   = await studentRepository.createUser({
+        username:                  studentUsername,
+        full_name:                 normStudentName,
+        password:                  studentHashed,
+        phone_number:              student_phone,
+        email:                     student_email || null,
+        address:                   student_address || null,
+        role_id:                   studentRole.role_id,
+        school_id,
+        status:                    "Active",
         is_password_reset_required: true,
       }, transaction);
 
       const student = await studentRepository.createStudentProfile({
-        user_id: studentUser.user_id,
+        user_id:            studentUser.user_id,
         school_id,
         preferred_language: preferred_language || null,
-        onboarding_date: onboarding_date || null,
-        cost_limit: cost_limit || null,
-        dob: dob || null,
-        gender: normalizedGender,
-        analytics_enabled: analytics_enabled ?? false,
+        onboarding_date:    onboarding_date    || null,
+        cost_limit:         cost_limit         || null,
+        dob:                dob                || null,
+        gender:             normalizedGender,
+        analytics_enabled:  analytics_enabled  ?? false,
       }, transaction);
 
-      // ── Assign class in curriculum microservice ───────────────────────────
-      try {
-        await curriculumService.assignClass({
-          userId: Number(studentUser.user_id),
-          schoolId: Number(school_id),
-          classId: resolvedClassId,
-          streamId: resolvedStreamId,
-          sectionId: resolvedSectionId,
-        });
-      } catch (e: any) {
-        throw new ApiError(503, `Failed to assign class in curriculum service: ${e?.message ?? "unknown error"}`);
-      }
+      // ── Local class assignment (replaces curriculumService.assignClass) ──────
+      // Find-or-create the class_stream_sections row, then assign the student.
+      const classStreamSection = await studentRepository.findOrCreateClassStreamSection(
+        school_id,
+        resolvedClassId,
+        resolvedStreamId,
+        resolvedSectionId,
+        transaction,
+      );
+      await studentRepository.assignUserToClassStreamSection(
+        studentUser.user_id,
+        classStreamSection.id,
+        transaction,
+      );
 
-      // ── Local enrolment row ───────────────────────────────────────────────
+      // ── Local enrolment row (student_class_section) ───────────────────────
       await studentRepository.createParentStudentMap(
         { parent_id: BigInt((parent as any).parent_id), student_id: BigInt(student.student_id) },
         transaction,
       );
       await studentRepository.createClassSection({
-        student_id: student.student_id,
-        class_id: resolvedClassId,
-        section_id: resolvedSectionId,
-        stream_id: resolvedStreamId,
-        roll_number: roll_number || null,
+        student_id:    student.student_id,
+        class_id:      resolvedClassId,
+        section_id:    resolvedSectionId,
+        stream_id:     resolvedStreamId,
+        roll_number:   roll_number || null,
         academic_year: academic_year || null,
-        status: "active",
+        status:        "active",
       }, transaction);
+
       await studentRepository.incrementSchoolStudentCount(school_id, 1, transaction);
       await transaction.commit();
 
-      if (student_email) sendWelcomeEmail(student_email, normStudentName, studentUsername, plainStudentPassword)
-        .catch((e) => console.error("[Mailer] Student welcome email failed:", e));
-      if (parent_email) sendWelcomeEmail(parent_email, normParentName, parentUsername, plainParentPassword)
-        .catch((e) => console.error("[Mailer] Parent welcome email failed:", e));
+      // ── Welcome emails (fire-and-forget) ─────────────────────────────────
+      if (student_email)
+        sendWelcomeEmail(student_email, normStudentName, studentUsername, plainStudentPassword)
+          .catch((e) => console.error("[Mailer] Student welcome email failed:", e));
+      if (parent_email)
+        sendWelcomeEmail(parent_email, normParentName, parentUsername, plainParentPassword)
+          .catch((e) => console.error("[Mailer] Parent welcome email failed:", e));
 
       return student;
     } catch (error) {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       throw error;
     }
   }
@@ -407,19 +420,33 @@ export class StudentService {
   ): Promise<{ created: number; updated: number; failed: number; errors: Array<{ row: string; message: string }> }> {
 
     const records = parseExcel(filePath);
+
+    // ── Delete uploaded file immediately after parsing ─────────────────────────
+    // Done here so the file is always removed even if the loop crashes.
+    // parseExcel() has read everything into memory already.
+    try {
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      console.log(`[BulkUpload] 🗑️  Temp file deleted: ${filePath}`);
+    } catch (e: any) {
+      console.warn(`[BulkUpload] ⚠️  Could not delete temp file: ${e?.message}`);
+    }
+
     if (!records.length) throw new ApiError(400, "Excel file is empty");
 
+    // ── Pre-fetch roles once ───────────────────────────────────────────────────
     const [studentRole, parentRole] = await Promise.all([
       studentRepository.findRoleByName("STUDENT"),
       studentRepository.findRoleByName("PARENT"),
     ]);
     if (!studentRole || !parentRole) throw new ApiError(400, "Student or Parent role missing");
 
+    // ── Pre-fetch curriculum data once (name→id mapping, no per-row HTTP) ──────
     const { allClasses, allSections, allStreams } = await fetchCurriculumData();
 
-    let createdCount = 0;
-    let updatedCount = 0;
-    let failedCount = 0;
+    let createdCount    = 0;
+    let updatedCount    = 0;
+    let failedCount     = 0;
+    let newStudentCount = 0; // batched — used for one school count update after loop
     const rowErrors: Array<{ row: string; message: string }> = [];
     const emailQueue: Array<{ to: string; name: string; username: string; password: string }> = [];
 
@@ -431,16 +458,16 @@ export class StudentService {
         // ── 1. Mandatory fields ──────────────────────────────────────────────
         const rowMissing: string[] = [];
         if (!row.student_full_name) rowMissing.push("student_full_name");
-        if (!row.student_phone) rowMissing.push("student_phone");
-        if (!row.parent_full_name) rowMissing.push("parent_full_name");
-        if (!row.parent_phone) rowMissing.push("parent_phone");
-        if (!row.class_name) rowMissing.push("class_name");
-        if (!row.section_name) rowMissing.push("section_name");
+        if (!row.student_phone)     rowMissing.push("student_phone");
+        if (!row.parent_full_name)  rowMissing.push("parent_full_name");
+        if (!row.parent_phone)      rowMissing.push("parent_phone");
+        if (!row.class_name)        rowMissing.push("class_name");
+        if (!row.section_name)      rowMissing.push("section_name");
         if (rowMissing.length) throw new Error(`Missing required fields: ${rowMissing.join(", ")}`);
 
         // ── 2. Normalise names ───────────────────────────────────────────────
         const studentFullName = toNameCase(String(row.student_full_name));
-        const parentFullName = toNameCase(String(row.parent_full_name));
+        const parentFullName  = toNameCase(String(row.parent_full_name));
 
         // ── 3. Phone validation ──────────────────────────────────────────────
         if (!isValidPhone(row.student_phone))
@@ -449,7 +476,7 @@ export class StudentService {
           throw new Error(`parent_phone "${row.parent_phone}" must be exactly 10 digits.`);
 
         const studentPhone = String(row.student_phone).trim();
-        const parentPhone = String(row.parent_phone || row.student_phone).trim();
+        const parentPhone  = String(row.parent_phone || row.student_phone).trim();
 
         // ── 4. class_name validation ─────────────────────────────────────────
         const { normalised: normalizedClassName, gradeNumber } = validateClassName(String(row.class_name));
@@ -457,22 +484,17 @@ export class StudentService {
         // ── 5. section_name → UPPERCASE ──────────────────────────────────────
         const normalizedSectionName = String(row.section_name).trim().toUpperCase();
 
-        // ── 6. stream ────────────────────────────────────────────────────────
-        const streamResult = validateStream(
-          row.stream ?? null,
-          gradeNumber,
-          allStreams,
-          normalizedClassName,
-        );
+        // ── 6. Stream → resolved from in-memory array (no HTTP call) ─────────
+        const streamResult    = validateStream(row.stream ?? null, gradeNumber, allStreams, normalizedClassName);
         const resolvedStreamId = streamResult.id;
 
         // ── 7. Flexible date parsing ──────────────────────────────────────────
-        const validatedDob = parseFlexibleDate(row.dob, "dob");
+        const validatedDob            = parseFlexibleDate(row.dob, "dob");
         const validatedOnboardingDate = parseFlexibleDate(row.onboarding_date, "onboarding_date");
 
         // ── 8. Enum validation ────────────────────────────────────────────────
         const normalizedRelation = row.relation ? String(row.relation).toLowerCase() : null;
-        const normalizedGender = row.gender ? String(row.gender).toLowerCase() : null;
+        const normalizedGender   = row.gender   ? String(row.gender).toLowerCase()   : null;
         if (normalizedRelation && !VALID_RELATIONS.includes(normalizedRelation))
           throw new Error(`Invalid relation "${row.relation}". Must be one of: ${VALID_RELATIONS.join(", ")}`);
         if (normalizedGender && !VALID_GENDERS.includes(normalizedGender))
@@ -480,15 +502,15 @@ export class StudentService {
 
         // ── 9. Email normalisation ────────────────────────────────────────────
         const studentEmailRaw = row.student_email ? String(row.student_email).trim().toLowerCase() : null;
-        const parentEmailRaw = row.parent_email ? String(row.parent_email).trim().toLowerCase() : null;
+        const parentEmailRaw  = row.parent_email  ? String(row.parent_email).trim().toLowerCase()  : null;
 
-        // ── 10. Resolve class ─────────────────────────────────────────────────
+        // ── 10. Resolve class from in-memory array ────────────────────────────
         const classRecord = allClasses.find((c: any) => c.class_name === normalizedClassName);
         if (!classRecord)
           throw new Error(`Class "${normalizedClassName}" does not exist. Please create it first.`);
         const resolvedClassId: number = classRecord.id;
 
-        // ── 11. Resolve section ───────────────────────────────────────────────
+        // ── 11. Resolve section from in-memory array ──────────────────────────
         const sectionRecord = allSections.find((s: any) => s.section_name === normalizedSectionName);
         if (!sectionRecord)
           throw new Error(`Section "${normalizedSectionName}" does not exist. Please create it first.`);
@@ -502,13 +524,11 @@ export class StudentService {
         let studentUserId: number | bigint;
 
         const existingStudentUser = await studentRepository.findUserByNamePhoneAndRole(
-          studentFullName,
-          studentPhone,
-          studentRole.role_id,
-          tx,
+          studentFullName, studentPhone, studentRole.role_id, tx,
         );
 
         if (existingStudentUser) {
+          // ── Existing student — update changed fields only ──────────────────
           const existingStudent = await studentRepository.findStudentProfileByUserId(
             (existingStudentUser as any).user_id, tx,
           );
@@ -543,69 +563,67 @@ export class StudentService {
           if (Object.keys(profileUpdates).length)
             await studentRepository.updateStudentProfile((existingStudent as any).student_id, profileUpdates, tx);
 
-          student = existingStudent;
+          student       = existingStudent;
           studentUserId = (existingStudentUser as any).user_id;
         } else {
-          isNewStudent = true;
-          plainStudentPassword = generatePassword();
-          studentUsername = generateUsername(studentFullName);
+          // ── New student ───────────────────────────────────────────────────
+          isNewStudent         = true;
+          // plainStudentPassword = generatePassword();
+          plainStudentPassword = "Student@123";
+          studentUsername      = generateUsername(studentFullName);
 
           const studentHashed = await bcrypt.hash(plainStudentPassword, 10);
-          const studentUser = await studentRepository.createUser({
-            username: studentUsername,
-            full_name: studentFullName,
-            password: studentHashed,
-            phone_number: studentPhone,
-            email: studentEmailRaw || null,
-            address: row.student_address || null,
-            role_id: studentRole.role_id,
-            school_id, status: "Active",
+          const studentUser   = await studentRepository.createUser({
+            username:                  studentUsername,
+            full_name:                 studentFullName,
+            password:                  studentHashed,
+            phone_number:              studentPhone,
+            email:                     studentEmailRaw || null,
+            address:                   row.student_address || null,
+            role_id:                   studentRole.role_id,
+            school_id,
+            status:                    "Active",
             is_password_reset_required: true,
           }, tx);
 
           student = await studentRepository.createStudentProfile({
-            user_id: studentUser.user_id,
+            user_id:            studentUser.user_id,
             school_id,
             preferred_language: row.preferred_language || null,
-            onboarding_date: validatedOnboardingDate,
-            cost_limit: row.cost_limit || null,
-            dob: validatedDob,
-            gender: normalizedGender,
-            analytics_enabled: row.analytics_enabled ?? false,
+            onboarding_date:    validatedOnboardingDate,
+            cost_limit:         row.cost_limit         || null,
+            dob:                validatedDob,
+            gender:             normalizedGender,
+            analytics_enabled:  row.analytics_enabled  ?? false,
           }, tx);
 
           studentUserId = studentUser.user_id;
-          await studentRepository.incrementSchoolStudentCount(school_id, 1, tx);
+          newStudentCount++; // batched — school count updated once after loop
         }
 
-        // ── 13. Assign class in curriculum microservice ───────────────────────
-        try {
-          await curriculumService.assignClass({
-            userId: Number(studentUserId),
-            schoolId: Number(school_id),
-            classId: resolvedClassId,
-            streamId: resolvedStreamId,
-            sectionId: resolvedSectionId,
-          });
-        } catch (e: any) {
-          throw new Error(`Failed to assign class in curriculum service: ${e?.message ?? "unknown error"}`);
-        }
+        // ── 13. LOCAL class assignment ────────────────────────────────────────
+        // Replaces curriculumService.assignClass() HTTP call.
+        // find-or-create the class_stream_sections combo row, then write
+        // user_classes — all inside the same tx, zero HTTP overhead.
+        const classStreamSection = await studentRepository.findOrCreateClassStreamSection(
+          school_id, resolvedClassId, resolvedStreamId, resolvedSectionId, tx,
+        );
+        await studentRepository.assignUserToClassStreamSection(
+          studentUserId, classStreamSection.id, tx,
+        );
 
-        // ── 14. Local enrolment upsert ────────────────────────────────────────
+        // ── 14. Local enrolment upsert (student_class_section) ────────────────
         const existingEnrolment = await studentRepository.findClassSectionEnrolmentByStudent(
           student.student_id, tx,
         );
 
         if (existingEnrolment) {
           const enrolmentUpdates: Record<string, any> = {};
-          if (resolvedClassId !== (existingEnrolment as any).class_id)
-            enrolmentUpdates.class_id = resolvedClassId;
-          if (resolvedSectionId !== (existingEnrolment as any).section_id)
-            enrolmentUpdates.section_id = resolvedSectionId;
-          if (resolvedStreamId !== ((existingEnrolment as any).stream_id ?? null))
-            enrolmentUpdates.stream_id = resolvedStreamId;
+          if (resolvedClassId   !== (existingEnrolment as any).class_id)   enrolmentUpdates.class_id   = resolvedClassId;
+          if (resolvedSectionId !== (existingEnrolment as any).section_id) enrolmentUpdates.section_id = resolvedSectionId;
+          if (resolvedStreamId  !== ((existingEnrolment as any).stream_id ?? null)) enrolmentUpdates.stream_id = resolvedStreamId;
           if (row.roll_number !== undefined &&
-            String(row.roll_number || "") !== String((existingEnrolment as any).roll_number || ""))
+            String(row.roll_number   || "") !== String((existingEnrolment as any).roll_number   || ""))
             enrolmentUpdates.roll_number = row.roll_number || null;
           if (row.academic_year !== undefined &&
             String(row.academic_year || "") !== String((existingEnrolment as any).academic_year || ""))
@@ -619,13 +637,13 @@ export class StudentService {
             );
         } else {
           await studentRepository.createClassSection({
-            student_id: student.student_id,
-            class_id: resolvedClassId,
-            section_id: resolvedSectionId,
-            stream_id: resolvedStreamId,
-            roll_number: row.roll_number || null,
+            student_id:    student.student_id,
+            class_id:      resolvedClassId,
+            section_id:    resolvedSectionId,
+            stream_id:     resolvedStreamId,
+            roll_number:   row.roll_number   || null,
             academic_year: row.academic_year || null,
-            status: "active",
+            status:        "active",
           }, tx);
         }
 
@@ -636,10 +654,7 @@ export class StudentService {
         let parentUsername = "";
 
         const existingParentUser = await studentRepository.findUserByNamePhoneAndRole(
-          parentFullName,
-          parentPhone,
-          parentRole.role_id,
-          tx,
+          parentFullName, parentPhone, parentRole.role_id, tx,
         );
 
         if (existingParentUser) {
@@ -670,29 +685,28 @@ export class StudentService {
 
           parent = existingParent;
         } else {
-          isNewParent = true;
-          plainParentPassword = generatePassword();
-          parentUsername = generateUsername(parentFullName);
+          isNewParent         = true;
+          // plainParentPassword = generatePassword();
+          plainParentPassword = "Parent@123";
+          parentUsername      = generateUsername(parentFullName);
 
           const resolvedParentAddress = row.parent_address || row.student_address || null;
           const parentHashed = await bcrypt.hash(plainParentPassword, 10);
-
-          const parentUser = await studentRepository.createUser({
-            username: parentUsername,
-            full_name: parentFullName,
-            password: parentHashed,
-            phone_number: parentPhone,
-            email: parentEmailRaw || null,
-            address: resolvedParentAddress,
-            role_id: parentRole.role_id,
-            school_id, status: "Active",
+          const parentUser   = await studentRepository.createUser({
+            username:                  parentUsername,
+            full_name:                 parentFullName,
+            password:                  parentHashed,
+            phone_number:              parentPhone,
+            email:                     parentEmailRaw || null,
+            address:                   resolvedParentAddress,
+            role_id:                   parentRole.role_id,
+            school_id,
+            status:                    "Active",
             is_password_reset_required: true,
           }, tx);
 
           parent = await studentRepository.createParentProfile({
-            user_id: parentUser.user_id,
-            school_id,
-            relation: normalizedRelation,
+            user_id: parentUser.user_id, school_id, relation: normalizedRelation,
           }, tx);
         }
 
@@ -708,11 +722,8 @@ export class StudentService {
 
         await tx.commit();
 
-        if (isNewStudent || isNewParent) {
-          createdCount++;
-        } else {
-          updatedCount++;
-        }
+        if (isNewStudent || isNewParent) createdCount++;
+        else updatedCount++;
 
         if (isNewStudent && studentEmailRaw)
           emailQueue.push({ to: studentEmailRaw, name: studentFullName, username: studentUsername, password: plainStudentPassword });
@@ -720,9 +731,10 @@ export class StudentService {
           emailQueue.push({ to: parentEmailRaw, name: parentFullName, username: parentUsername, password: plainParentPassword });
 
       } catch (err: any) {
-        await tx.rollback();
-        failedCount++;
+        // ── Safe rollback ─────────────────────────────────────────────────────
+        try { await tx.rollback(); } catch (_) {}
 
+        failedCount++;
         const sqlMsg = err?.parent?.sqlMessage;
         const rawMsg: string = sqlMsg ?? err?.message ?? "Unknown error";
 
@@ -758,6 +770,12 @@ export class StudentService {
       }
     }
 
+    // ── Single school count update after loop ──────────────────────────────────
+    // Previously done per-row INSIDE each tx → caused ER_LOCK_WAIT_TIMEOUT
+    // because every row competed to UPDATE the same schools row simultaneously.
+    // Now done once here with the total of all new students created this run.
+    await studentRepository.incrementSchoolStudentCountBulk(school_id, newStudentCount);
+
     console.log(`\n[BulkUpload] ══════════════ UPLOAD COMPLETE ══════════════`);
     console.log(`[BulkUpload]   Total rows processed : ${records.length}`);
     console.log(`[BulkUpload]   ✅ Created            : ${createdCount}`);
@@ -767,8 +785,7 @@ export class StudentService {
       rowErrors.forEach(e => console.error(`[BulkUpload]     • ${e.row}: ${e.message}`));
     console.log(`[BulkUpload] ═══════════════════════════════════════════════\n`);
 
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-
+    // ── Welcome emails (fire-and-forget) ──────────────────────────────────────
     for (const entry of emailQueue) {
       sendWelcomeEmail(entry.to, entry.name, entry.username, entry.password).catch(
         (err) => console.error(`[Mailer] Welcome email to ${entry.to} failed:`, err),
@@ -808,58 +825,40 @@ export class StudentService {
     const student = await studentRepository.findStudentById(id);
     if (!student) throw new ApiError(404, "Student not found");
 
-    // Split body into user-level vs profile-level fields
     const {
-      // User-level
-      full_name,
-      phone_number,
-      email,
-      address,
-      // Profile-level
-      status,
-      gender,
-      preferred_language,
-      onboarding_date,
-      cost_limit,
-      dob,
-      analytics_enabled,
-      // Ignore anything else not explicitly handled
+      full_name, phone_number, email, address,
+      status, gender, preferred_language, onboarding_date, cost_limit, dob, analytics_enabled,
     } = body;
 
-    // ── Validate phone ────────────────────────────────────────────────────────
     if (phone_number !== undefined && !isValidPhone(phone_number))
       throw new ApiError(400, `phone_number "${phone_number}" must be exactly 10 digits.`);
 
-    // ── Validate gender ───────────────────────────────────────────────────────
     const normalizedGender = gender?.toLowerCase() || null;
     if (normalizedGender && !VALID_GENDERS.includes(normalizedGender))
       throw new ApiError(400, `Invalid gender. Must be one of: ${VALID_GENDERS.join(", ")}`);
 
     const user_id = (student as any).user_id;
 
-    // ── Update User table (full_name, phone_number, email, address) ───────────
     const userUpdates: Record<string, any> = {};
-    if (full_name !== undefined) userUpdates.full_name = toNameCase(full_name);
+    if (full_name    !== undefined) userUpdates.full_name    = toNameCase(full_name);
     if (phone_number !== undefined) userUpdates.phone_number = String(phone_number).trim();
-    if (email !== undefined) userUpdates.email = email?.trim().toLowerCase() || null;
-    if (address !== undefined) userUpdates.address = address || null;
+    if (email        !== undefined) userUpdates.email        = email?.trim().toLowerCase() || null;
+    if (address      !== undefined) userUpdates.address      = address || null;
 
     if (Object.keys(userUpdates).length)
       await studentRepository.updateUser(user_id, userUpdates);
 
-    // ── Update StudentProfile table ───────────────────────────────────────────
     const profileUpdates: Record<string, any> = {};
-    if (normalizedGender !== null) profileUpdates.gender = normalizedGender;
-    if (preferred_language !== undefined) profileUpdates.preferred_language = preferred_language || null;
-    if (onboarding_date !== undefined) profileUpdates.onboarding_date = onboarding_date || null;
-    if (cost_limit !== undefined) profileUpdates.cost_limit = cost_limit || null;
-    if (dob !== undefined) profileUpdates.dob = dob || null;
-    if (analytics_enabled !== undefined) profileUpdates.analytics_enabled = analytics_enabled ?? false;
+    if (normalizedGender       !== null)      profileUpdates.gender             = normalizedGender;
+    if (preferred_language     !== undefined) profileUpdates.preferred_language = preferred_language || null;
+    if (onboarding_date        !== undefined) profileUpdates.onboarding_date    = onboarding_date   || null;
+    if (cost_limit             !== undefined) profileUpdates.cost_limit         = cost_limit        || null;
+    if (dob                    !== undefined) profileUpdates.dob                = dob               || null;
+    if (analytics_enabled      !== undefined) profileUpdates.analytics_enabled  = analytics_enabled ?? false;
 
     if (Object.keys(profileUpdates).length)
       await studentRepository.updateStudentProfile((student as any).student_id, profileUpdates);
 
-    // Re-fetch so response includes fresh user + classSection + parents data
     return studentRepository.findStudentById(id) as Promise<StudentProfile>;
   }
 

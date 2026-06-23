@@ -16,6 +16,7 @@ export interface AiNoteNewCreationAttributes {
   full_notes?: string | null;
   book_url?: string | null;
   created_by?: string;
+  chapter_id?: number | null;
 }
 
 export interface FindNotesFilters {

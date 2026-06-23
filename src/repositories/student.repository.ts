@@ -7,16 +7,12 @@ import ParentProfile from "../models/parent_profile.model.js";
 import ParentStudentMap from "../models/parent_student_map.model.js";
 import AdminSchool from "../models/admin_school.model.js";
 import AdminRole from "../models/admin_role.model.js";
-
-// ─── NOTE ──────────────────────────────────────────────────────────────────────
-// AdminClass and AdminSection are intentionally NOT imported.
-// Class / section / stream data is owned by the curriculum microservice.
-// class_id, section_id, stream_id are stored as plain integers in
-// student_class_section. The frontend resolves names via the
-// /api/v1/curriculum/proxy/* routes.
-// ──────────────────────────────────────────────────────────────────────────────
+import ClassStreamSection from "../models/class_stream_section.model.js";
+import UserClass from "../models/user_class.model.js";
 
 export class StudentRepository {
+
+  // ─── School / Role ────────────────────────────────────────────────────────
 
   async findSchoolById(school_id: number | bigint): Promise<AdminSchool | null> {
     return AdminSchool.findByPk(school_id);
@@ -34,10 +30,10 @@ export class StudentRepository {
    * Unique key = full_name + phone_number + role_id
    *
    * Why all three:
-   *   phone alone          → siblings sharing a family phone would false-match
-   *   name + phone         → correctly identifies a parent across two sibling rows
-   *   + role_id            → a person who is both parent & student (adult ed)
-   *                          has two separate accounts; role_id keeps them apart
+   *   phone alone      → siblings sharing a family phone would false-match
+   *   name + phone     → correctly identifies a parent across two sibling rows
+   *   + role_id        → a person who is both parent & student (adult ed)
+   *                      has two separate accounts; role_id keeps them apart
    */
   async findUserByNamePhoneAndRole(
     full_name: string,
@@ -91,8 +87,55 @@ export class StudentRepository {
     return StudentClassSection.create(data as any, { transaction });
   }
 
+  // ─── Class Stream Section (local curriculum mirror) ───────────────────────
+
   /**
-   * Find the enrolment row for a student by student_id alone.
+   * Find-or-create a CLASS_STREAM_SECTIONS row for this combo.
+   *
+   * slug is built deterministically: "c{classId}-st{streamId}-se{sectionId}-sc{schoolId}"
+   * so concurrent inserts hit the unique constraint and collapse to one row.
+   */
+  async findOrCreateClassStreamSection(
+    school_id: number | bigint,
+    class_id: number,
+    stream_id: number,
+    section_id: number,
+    transaction?: any,
+  ): Promise<ClassStreamSection> {
+    const slug = `c${class_id}-st${stream_id}-se${section_id}-sc${school_id}`;
+    const [record] = await ClassStreamSection.findOrCreate({
+      where: { school_id: Number(school_id), class_id, stream_id, section_id },
+      defaults: { school_id: Number(school_id), class_id, stream_id, section_id, slug },
+      transaction,
+    });
+    return record;
+  }
+
+  /**
+   * Assign a user to a class_stream_section (local USER_CLASSES write).
+   *
+   * Replaces curriculumService.assignClass() — same data, no HTTP call.
+   *
+   * Steps (same transaction):
+   *   1. Delete any existing user_classes row for this user
+   *      (a student is in exactly ONE class at a time).
+   *   2. Insert the new assignment row.
+   */
+  async assignUserToClassStreamSection(
+    user_id: number | bigint,
+    class_stream_section_id: number,
+    transaction?: any,
+  ): Promise<void> {
+    // Remove old assignment if any (re-enrolment / class change)
+    await UserClass.destroy({ where: { user_id: Number(user_id) }, transaction });
+    // Insert new assignment
+    await UserClass.create({ user_id: Number(user_id), class_stream_section_id }, { transaction });
+  }
+
+  // ─── Enrolment (student_class_section) ───────────────────────────────────
+
+  /**
+   * Find the enrolment row for a student.
    * student_class_section has student_id as its sole PRIMARY KEY so a student
    * can only have one row at a time.
    */
@@ -115,8 +158,25 @@ export class StudentRepository {
     await StudentClassSection.update(updates, { where: { student_id }, transaction });
   }
 
+  // ─── School student count ─────────────────────────────────────────────────
+
+  /**
+   * Per-row increment — used by single createStudent only.
+   * Bulk upload uses incrementSchoolStudentCountBulk instead to avoid
+   * hot-row lock contention (ER_LOCK_WAIT_TIMEOUT).
+   */
   async incrementSchoolStudentCount(school_id: number | bigint, by: number, transaction?: any): Promise<void> {
     await AdminSchool.increment("student_count", { by, where: { school_id }, transaction });
+  }
+
+  /**
+   * Batch increment — called ONCE after the bulk upload loop with the total
+   * count of new students created. Eliminates the per-row UPDATE lock
+   * that caused ER_LOCK_WAIT_TIMEOUT at row 257.
+   */
+  async incrementSchoolStudentCountBulk(school_id: number | bigint, by: number): Promise<void> {
+    if (by <= 0) return;
+    await AdminSchool.increment("student_count", { by, where: { school_id } });
   }
 
   // ─── Update helpers ────────────────────────────────────────────────────────
@@ -146,13 +206,6 @@ export class StudentRepository {
   }
 
   // ─── Standard queries ─────────────────────────────────────────────────────
-  //
-  // All three queries include the parents association so the UI receives
-  // parent_id (and basic parent info) alongside every student record.
-  // The frontend uses parent_id to build the "linked parent" section.
-  //
-  // AdminClass / AdminSection joins removed — IDs are returned as plain
-  // integers and resolved to names by the frontend via the proxy routes.
 
   async findAllStudents(school_id: number | bigint): Promise<StudentProfile[]> {
     return StudentProfile.findAll({
@@ -169,8 +222,6 @@ export class StudentRepository {
           attributes: ["class_id", "section_id", "stream_id", "academic_year", "roll_number", "status"],
         },
         {
-          // parent_id + basic info so the list view can show "has linked parent"
-          // and the UI can navigate to the parent detail page
           model: ParentProfile,
           as: "parents",
           attributes: ["parent_id", "relation"],
@@ -231,7 +282,6 @@ export class StudentRepository {
           attributes: ["class_id", "section_id", "stream_id", "academic_year", "roll_number", "status"],
         },
         {
-          // Full parent detail for the student profile / linked-parent section
           model: ParentProfile,
           as: "parents",
           attributes: ["parent_id", "relation"],
@@ -262,11 +312,13 @@ export class StudentRepository {
     const transaction = await sequelize.transaction();
     try {
       await StudentClassSection.destroy({ where: { student_id: id }, transaction });
-      await ParentStudentMap.destroy({ where: { student_id: id },    transaction });
-      await StudentAnalytics.destroy({ where: { student_id: id },    transaction });
+      await ParentStudentMap.destroy({ where: { student_id: id }, transaction });
+      await StudentAnalytics.destroy({ where: { student_id: id }, transaction });
+      // Remove user_classes assignment
+      await UserClass.destroy({ where: { user_id: Number(user_id) }, transaction });
       const student = await StudentProfile.findByPk(id, { transaction });
       await student?.destroy({ transaction });
-      await User.destroy({ where: { user_id },                        transaction });
+      await User.destroy({ where: { user_id }, transaction });
       await AdminSchool.increment("student_count", { by: -1, where: { school_id }, transaction });
       await transaction.commit();
     } catch (error) {

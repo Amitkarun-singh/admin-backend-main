@@ -1,6 +1,7 @@
-import multer, { StorageEngine } from "multer";
+import multer, { StorageEngine, FileFilterCallback } from "multer";
 import path from "path";
 
+// All uploads are stored temporarily in public/temp
 const storage: StorageEngine = multer.diskStorage({
   destination: function (
     _req: Express.Request,
@@ -19,4 +20,23 @@ const storage: StorageEngine = multer.diskStorage({
   },
 });
 
+// General-purpose upload (no file type restriction)
 export const upload = multer({ storage });
+
+// Bulk upload restricted to .xlsx and .csv files only
+export const uploadBulk = multer({
+  storage,
+  fileFilter: (
+    _req: Express.Request,
+    file: Express.Multer.File,
+    cb: FileFilterCallback
+  ) => {
+    const allowed = [".xlsx", ".csv"];
+    const ext = path.extname(file.originalname).toLowerCase();
+
+    if (!allowed.includes(ext)) {
+      return cb(new Error("Only .xlsx or .csv files allowed"));
+    }
+    cb(null, true);
+  },
+});
