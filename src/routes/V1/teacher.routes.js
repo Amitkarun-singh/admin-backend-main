@@ -10,7 +10,7 @@ import {
 
 import { authMiddleware } from "../../middlewares/auth.middleware.js";
 import { requirePermission } from "../../middlewares/permission.middleware.js";
-import upload from "../../middlewares/upload.middleware.js";
+import { uploadBulk } from "../../middlewares/multer.middleware.js";
 import { activityMiddleware } from "../../middlewares/activity.middleware.js";
 
 const router = express.Router();
@@ -32,7 +32,7 @@ router.post(
   "/teachers/bulk",
   authMiddleware,
   requirePermission("MANAGE_SCHOOL"),
-  upload.single("file"),
+  uploadBulk.single("file"),
   bulkTeacherUpload
 );
 

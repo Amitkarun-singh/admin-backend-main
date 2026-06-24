@@ -12,14 +12,14 @@ import {
 
 import { authMiddleware } from "../../middlewares/auth.middleware.js";
 import { requirePermission } from "../../middlewares/permission.middleware.js";
-import upload from "../../middlewares/upload.middleware.js";
+import { uploadBulk } from "../../middlewares/multer.middleware.js";
 import { activityMiddleware } from "../../middlewares/activity.middleware.js";
 
 const router = express.Router();
 router.use(activityMiddleware);
 
 router.post("/student",       authMiddleware, requirePermission("MANAGE_SCHOOL"), createStudent);
-router.post("/students/bulk", authMiddleware, requirePermission("MANAGE_SCHOOL"), upload.single("file"), bulkStudentUpload);
+router.post("/students/bulk", authMiddleware, requirePermission("MANAGE_SCHOOL"), uploadBulk.single("file"), bulkStudentUpload);
 router.get("/students",       authMiddleware, requirePermission("MANAGE_SCHOOL"), getAllStudents);
 router.get("/student/:id",    authMiddleware, requirePermission("MANAGE_SCHOOL"), getStudentById);
 

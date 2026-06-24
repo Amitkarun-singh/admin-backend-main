@@ -37,6 +37,10 @@ import Feature from "./feature.model.js";
 import SchoolFeature from "./school_feature.model.js";
 import FeatureOverride from "./feature_overrides.model.js";
 
+// ── New local curriculum models ───────────────────────────────────────────────
+import ClassStreamSection from "./class_stream_section.model.js";
+import UserClass from "./user_class.model.js";
+
 /* =====================================================
    USER ↔ ROLE  (RBAC)
    ===================================================== */
@@ -151,7 +155,6 @@ TeacherAnalytics.belongsTo(TeacherProfile, {
   as: "teacher",
 });
 
-
 /* =====================================================
    USER ↔ USER SESSIONS
    ===================================================== */
@@ -179,7 +182,6 @@ TutorLog.belongsTo(User, { foreignKey: "user_id", as: "user" });
 /* =====================================================
    ASSESSMENT ENGINE ASSOCIATIONS
    ===================================================== */
-
 User.hasMany(Assessment, { foreignKey: "created_by", as: "assessments" });
 Assessment.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 
@@ -245,6 +247,37 @@ SchoolFeature.belongsTo(Feature, { foreignKey: "feature_id", as: "feature" });
 // FeatureOverride associations intentionally omitted — see model comment.
 
 /* =====================================================
+   CLASS STREAM SECTIONS
+   school_id → AdminSchool (local FK)
+   class_id / stream_id / section_id are curriculum-service IDs (no local FK)
+   ===================================================== */
+AdminSchool.hasMany(ClassStreamSection, {
+  foreignKey: "school_id",
+  as: "classStreamSections",
+});
+ClassStreamSection.belongsTo(AdminSchool, {
+  foreignKey: "school_id",
+  as: "school",
+});
+
+/* =====================================================
+   USER ↔ CLASS STREAM SECTIONS  (via UserClass join table)
+   A user (student) belongs to exactly one ClassStreamSection at a time.
+   ===================================================== */
+User.belongsToMany(ClassStreamSection, {
+  through: UserClass,
+  foreignKey: "user_id",
+  otherKey: "class_stream_section_id",
+  as: "classStreamSections",
+});
+ClassStreamSection.belongsToMany(User, {
+  through: UserClass,
+  foreignKey: "class_stream_section_id",
+  otherKey: "user_id",
+  as: "users",
+});
+
+/* =====================================================
    EXPORT ALL MODELS
    ===================================================== */
 export {
@@ -274,4 +307,7 @@ export {
   Feature,
   SchoolFeature,
   FeatureOverride,
+  // New local curriculum models
+  ClassStreamSection,
+  UserClass,
 };

@@ -17,9 +17,13 @@ export const getSignedPdfUrl = async (
   const command = new GetObjectCommand({
     Bucket: process.env.AWS_S3_BUCKET,
     Key: key,
+    // Force browser to display the file inline (not download it)
+    ResponseContentDisposition: "inline",
+    // Tell the browser it is a PDF so it uses its built-in PDF viewer
+    ResponseContentType: "application/pdf",
   });
 
   const url = await getSignedUrl(s3, command, { expiresIn: 3600 }); // 1 hour
 
   return url;
-};
+};

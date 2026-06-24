@@ -13,6 +13,7 @@ interface AiNoteNewAttributes {
   full_notes?: string | null;
   book_url?: string | null;
   created_by?: string;
+  chapter_id?: number | null;
 }
 
 interface AiNoteNewCreationAttributes
@@ -33,6 +34,7 @@ class AiNoteNew
   public full_notes?: string | null;
   public book_url?: string | null;
   public created_by?: string;
+  public chapter_id?: number | null;
 
   public readonly created_at!: Date;
   public readonly updated_at!: Date;
@@ -45,23 +47,24 @@ AiNoteNew.init(
       primaryKey: true,
       autoIncrement: true,
     },
-    language: { type: DataTypes.STRING, allowNull: false },
-    board: { type: DataTypes.STRING, allowNull: false },
-    stream: { type: DataTypes.STRING, allowNull: true },
-    class: { type: DataTypes.STRING, allowNull: false },
-    subject: { type: DataTypes.STRING, allowNull: false },
-    topic: { type: DataTypes.STRING, allowNull: false },
-    short_notes: { type: DataTypes.TEXT, allowNull: true },
-    full_notes: { type: DataTypes.STRING, allowNull: true },
-    book_url: { type: DataTypes.STRING, allowNull: true },
-    created_by: { type: DataTypes.STRING, defaultValue: "Teacher" },
+    language:    { type: DataTypes.STRING,  allowNull: false },
+    board:       { type: DataTypes.STRING,  allowNull: false },
+    stream:      { type: DataTypes.STRING,  allowNull: true },
+    class:       { type: DataTypes.STRING,  allowNull: false },
+    subject:     { type: DataTypes.STRING,  allowNull: false },
+    topic:       { type: DataTypes.STRING,  allowNull: false },
+    short_notes: { type: DataTypes.TEXT,    allowNull: true },
+    full_notes:  { type: DataTypes.STRING,  allowNull: true },
+    book_url:    { type: DataTypes.STRING,  allowNull: true },
+    created_by:  { type: DataTypes.STRING,  defaultValue: "Teacher" },
+    chapter_id:  { type: DataTypes.INTEGER, allowNull: true },
   },
   {
     sequelize,
-    tableName: "ai_notes_new",
+    tableName:  "ai_notes_new",
     timestamps: true,
-    createdAt: "created_at",
-    updatedAt: "updated_at",
+    createdAt:  "created_at",
+    updatedAt:  "updated_at",
   }
 );
 
